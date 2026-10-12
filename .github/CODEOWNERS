@@ -1,0 +1,10 @@
+# Revisores asignados automáticamente a cada área.
+# Reemplacen los usuarios por los de cada integrante cuando los tengan.
+
+# Por defecto, el líder técnico revisa todo lo que no tenga dueño más específico.
+*               @rc-0105
+
+/backend/       @rc-0105
+/frontend/      @rc-0105
+/.github/       @rc-0105
+/docs/adr/      @rc-0105

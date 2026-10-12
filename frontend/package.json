@@ -1,0 +1,31 @@
+{
+  "name": "marketplace-spa",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Interfaz del Marketplace de alojamientos temporales - Inversiones LR",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:cobertura": "vitest run --coverage"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "6.5.0",
+    "@testing-library/react": "16.0.1",
+    "@vitejs/plugin-react": "4.3.3",
+    "@vitest/coverage-v8": "2.1.4",
+    "eslint": "9.14.0",
+    "eslint-plugin-react": "7.37.2",
+    "globals": "15.12.0",
+    "jsdom": "25.0.1",
+    "vite": "5.4.11",
+    "vitest": "2.1.4"
+  }
+}
