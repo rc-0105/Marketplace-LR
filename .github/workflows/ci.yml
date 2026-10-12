@@ -1,0 +1,129 @@
+name: CI
+
+# Compilación, pruebas y análisis en cada pull request contra main,
+# y también al integrar, para que SonarCloud tenga la rama de referencia.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Si se empuja otro commit al mismo PR, se cancela la corrida anterior.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  backend:
+    name: Backend · build, pruebas y Sonar
+    runs-on: ubuntu-latest
+
+    # A nivel de job para que los pasos puedan consultarlo en su condición.
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: marketplace
+          POSTGRES_USER: marketplace
+          POSTGRES_PASSWORD: marketplace
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+        with:
+          # Sonar necesita el historial completo para atribuir la deuda.
+          fetch-depth: 0
+
+      - name: Preparar Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+
+      - name: Compilar y probar con cobertura
+        working-directory: backend
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/marketplace
+          SPRING_DATASOURCE_USERNAME: marketplace
+          SPRING_DATASOURCE_PASSWORD: marketplace
+        run: mvn -B verify
+
+      - name: Publicar el resultado de las pruebas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pruebas-backend
+          path: backend/target/surefire-reports/
+          if-no-files-found: ignore
+
+      # El análisis necesita el secreto SONAR_TOKEN. Mientras no exista,
+      # el paso se omite y el build sigue siendo válido.
+      - name: Analizar con SonarCloud
+        if: ${{ env.SONAR_TOKEN != '' }}
+        working-directory: backend
+        run: >-
+          mvn -B sonar:sonar
+          -Dsonar.host.url=https://sonarcloud.io
+          -Dsonar.organization=${{ vars.SONAR_ORGANIZACION }}
+          -Dsonar.projectKey=${{ vars.SONAR_PROYECTO_BACKEND }}
+          -Dsonar.projectName=Marketplace-LR Backend
+          -Dsonar.qualitygate.wait=true
+
+  frontend:
+    name: Frontend · build, pruebas y Sonar
+    runs-on: ubuntu-latest
+
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Preparar Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias
+        working-directory: frontend
+        run: npm ci
+
+      - name: Revisar el estilo del código
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Probar con cobertura
+        working-directory: frontend
+        run: npm run test:cobertura
+
+      - name: Compilar
+        working-directory: frontend
+        run: npm run build
+
+      - name: Analizar con SonarCloud
+        if: ${{ env.SONAR_TOKEN != '' }}
+        uses: SonarSource/sonarqube-scan-action@v4
+        with:
+          projectBaseDir: frontend
+        env:
+          SONAR_HOST_URL: https://sonarcloud.io

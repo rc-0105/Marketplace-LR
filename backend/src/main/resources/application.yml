@@ -1,0 +1,34 @@
+spring:
+  application:
+    name: marketplace-app
+
+server:
+  port: ${PUERTO:8080}
+
+# Contrato OpenAPI que exige el enunciado.
+#   JSON: /v3/api-docs      interfaz: /swagger-ui.html
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+# Registro con identificador de correlación, que es lo que permite seguir una
+# petición de punta a punta (RNF-24).
+# Pendiente: al entrar al sprint de trazabilidad, cambiar a JSON real con
+# logstash-logback-encoder en lugar de este patrón de texto.
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%X{correlacion:-sin-correlacion}] %logger{36} - %msg%n"
+  level:
+    co.edu.unbosque.marketplace: INFO
+
+# La configuración de la base de datos entra cuando se agregue JPA.
+# El pipeline ya levanta un PostgreSQL 16 y expone estas variables:
+#   SPRING_DATASOURCE_URL, SPRING_DATASOURCE_USERNAME, SPRING_DATASOURCE_PASSWORD

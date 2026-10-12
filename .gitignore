@@ -1,24 +1,40 @@
-# Compiled class file
+# ---------- Java / Maven ----------
+target/
 *.class
-
-# Log file
-*.log
-
-# BlueJ files
-*.ctxt
-
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
-
-# Package Files #
 *.jar
 *.war
-*.nar
 *.ear
-*.zip
-*.tar.gz
-*.rar
+!.mvn/wrapper/maven-wrapper.jar
+.mvn/timing.properties
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
-hs_err_pid*
-replay_pid*
+# ---------- Node / React ----------
+node_modules/
+dist/
+dist-ssr/
+coverage/
+*.local
+.vite/
+
+# ---------- Entorno y secretos ----------
+# Nunca se versionan: RNF-17 exige credenciales fuera del código fuente.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---------- Herramientas ----------
+.scannerwork/
+.sonar/
+.idea/
+*.iml
+.vscode/
+!.vscode/extensions.json
+.classpath
+.project
+.settings/
+
+# ---------- Sistema operativo ----------
+.DS_Store
+Thumbs.db
+*.log
