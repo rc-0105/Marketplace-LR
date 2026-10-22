@@ -19,13 +19,10 @@ management:
       exposure:
         include: health,info
 
-# Registro con identificador de correlación, que es lo que permite seguir una
-# petición de punta a punta (RNF-24).
-# Pendiente: al entrar al sprint de trazabilidad, cambiar a JSON real con
-# logstash-logback-encoder en lugar de este patrón de texto.
+# El formato JSON de los logs vive en logback-spring.xml (RF-45, RNF-24). Cada
+# línea lleva el identificador de correlación que pone FiltroCorrelacion, que es
+# lo que permite seguir una petición de punta a punta.
 logging:
-  pattern:
-    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%X{correlacion:-sin-correlacion}] %logger{36} - %msg%n"
   level:
     co.edu.unbosque.marketplace: INFO
 

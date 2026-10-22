@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Cada línea de la consola es un objeto JSON (RF-45, RNF-24), así que se puede
+  filtrar por usuario, acción o entidad con jq o con el agregador de logs.
+  Los eventos críticos salen por el logger AUDITORIA; el campo "correlacion"
+  llega desde el MDC que llena FiltroCorrelacion.
+-->
+<configuration>
+    <springProperty scope="context" name="aplicacion" source="spring.application.name"/>
+
+    <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <customFields>{"aplicacion":"${aplicacion}"}</customFields>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="JSON"/>
+    </root>
+</configuration>
