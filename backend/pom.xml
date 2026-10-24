@@ -23,6 +23,7 @@
     <springdoc.version>2.6.0</springdoc.version>
     <jacoco.version>0.8.12</jacoco.version>
     <logstash-encoder.version>8.0</logstash-encoder.version>
+    <sonar-maven-plugin.version>5.8.0.7211</sonar-maven-plugin.version>
     <!-- Ruta que SonarCloud lee para la cobertura -->
     <sonar.coverage.jacoco.xmlReportPaths>
       ${project.build.directory}/site/jacoco/jacoco.xml
@@ -63,6 +64,18 @@
   </dependencies>
 
   <build>
+    <!-- El scanner de SonarCloud no está en los grupos de plugins por defecto
+         de Maven: sin fijarlo aquí, el prefijo 'sonar' no se resuelve. -->
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.sonarsource.scanner.maven</groupId>
+          <artifactId>sonar-maven-plugin</artifactId>
+          <version>${sonar-maven-plugin.version}</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+
     <plugins>
       <plugin>
         <groupId>org.springframework.boot</groupId>
