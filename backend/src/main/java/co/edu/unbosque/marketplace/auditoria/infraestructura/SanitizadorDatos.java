@@ -9,9 +9,11 @@ final class SanitizadorDatos {
 
     static final String OCULTO = "***";
 
+    // UNICODE_CASE para que "CONTRASEÑA" coincida (CASE_INSENSITIVE solo cubre
+    // ASCII) y CANON_EQ para la ñ escrita como n + tilde combinable.
     private static final Pattern CLAVES_SENSIBLES = Pattern.compile(
             "contrasena|contraseña|password|clave|token|secret|tarjeta|card|cvv|cvc|pago|payment",
-            Pattern.CASE_INSENSITIVE);
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.CANON_EQ);
 
     private SanitizadorDatos() {
     }
