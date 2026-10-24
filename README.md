@@ -16,12 +16,12 @@ Docente: Ing. Andrés Felipe Rey.
 
 ## Arquitectura
 
-Monolito modular en capas con puertos y adaptadores, en tres niveles. Las decisiones
+Monolito modular en tres niveles: cada módulo del negocio tiene sus propias capas. Las decisiones
 están registradas como ADR en Confluence; el resumen:
 
 | Decisión | Qué se decidió |
 | --- | --- |
-| ADR-1 | Capas con puertos y adaptadores: el dominio no depende de presentación ni de infraestructura |
+| ADR-1 | Capas dentro de cada módulo (`controllers`, `services`, `repository`, `model`, `exceptions`); un módulo solo usa a otro por su servicio o por eventos |
 | ADR-2 | Los módulos secundarios se comunican por eventos internos guardados junto con el cambio |
 | ADR-3 | PostgreSQL rechaza con una restricción de exclusión cualquier reserva que se cruce |
 | ADR-4 | La reserva se crea pendiente, el pago va aparte y un proceso concilia lo que quede a medias |
@@ -41,7 +41,8 @@ marketplace-lr/
 ├── docs/
 │   ├── adr/                      copia local de los ADR
 │   └── openapi.yaml              contrato generado desde el código
-├── .coderabbit.yaml
+├── AGENTS.md                     estructura y convenciones de código
+├── CLAUDE.md                     carga AGENTS.md en Claude Code
 └── CONTRIBUTING.md               flujo Git, ramas y commits
 ```
 
@@ -53,7 +54,7 @@ marketplace-lr/
 | API | Java 21, Spring Boot 3.3, springdoc-openapi |
 | Datos | PostgreSQL 16 |
 | Pagos | Stripe en modo prueba |
-| Calidad | GitHub Actions, SonarCloud, CodeRabbit, JaCoCo |
+| Calidad | GitHub Actions, SonarCloud, JaCoCo |
 
 ## Cómo levantarlo
 
