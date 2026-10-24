@@ -6,7 +6,7 @@ que es lo que pide la trazabilidad ASR → decisión → implementación → med
 
 | ADR | Decisión | Estado |
 | --- | --- | --- |
-| ADR-1 | Separación de capas con puertos y adaptadores | Propuesta |
+| ADR-1 | Capas dentro de cada módulo (`controllers`, `services`, `repository`, `model`, `exceptions`) | Propuesta |
 | ADR-2 | Comunicación entre módulos no críticos por eventos internos | Propuesta |
 | ADR-3 | Modelo de disponibilidad sin superposición y consultable | Propuesta |
 | ADR-4 | Flujo de reserva y pago | Propuesta |

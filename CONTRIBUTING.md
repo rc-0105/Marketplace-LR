@@ -6,13 +6,16 @@ trazabilidad que exige el enunciado se arma sin esfuerzo extra.
 
 La clave del proyecto en Jira es **SOF**.
 
+La estructura de carpetas y las convenciones de código están en
+[AGENTS.md](AGENTS.md). Vale igual si escribes a mano o con un agente de IA.
+
 ## El flujo, de principio a fin
 
 1. Toma una historia del tablero y pásala a *En curso*.
 2. Crea la rama desde `main` actualizada.
 3. Trabaja en commits pequeños que mencionen la historia.
 4. Abre el pull request. El pipeline corre solo.
-5. Resuelve lo que señalen CodeRabbit y tu revisor.
+5. Resuelve lo que señale tu revisor.
 6. Con el pipeline en verde y una aprobación, haz *squash merge*.
 7. La rama se borra sola al integrar.
 
@@ -55,14 +58,13 @@ docs(adr): SOF-1 cerrar ADR-3 con la restricción de exclusión
 - **Merge:** *squash merge*, para que cada historia quede como un solo commit en
   `main` con el número de PR.
 - **Revisores:** mínimo uno distinto del autor. El autor responde cada comentario
-  de CodeRabbit y de sus compañeros antes de pedir el merge.
+  de sus compañeros antes de pedir el merge.
 
 ## Definición de hecho
 
 - [ ] Criterios de aceptación de la historia verificados.
 - [ ] Pruebas unitarias y, si aplica, de integración agregadas y en verde.
 - [ ] Quality Gate de SonarCloud aprobado.
-- [ ] Comentarios de CodeRabbit resueltos o descartados con justificación.
 - [ ] Una aprobación humana.
 - [ ] Contrato OpenAPI y documentación de Confluence actualizados si cambió un
       contrato o una decisión.

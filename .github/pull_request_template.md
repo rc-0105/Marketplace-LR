@@ -21,6 +21,5 @@ Ninguno / ADR-X
 
 ## Checklist
 - [ ] Quality Gate de SonarCloud aprobado
-- [ ] Comentarios de CodeRabbit resueltos o justificados
 - [ ] Contrato OpenAPI actualizado, si cambió un endpoint
 - [ ] Documentación de Confluence actualizada, si cambió una decisión
