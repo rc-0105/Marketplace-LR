@@ -77,7 +77,7 @@ jobs:
         if: ${{ env.SONAR_TOKEN != '' }}
         working-directory: backend
         run: >-
-          mvn -B sonar:sonar
+          mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
           -Dsonar.host.url=https://sonarcloud.io
           -Dsonar.organization=${{ vars.SONAR_ORGANIZACION }}
           -Dsonar.projectKey=${{ vars.SONAR_PROYECTO_BACKEND }}
