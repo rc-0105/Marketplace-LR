@@ -34,6 +34,15 @@ describe('InicioSesionPage', () => {
     expect(screen.getByRole('status').className).toMatch(/exito/);
   });
 
+  it('retira la confirmación del registro al intentar iniciar sesión', async () => {
+    iniciarSesion.mockRejectedValue(new ErrorApi(401, 'Correo o contraseña incorrectos. Revísalos e intenta de nuevo.'));
+    renderizar({ registrado: true });
+    ingresar('a@b.co', 'mala');
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByText('Tu cuenta quedó creada. Ya puedes iniciar sesión.')).not.toBeInTheDocument();
+  });
+
   it('no muestra la confirmación si se entra directo', () => {
     renderizar(undefined);
     expect(screen.getByRole('heading', { name: 'Inicia sesión' })).toBeInTheDocument();
