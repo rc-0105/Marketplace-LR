@@ -13,6 +13,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.stereotype.Component;
 
 /**
@@ -21,7 +22,8 @@ import org.springframework.stereotype.Component;
  * El mensaje es genérico: nunca se explica por qué se rechazó el token.
  */
 @Component
-public class ManejadorFallosSeguridad implements AuthenticationEntryPoint, AccessDeniedHandler {
+public class ManejadorFallosSeguridad implements AuthenticationEntryPoint, AccessDeniedHandler,
+        AuthenticationFailureHandler {
 
     private final ObjectMapper mapper;
 
@@ -40,6 +42,23 @@ public class ManejadorFallosSeguridad implements AuthenticationEntryPoint, Acces
     public void handle(HttpServletRequest peticion, HttpServletResponse respuesta,
             AccessDeniedException error) throws IOException {
         escribir(peticion, respuesta, HttpStatus.FORBIDDEN, "No tienes permiso para realizar esta acción.");
+    }
+
+    /**
+     * Fallos del filtro Bearer: si la denylist no se pudo consultar es un 503
+     * (el token no es inválido), y cualquier otro fallo sigue siendo un 401.
+     */
+    @Override
+    public void onAuthenticationFailure(HttpServletRequest peticion, HttpServletResponse respuesta,
+            AuthenticationException error) throws IOException {
+        for (Throwable causa = error; causa != null; causa = causa.getCause()) {
+            if (causa instanceof SesionNoVerificableException) {
+                escribir(peticion, respuesta, HttpStatus.SERVICE_UNAVAILABLE,
+                        "El servicio no está disponible en este momento. Intenta de nuevo en unos minutos.");
+                return;
+            }
+        }
+        commence(peticion, respuesta, error);
     }
 
     private void escribir(HttpServletRequest peticion, HttpServletResponse respuesta,

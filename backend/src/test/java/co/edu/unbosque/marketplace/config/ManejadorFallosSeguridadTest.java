@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 
@@ -45,5 +46,33 @@ class ManejadorFallosSeguridadTest {
         JsonNode cuerpo = mapper.readTree(respuesta.getContentAsString());
         assertThat(cuerpo.get("detail").asText()).isEqualTo("No tienes permiso para realizar esta acción.");
         assertThat(cuerpo.has("trace")).isFalse();
+    }
+
+    @Test
+    @DisplayName("Si la causa es SesionNoVerificableException responde 503 genérico, sin WWW-Authenticate ni trace")
+    void responde503() throws Exception {
+        AuthenticationServiceException error = new AuthenticationServiceException("interno",
+                new SesionNoVerificableException(new RuntimeException("BD caída")));
+
+        manejador.onAuthenticationFailure(peticion, respuesta, error);
+
+        assertThat(respuesta.getStatus()).isEqualTo(503);
+        assertThat(respuesta.getContentType()).startsWith(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        assertThat(respuesta.getHeader("WWW-Authenticate")).isNull();
+        JsonNode cuerpo = mapper.readTree(respuesta.getContentAsString());
+        assertThat(cuerpo.get("detail").asText())
+                .isEqualTo("El servicio no está disponible en este momento. Intenta de nuevo en unos minutos.");
+        assertThat(cuerpo.has("trace")).isFalse();
+        assertThat(respuesta.getContentAsString()).doesNotContain("BD caída", "interno");
+    }
+
+    @Test
+    @DisplayName("Cualquier otro fallo de autenticación responde 401, incluso un AuthenticationServiceException")
+    void respondeOtrosFallos401() throws Exception {
+        manejador.onAuthenticationFailure(peticion, respuesta,
+                new AuthenticationServiceException("otro", new IllegalStateException()));
+
+        assertThat(respuesta.getStatus()).isEqualTo(401);
+        assertThat(respuesta.getHeader("WWW-Authenticate")).isEqualTo("Bearer");
     }
 }
