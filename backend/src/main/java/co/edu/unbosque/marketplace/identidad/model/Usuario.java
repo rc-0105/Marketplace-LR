@@ -57,6 +57,11 @@ public class Usuario {
         return new Usuario(nombre, correo, contrasenaHash, rol);
     }
 
+    /** Gancho para SOF-15 y SOF-17: hoy toda cuenta activa puede entrar. */
+    public boolean puedeIniciarSesion() {
+        return estado == EstadoCuenta.ACTIVA;
+    }
+
     public Long getId() {
         return id;
     }
