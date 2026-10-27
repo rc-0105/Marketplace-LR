@@ -37,5 +37,5 @@ export default function Encabezado({ alCerrarSesion }) {
 }
 
 Encabezado.propTypes = {
-  alCerrarSesion: PropTypes.func,
+  alCerrarSesion: PropTypes.func.isRequired,
 };

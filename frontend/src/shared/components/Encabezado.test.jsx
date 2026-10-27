@@ -21,7 +21,7 @@ describe('Encabezado', () => {
   afterEach(() => limpiarSesion());
 
   it('muestra la marca con un enlace al inicio', () => {
-    renderizar();
+    renderizar(vi.fn());
 
     expect(screen.getByRole('banner')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Inversiones LR, ir al inicio' })).toHaveAttribute('href', '/');
