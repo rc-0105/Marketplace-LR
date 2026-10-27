@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtClaimValidator;
@@ -49,17 +50,23 @@ public class ConfiguracionJwt {
     }
 
     @Bean
-    public JwtDecoder decodificadorJwt(SecretKey claveJwt, PropiedadesJwt propiedades) {
+    public JwtDecoder decodificadorJwt(SecretKey claveJwt, PropiedadesJwt propiedades,
+            ValidadorSesionVigente sesionVigente) {
         NimbusJwtDecoder decodificador = NimbusJwtDecoder.withSecretKey(claveJwt)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
         // JwtTimestampValidator acepta tokens sin exp, por eso se exige el claim.
-        OAuth2TokenValidator<Jwt> validadores = new DelegatingOAuth2TokenValidator<>(
+        OAuth2TokenValidator<Jwt> base = new DelegatingOAuth2TokenValidator<>(
                 new JwtTimestampValidator(DESFASE_RELOJ),
                 new JwtIssuerValidator(propiedades.emisor()),
                 new JwtClaimValidator<Object>("exp", Objects::nonNull),
                 new JwtClaimValidator<Object>("jti", Objects::nonNull));
-        decodificador.setJwtValidator(validadores);
+        // La denylist va después y solo si lo base pasó: un token vencido o manipulado
+        // da 401 sin tocar la BD, incluso durante una caída (D4).
+        decodificador.setJwtValidator(jwt -> {
+            OAuth2TokenValidatorResult resultado = base.validate(jwt);
+            return resultado.hasErrors() ? resultado : sesionVigente.validate(jwt);
+        });
         return decodificador;
     }
 

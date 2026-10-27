@@ -1,9 +1,11 @@
 package co.edu.unbosque.marketplace.identidad.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import co.edu.unbosque.marketplace.config.ConfiguracionJwt;
 import co.edu.unbosque.marketplace.config.PropiedadesJwt;
+import co.edu.unbosque.marketplace.config.ValidadorSesionVigente;
 import co.edu.unbosque.marketplace.identidad.model.Rol;
 import co.edu.unbosque.marketplace.identidad.model.Usuario;
 import java.time.Clock;
@@ -27,7 +29,8 @@ class EmisorTokensTest {
     private final ConfiguracionJwt configuracion = new ConfiguracionJwt();
     private final PropiedadesJwt propiedades = new PropiedadesJwt("S".repeat(32), 60, EMISOR);
     private final SecretKey clave = configuracion.claveJwt(propiedades);
-    private final JwtDecoder decodificador = configuracion.decodificadorJwt(clave, propiedades);
+    private final JwtDecoder decodificador = configuracion.decodificadorJwt(clave, propiedades,
+            new ValidadorSesionVigente(mock(SesionService.class)));
     private final EmisorTokens emisor = new EmisorTokens(
             configuracion.codificadorJwt(clave), propiedades, Clock.fixed(ahora, ZoneOffset.UTC));
     private final Usuario usuario = usuario();

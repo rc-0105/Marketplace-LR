@@ -2,7 +2,13 @@ package co.edu.unbosque.marketplace.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import co.edu.unbosque.marketplace.identidad.services.SesionService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -28,7 +34,9 @@ class ConfiguracionJwtTest {
     private final PropiedadesJwt propiedades = new PropiedadesJwt("S".repeat(32), 60, EMISOR);
     private final SecretKey clave = configuracion.claveJwt(propiedades);
     private final JwtEncoder codificador = configuracion.codificadorJwt(clave);
-    private final JwtDecoder decodificador = configuracion.decodificadorJwt(clave, propiedades);
+    private final SesionService sesiones = mock(SesionService.class);
+    private final JwtDecoder decodificador = configuracion.decodificadorJwt(clave, propiedades,
+            new ValidadorSesionVigente(sesiones));
 
     @Test
     @DisplayName("El claim rol se convierte en la autoridad ROLE_HUESPED")
@@ -101,6 +109,29 @@ class ConfiguracionJwtTest {
         String token = partes[0] + "." + partes[1] + "." + firma;
 
         assertThatThrownBy(() -> decodificador.decode(token)).isInstanceOf(JwtException.class);
+    }
+
+    @Test
+    @DisplayName("Un token válido pero en la denylist es rechazado")
+    void rechazaTokenInvalidado() {
+        when(sesiones.estaInvalidada(anyString())).thenReturn(true);
+
+        assertThatThrownBy(() -> decodificador.decode(emitir(c -> { }))).isInstanceOf(JwtException.class);
+    }
+
+    @Test
+    @DisplayName("La denylist no se consulta si un validador base ya falló")
+    void noConsultaDenylistSiFallaUnoBase() {
+        Instant hace = Instant.now().minus(Duration.ofMinutes(5));
+        String vencido = emitir(c -> c.issuedAt(hace.minusSeconds(60)).expiresAt(hace));
+        String otroEmisor = emitir(c -> c.issuer("otro-emisor"));
+        String sinJti = emitir(c -> c.claims(m -> m.remove("jti")));
+
+        for (String token : new String[] {vencido, otroEmisor, sinJti}) {
+            assertThatThrownBy(() -> decodificador.decode(token)).isInstanceOf(JwtException.class);
+        }
+
+        verify(sesiones, never()).estaInvalidada(anyString());
     }
 
     private String emitir(Consumer<JwtClaimsSet.Builder> ajuste) {
