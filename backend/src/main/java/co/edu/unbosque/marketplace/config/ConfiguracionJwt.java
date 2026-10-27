@@ -2,6 +2,7 @@ package co.edu.unbosque.marketplace.config;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.Objects;
 import javax.crypto.SecretKey;
@@ -30,6 +31,12 @@ public class ConfiguracionJwt {
 
     /** Tolerancia entre el reloj de quien emite y el de quien verifica. */
     public static final Duration DESFASE_RELOJ = Duration.ofSeconds(60);
+
+    /** Reloj inyectable: los tests fijan la hora para comprobar iat y exp (D13). */
+    @Bean
+    public Clock reloj() {
+        return Clock.systemUTC();
+    }
 
     @Bean
     public SecretKey claveJwt(PropiedadesJwt propiedades) {
