@@ -44,22 +44,32 @@ function notificar(conjunto) {
  * @typedef {Object} Sesion
  * @property {string} token
  * @property {string} expiraEn fecha ISO en la que vence el token
- * @property {import('../../modules/identidad/models/usuario.js').Usuario} usuario
+ * @property {UsuarioSesion} usuario
+ */
+
+/**
+ * @typedef {Object} UsuarioSesion
+ * @property {number} id
+ * @property {string} nombre
+ * @property {string} correo
+ * @property {string} rol
+ * @property {boolean} activa
  */
 
 /** @returns {Sesion | null} la sesión vigente; una vencida cuenta como ausente y se borra */
 export function obtenerSesion() {
   const crudo = leerCrudo();
-  if (crudo === cache.crudo) {
-    return cache.valor;
-  }
-  const sesion = crudo === null ? null : parsear(crudo);
+  const sesion = crudo === cache.crudo ? cache.valor : (crudo === null ? null : parsear(crudo));
+  // El vencimiento se revisa también con la sesión en cache: puede vencer con la pestaña abierta.
+  // No se notifica desde el getter (se llama durante el render); eso lo hace el timer de expiración.
   if (sesion && !(new Date(sesion.expiraEn) > new Date())) {
     borrarCrudo();
     cache = { crudo: null, valor: null };
     return null;
   }
-  cache = { crudo, valor: sesion };
+  if (crudo !== cache.crudo) {
+    cache = { crudo, valor: sesion };
+  }
   return sesion;
 }
 

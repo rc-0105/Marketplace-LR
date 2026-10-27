@@ -35,6 +35,23 @@ describe('sesion', () => {
     expect(sessionStorage.getItem(CLAVE)).toBeNull();
   });
 
+  it('invalida una sesión que vence estando en cache y mantiene el resultado estable', () => {
+    vi.useFakeTimers();
+    try {
+      guardarSesion(sesionVigente());
+      expect(obtenerSesion()).not.toBeNull();
+
+      vi.advanceTimersByTime(61_000);
+
+      const primera = obtenerSesion();
+      expect(primera).toBeNull();
+      expect(obtenerSesion()).toBe(primera);
+      expect(sessionStorage.getItem(CLAVE)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('devuelve la misma referencia mientras el contenido guardado no cambie', () => {
     guardarSesion(sesionVigente());
 
