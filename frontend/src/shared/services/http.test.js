@@ -1,11 +1,16 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi, post } from './http.js';
+import { guardarSesion, limpiarSesion, obtenerSesion, suscribirExpiracion } from './sesion.js';
 
 function respuesta(estado, cuerpo) {
   return Promise.resolve(new Response(cuerpo === undefined ? null : JSON.stringify(cuerpo), { status: estado }));
 }
 
 describe('http', () => {
+  beforeEach(() => {
+    limpiarSesion();
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -49,6 +54,69 @@ describe('http', () => {
     await expect(post('/api/v1/recurso', {})).rejects.toMatchObject({
       estado: 0,
       message: 'No pudimos conectar con el servidor. Revisa tu conexión e intenta de nuevo.',
+    });
+  });
+
+  describe('con sesión', () => {
+    const iniciarSesion = () => guardarSesion({
+      token: 'abc.def',
+      usuario: { id: 1, rol: 'HUESPED' },
+      expiraEn: new Date(Date.now() + 60_000).toISOString(),
+    });
+
+    it('envía el token como Bearer cuando hay sesión y no lo envía cuando no la hay', async () => {
+      const fetchFalso = vi.fn(() => respuesta(200, {}));
+      vi.stubGlobal('fetch', fetchFalso);
+
+      await post('/api/v1/recurso', {});
+      iniciarSesion();
+      await post('/api/v1/recurso', {});
+
+      expect(fetchFalso.mock.calls[0][1].headers).not.toHaveProperty('Authorization');
+      expect(fetchFalso.mock.calls[1][1].headers).toHaveProperty('Authorization', 'Bearer abc.def');
+    });
+
+    it('limpia la sesión y avisa la expiración ante un 401 con token fuera de /api/v1/auth/', async () => {
+      iniciarSesion();
+      const expiracion = vi.fn();
+      suscribirExpiracion(expiracion);
+      vi.stubGlobal('fetch', vi.fn(() => respuesta(401, { detail: 'Necesitas iniciar sesión.' })));
+
+      await expect(post('/api/v1/recurso', {})).rejects.toMatchObject({ estado: 401 });
+
+      expect(obtenerSesion()).toBeNull();
+      expect(expiracion).toHaveBeenCalledTimes(1);
+    });
+
+    it('conserva la sesión ante un 401 de /api/v1/auth/', async () => {
+      iniciarSesion();
+      vi.stubGlobal('fetch', vi.fn(() => respuesta(401, {})));
+
+      await expect(post('/api/v1/auth/login', {})).rejects.toMatchObject({ estado: 401 });
+
+      expect(obtenerSesion()).not.toBeNull();
+    });
+
+    it('no avisa la expiración ante un 401 sin token enviado', async () => {
+      const expiracion = vi.fn();
+      suscribirExpiracion(expiracion);
+      vi.stubGlobal('fetch', vi.fn(() => respuesta(401, {})));
+
+      await expect(post('/api/v1/recurso', {})).rejects.toMatchObject({ estado: 401 });
+
+      expect(expiracion).not.toHaveBeenCalled();
+    });
+
+    it.each([[503], [500], [0]])('conserva la sesión ante el estado %i y sigue funcionando después', async (estado) => {
+      iniciarSesion();
+      const fetchFalso = vi.fn()
+        .mockImplementationOnce(() => (estado === 0 ? Promise.reject(new TypeError('red')) : respuesta(estado, {})))
+        .mockImplementationOnce(() => respuesta(200, { ok: true }));
+      vi.stubGlobal('fetch', fetchFalso);
+
+      await expect(post('/api/v1/recurso', {})).rejects.toBeInstanceOf(ErrorApi);
+      expect(obtenerSesion()).not.toBeNull();
+      await expect(post('/api/v1/recurso', {})).resolves.toEqual({ ok: true });
     });
   });
 });
