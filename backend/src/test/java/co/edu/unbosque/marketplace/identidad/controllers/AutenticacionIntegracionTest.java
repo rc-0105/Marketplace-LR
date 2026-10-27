@@ -43,13 +43,26 @@ class AutenticacionIntegracionTest {
     private static final String RUTA = "/api/v1/auth/login";
     private static final String MENSAJE = "Correo o contraseña incorrectos. Revísalos e intenta de nuevo.";
 
-    @Autowired private MockMvc mvc;
-    @Autowired private UsuarioRepository usuarios;
-    @Autowired private PasswordEncoder codificador;
-    @Autowired private JwtDecoder decodificador;
-    @Autowired private JwtEncoder cifrador;
-    @Autowired private ConfiguracionJwt configuracion;
-    @Autowired private ObjectMapper json;
+    @Autowired
+    private MockMvc mvc;
+
+    @Autowired
+    private UsuarioRepository usuarios;
+
+    @Autowired
+    private PasswordEncoder codificador;
+
+    @Autowired
+    private JwtDecoder decodificador;
+
+    @Autowired
+    private JwtEncoder cifrador;
+
+    @Autowired
+    private ConfiguracionJwt configuracion;
+
+    @Autowired
+    private ObjectMapper json;
 
     @BeforeEach
     void preparar() {
