@@ -28,6 +28,37 @@
   border-color: var(--color-error);
 }
 
+.conBoton {
+  position: relative;
+  display: flex;
+}
+
+.conBoton .control {
+  flex: 1;
+  padding-right: 5.5rem;
+}
+
+.alternar {
+  position: absolute;
+  top: 50%;
+  right: var(--espacio-2);
+  transform: translateY(-50%);
+  padding: var(--espacio-1) var(--espacio-2);
+  border: none;
+  border-radius: var(--radio);
+  background: transparent;
+  color: var(--color-texto-secundario);
+  font: inherit;
+  font-size: var(--texto-pequeno);
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--transicion);
+}
+
+.alternar:hover {
+  color: var(--color-texto);
+}
+
 .ayuda,
 .error {
   margin: 0;
