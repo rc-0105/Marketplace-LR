@@ -35,3 +35,10 @@ management:
 logging:
   level:
     co.edu.unbosque.marketplace: INFO
+
+# Los JWT los firma la propia aplicación (HS256). El secreto es obligatorio, de al
+# menos 32 bytes, y llega solo por entorno (RNF-17, REQ-A11).
+jwt:
+  secreto: ${JWT_SECRET}
+  expiracion-minutos: ${JWT_EXPIRACION_MINUTOS:60}
+  emisor: ${spring.application.name}

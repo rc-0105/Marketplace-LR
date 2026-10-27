@@ -1,12 +1,12 @@
 name: CI
 
-# Compilación, pruebas y análisis en cada pull request contra main,
-# y también al integrar, para que SonarCloud tenga la rama de referencia.
+# Compilación y pruebas en cada pull request, sea cual sea su rama base (los
+# PR encadenados de una historia apuntan a la rama anterior). SonarCloud solo
+# analiza los PR contra main y la integración a main, que es su rama de referencia.
 on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
 
 # Si se empuja otro commit al mismo PR, se cancela la corrida anterior.
 concurrency:
@@ -61,6 +61,8 @@ jobs:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/marketplace
           SPRING_DATASOURCE_USERNAME: marketplace
           SPRING_DATASOURCE_PASSWORD: marketplace
+          # Valor de prueba, sin validez fuera del CI (mínimo 32 bytes).
+          JWT_SECRET: secreto-solo-para-ci-0123456789-abcdef
         run: mvn -B verify
 
       - name: Publicar el resultado de las pruebas
@@ -72,9 +74,10 @@ jobs:
           if-no-files-found: ignore
 
       # El análisis necesita el secreto SONAR_TOKEN. Mientras no exista,
-      # el paso se omite y el build sigue siendo válido.
+      # el paso se omite y el build sigue siendo válido. Tampoco corre en los
+      # PR que no apuntan a main.
       - name: Analizar con SonarCloud
-        if: ${{ env.SONAR_TOKEN != '' }}
+        if: ${{ env.SONAR_TOKEN != '' && (github.event_name == 'push' || github.base_ref == 'main') }}
         working-directory: backend
         run: >-
           mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
@@ -121,7 +124,7 @@ jobs:
         run: npm run build
 
       - name: Analizar con SonarCloud
-        if: ${{ env.SONAR_TOKEN != '' }}
+        if: ${{ env.SONAR_TOKEN != '' && (github.event_name == 'push' || github.base_ref == 'main') }}
         uses: SonarSource/sonarqube-scan-action@v4
         with:
           projectBaseDir: frontend

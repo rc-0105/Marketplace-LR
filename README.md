@@ -91,6 +91,8 @@ complétenlo localmente.
 | `SPRING_DATASOURCE_URL` | Conexión a PostgreSQL |
 | `SPRING_DATASOURCE_USERNAME` | Usuario de la base de datos |
 | `SPRING_DATASOURCE_PASSWORD` | Contraseña de la base de datos |
+| `JWT_SECRET` | Firma de los tokens de sesión. Obligatorio, mínimo 32 bytes; sin él la API no arranca. Genéralo con `openssl rand -base64 48` |
+| `JWT_EXPIRACION_MINUTOS` | Vigencia del token en minutos (por defecto 60) |
 | `STRIPE_CLAVE_PRUEBA` | Clave de la pasarela en modo prueba |
 
 ## Documentación
