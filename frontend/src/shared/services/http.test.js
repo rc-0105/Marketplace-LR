@@ -88,6 +88,22 @@ describe('http', () => {
       expect(expiracion).toHaveBeenCalledTimes(1);
     });
 
+    it('no limpia una sesión nueva ante el 401 tardío de una petición enviada con un token anterior', async () => {
+      iniciarSesion();
+      let resolver;
+      vi.stubGlobal('fetch', vi.fn(() => new Promise((res) => { resolver = res; })));
+      const expiracion = vi.fn();
+      suscribirExpiracion(expiracion);
+
+      const pendiente = post('/api/v1/recurso', {}).catch((e) => e);
+      guardarSesion({ token: 'nuevo.token', usuario: { id: 1, rol: 'HUESPED' }, expiraEn: new Date(Date.now() + 60_000).toISOString() });
+      resolver(new Response('{}', { status: 401 }));
+      await pendiente;
+
+      expect(obtenerSesion()?.token).toBe('nuevo.token');
+      expect(expiracion).not.toHaveBeenCalled();
+    });
+
     it('conserva la sesión ante un 401 de /api/v1/auth/', async () => {
       iniciarSesion();
       vi.stubGlobal('fetch', vi.fn(() => respuesta(401, {})));

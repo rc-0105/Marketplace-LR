@@ -52,7 +52,8 @@ async function solicitar(ruta, opciones) {
   if (!respuesta.ok) {
     // Solo un 401 con token enviado fuera de /auth/ significa sesión vencida o revocada.
     // Un 401 de login son credenciales malas, y ningún otro estado (503, 500) toca la sesión.
-    if (respuesta.status === 401 && sesion && !ruta.startsWith(PREFIJO_AUTH)) {
+    // Y solo si el token enviado sigue siendo el actual: un 401 tardío de un token viejo no debe borrar una sesión nueva.
+    if (respuesta.status === 401 && sesion && !ruta.startsWith(PREFIJO_AUTH) && obtenerSesion()?.token === sesion.token) {
       limpiarSesion('expirada');
     }
     throw new ErrorApi(respuesta.status, datos?.detail ?? MENSAJE_INESPERADO, datos?.errores ?? {});
