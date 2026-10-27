@@ -117,7 +117,9 @@ class ConfiguracionJwtTest {
     void rechazaTokenInvalidado() {
         when(sesiones.estaInvalidada(anyString())).thenReturn(true);
 
-        assertThatThrownBy(() -> decodificador.decode(emitir(c -> { }))).isInstanceOf(JwtException.class);
+        String token = emitir(c -> { });
+
+        assertThatThrownBy(() -> decodificador.decode(token)).isInstanceOf(JwtException.class);
     }
 
     @Test
