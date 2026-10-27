@@ -3,6 +3,12 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  // En desarrollo, /api va al backend: mismo origen y sin configurar CORS.
+  server: {
+    proxy: {
+      '/api': 'http://localhost:8080',
+    },
+  },
   test: {
     environment: 'jsdom',
     globals: true,

@@ -1,0 +1,44 @@
+/*
+ * Tokens del design system (DESIGN.md · "La recepción cálida").
+ * Neutros teñidos hacia la arcilla y un único acento terracota.
+ */
+:root {
+  /* Acento: solo acción principal, selección y foco */
+  --color-terracota: #a14a28;
+  --color-terracota-oscuro: #873c1f;
+  --color-sobre-terracota: #fffaf5;
+
+  /* Neutros */
+  --color-fondo: #faf6f1;
+  --color-superficie: #f2ebe2;
+  --color-texto: #2b211c;
+  --color-texto-secundario: #6b5b52;
+  --color-borde: #e3d8cc;
+  --color-borde-control: #94817a;
+
+  /* Semánticos, siempre acompañados de texto */
+  --color-error: #a3352a;
+  --color-error-fondo: #f8e6e1;
+  --color-exito: #3f6b48;
+  --color-exito-fondo: #e6efe6;
+
+  /* Tipografía: escala fija en rem, razón 1.2 */
+  --fuente: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --texto-pequeno: 0.875rem;
+  --texto-base: 1rem;
+  --texto-titulo: 1.25rem;
+  --texto-encabezado: 1.5rem;
+  --texto-display: 2.25rem;
+
+  /* Espaciado */
+  --espacio-1: 0.25rem;
+  --espacio-2: 0.5rem;
+  --espacio-3: 0.75rem;
+  --espacio-4: 1rem;
+  --espacio-6: 1.5rem;
+  --espacio-8: 2rem;
+  --espacio-12: 3rem;
+
+  --radio: 0.5rem;
+  --transicion: 180ms cubic-bezier(0.25, 1, 0.5, 1);
+}

@@ -1,0 +1,18 @@
+.pagina {
+  max-width: 28rem;
+  margin: 0 auto;
+  padding: var(--espacio-12) var(--espacio-4);
+}
+
+.titulo {
+  margin: 0 0 var(--espacio-6);
+  font-size: var(--texto-encabezado);
+}
+
+.exito {
+  margin: 0;
+  padding: var(--espacio-3) var(--espacio-4);
+  border-radius: var(--radio);
+  background: var(--color-exito-fondo);
+  color: var(--color-exito);
+}
