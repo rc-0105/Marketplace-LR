@@ -1,6 +1,16 @@
 spring:
   application:
     name: marketplace-app
+  # Las credenciales llegan solo por variables de entorno (RNF-17).
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+  jpa:
+    open-in-view: false
+    # Flyway es dueño del esquema; Hibernate solo verifica que coincida.
+    hibernate:
+      ddl-auto: validate
 
 server:
   port: ${PUERTO:8080}
@@ -25,7 +35,3 @@ management:
 logging:
   level:
     co.edu.unbosque.marketplace: INFO
-
-# La configuración de la base de datos entra cuando se agregue JPA.
-# El pipeline ya levanta un PostgreSQL 16 y expone estas variables:
-#   SPRING_DATASOURCE_URL, SPRING_DATASOURCE_USERNAME, SPRING_DATASOURCE_PASSWORD
