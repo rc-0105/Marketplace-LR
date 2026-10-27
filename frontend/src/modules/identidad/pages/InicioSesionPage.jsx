@@ -13,6 +13,8 @@ export default function InicioSesionPage() {
   const [errores, setErrores] = useState({});
   const [errorGeneral, setErrorGeneral] = useState('');
   const [enviando, setEnviando] = useState(false);
+  // Los avisos que trae la navegación (registro, sesión vencida) dejan de aplicar al primer intento.
+  const [intento, setIntento] = useState(false);
 
   function cambiar(evento) {
     const { name, value } = evento.target;
@@ -21,6 +23,7 @@ export default function InicioSesionPage() {
 
   async function enviar(evento) {
     evento.preventDefault();
+    setIntento(true);
     setErrorGeneral('');
     const erroresFormato = validarInicioSesion(datos);
     setErrores(erroresFormato);
@@ -41,10 +44,10 @@ export default function InicioSesionPage() {
   return (
     <main className={estilos.pagina}>
       <h1 className={estilos.titulo}>Inicia sesión</h1>
-      {state?.registrado && (
+      {!intento && state?.registrado && (
         <p role="status" className={estilos.exito}>Tu cuenta quedó creada. Ya puedes iniciar sesión.</p>
       )}
-      {state?.sesionExpirada && (
+      {!intento && state?.sesionExpirada && (
         <p role="status" className={estilos.vencida}>Tu sesión venció. Inicia sesión de nuevo para continuar.</p>
       )}
 
