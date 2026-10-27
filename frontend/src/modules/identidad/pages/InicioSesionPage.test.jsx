@@ -32,6 +32,7 @@ describe('InicioSesionPage', () => {
     renderizar({ registrado: true });
     expect(screen.getByRole('status')).toHaveTextContent('Tu cuenta quedó creada. Ya puedes iniciar sesión.');
     expect(screen.getByRole('status').className).toMatch(/exito/);
+    expect(screen.getByRole('status').tagName).toBe('OUTPUT');
   });
 
   it('retira la confirmación del registro al intentar iniciar sesión', async () => {

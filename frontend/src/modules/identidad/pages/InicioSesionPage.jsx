@@ -45,10 +45,10 @@ export default function InicioSesionPage() {
     <main className={estilos.pagina}>
       <h1 className={estilos.titulo}>Inicia sesión</h1>
       {!intento && state?.registrado && (
-        <p role="status" className={estilos.exito}>Tu cuenta quedó creada. Ya puedes iniciar sesión.</p>
+        <output className={estilos.exito}>Tu cuenta quedó creada. Ya puedes iniciar sesión.</output>
       )}
       {!intento && state?.sesionExpirada && (
-        <p role="status" className={estilos.vencida}>Tu sesión venció. Inicia sesión de nuevo para continuar.</p>
+        <output className={estilos.vencida}>Tu sesión venció. Inicia sesión de nuevo para continuar.</output>
       )}
 
       {errorGeneral && <p role="alert" className={estilos.aviso}>{errorGeneral}</p>}
