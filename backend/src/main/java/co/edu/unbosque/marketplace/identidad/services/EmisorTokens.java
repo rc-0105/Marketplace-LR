@@ -5,6 +5,7 @@ import co.edu.unbosque.marketplace.identidad.model.Usuario;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
@@ -28,7 +29,8 @@ public class EmisorTokens {
     }
 
     public TokenEmitido emitir(Usuario usuario) {
-        Instant emitidoEn = reloj.instant();
+        // El JWT guarda segundos: truncar aquí evita que expiraEn de la respuesta difiera del exp firmado.
+        Instant emitidoEn = reloj.instant().truncatedTo(ChronoUnit.SECONDS);
         Instant expiraEn = emitidoEn.plus(Duration.ofMinutes(propiedades.expiracionMinutos()));
         String jti = UUID.randomUUID().toString();
         JwtClaimsSet claims = JwtClaimsSet.builder()
