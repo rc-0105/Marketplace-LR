@@ -45,7 +45,7 @@ export default function InicioSesionPage() {
         <p role="status" className={estilos.exito}>Tu cuenta quedó creada. Ya puedes iniciar sesión.</p>
       )}
       {state?.sesionExpirada && (
-        <p role="status" className={estilos.exito}>Tu sesión venció. Inicia sesión de nuevo para continuar.</p>
+        <p role="status" className={estilos.vencida}>Tu sesión venció. Inicia sesión de nuevo para continuar.</p>
       )}
 
       {errorGeneral && <p role="alert" className={estilos.aviso}>{errorGeneral}</p>}

@@ -31,6 +31,7 @@ describe('InicioSesionPage', () => {
   it('confirma la cuenta creada cuando viene del registro', () => {
     renderizar({ registrado: true });
     expect(screen.getByRole('status')).toHaveTextContent('Tu cuenta quedó creada. Ya puedes iniciar sesión.');
+    expect(screen.getByRole('status').className).toMatch(/exito/);
   });
 
   it('no muestra la confirmación si se entra directo', () => {
@@ -42,6 +43,7 @@ describe('InicioSesionPage', () => {
   it('avisa que la sesión venció', () => {
     renderizar({ sesionExpirada: true });
     expect(screen.getByRole('status')).toHaveTextContent('Tu sesión venció. Inicia sesión de nuevo para continuar.');
+    expect(screen.getByRole('status').className).not.toMatch(/exito/);
   });
 
   it('exige correo y contraseña sin llamar al servicio', () => {
