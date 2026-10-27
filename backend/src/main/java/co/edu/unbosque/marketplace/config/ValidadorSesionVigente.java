@@ -34,6 +34,10 @@ public class ValidadorSesionVigente implements OAuth2TokenValidator<Jwt> {
             // Solo el tipo de la causa: nunca el token ni el mensaje del driver.
             LOG.error("No se pudo consultar la denylist de sesiones: {}", error.getClass().getSimpleName());
             throw new SesionNoVerificableException(error);
+        } catch (RuntimeException error) {
+            // Fallo inesperado (no es de infraestructura): no se convierte en 503, sigue cerrado con 401.
+            LOG.error("Fallo inesperado al consultar la denylist de sesiones: {}", error.getClass().getSimpleName());
+            throw error;
         }
     }
 }

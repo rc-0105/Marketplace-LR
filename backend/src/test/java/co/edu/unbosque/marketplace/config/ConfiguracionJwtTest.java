@@ -2,6 +2,7 @@ package co.edu.unbosque.marketplace.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -131,7 +132,8 @@ class ConfiguracionJwtTest {
             assertThatThrownBy(() -> decodificador.decode(token)).isInstanceOf(JwtException.class);
         }
 
-        verify(sesiones, never()).estaInvalidada(anyString());
+        // any() y no anyString(): este último no casa con null y no cubriría el caso sin jti.
+        verify(sesiones, never()).estaInvalidada(any());
     }
 
     private String emitir(Consumer<JwtClaimsSet.Builder> ajuste) {
