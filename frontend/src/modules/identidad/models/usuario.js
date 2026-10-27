@@ -56,6 +56,24 @@ export function validarRegistro(datos) {
 }
 
 /**
+ * Solo exige los datos: la API decide si las credenciales son correctas.
+ * @param {{correo: string, contrasena: string}} datos
+ * @returns {Partial<Record<'correo' | 'contrasena', string>>} errores por campo
+ */
+export function validarInicioSesion(datos) {
+  const errores = {};
+  if (!datos.correo.trim()) {
+    errores.correo = 'Escribe tu correo.';
+  } else if (!CORREO_VALIDO.test(datos.correo.trim())) {
+    errores.correo = 'El correo no tiene un formato válido.';
+  }
+  if (!datos.contrasena) {
+    errores.contrasena = 'Escribe tu contraseña.';
+  }
+  return errores;
+}
+
+/**
  * @param {{id: number, nombre: string, correo: string, rol: string, estado: string}} respuesta
  * @returns {Usuario}
  */
