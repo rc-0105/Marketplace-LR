@@ -1,8 +1,14 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, describe, expect, it } from 'vitest';
-import { guardarSesion, limpiarSesion } from '../shared/services/sesion.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ErrorApi, post } from '../shared/services/http.js';
+import { guardarSesion, limpiarSesion, obtenerSesion } from '../shared/services/sesion.js';
 import App from './App.jsx';
+
+vi.mock('../shared/services/http.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  post: vi.fn(),
+}));
 
 function iniciar(rol) {
   const expiraEn = new Date(Date.now() + 3600_000).toISOString();
@@ -18,7 +24,10 @@ function renderizarEn(ruta) {
 }
 
 describe('App', () => {
-  afterEach(() => limpiarSesion());
+  afterEach(() => {
+    limpiarSesion();
+    vi.clearAllMocks();
+  });
 
   it('muestra el nombre del marketplace', () => {
     renderizarEn('/');
@@ -72,5 +81,22 @@ describe('App', () => {
   it('sin sesión muestra el inicio de sesión normalmente', () => {
     renderizarEn('/inicio-sesion');
     expect(screen.getByRole('heading', { name: 'Inicia sesión' })).toBeInTheDocument();
+  });
+
+  it.each([
+    ['responde bien', () => Promise.resolve({})],
+    ['falla con 503', () => Promise.reject(new ErrorApi(503, 'No disponible'))],
+  ])('cerrar sesión desde un panel cuando el servidor %s limpia la sesión y vuelve al inicio de sesión', async (_caso, respuesta) => {
+    post.mockImplementation(respuesta);
+    iniciar('HUESPED');
+    renderizarEn('/huesped');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
+
+    expect(await screen.findByRole('heading', { name: 'Inicia sesión' })).toBeInTheDocument();
+    expect(post).toHaveBeenCalledWith('/api/v1/auth/logout');
+    expect(obtenerSesion()).toBeNull();
+    expect(screen.queryByText(/^Ingresaste como/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cerrar sesión' })).not.toBeInTheDocument();
   });
 });

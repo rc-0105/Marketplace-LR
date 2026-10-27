@@ -1,4 +1,5 @@
-import { Link, Route, Routes } from 'react-router-dom';
+import { Link, Route, Routes, useNavigate } from 'react-router-dom';
+import { cerrarSesion } from '../modules/identidad/services/identidadService.js';
 import InicioSesionPage from '../modules/identidad/pages/InicioSesionPage.jsx';
 import RegistroPage from '../modules/identidad/pages/RegistroPage.jsx';
 import PanelRolPage from './pages/PanelRolPage.jsx';
@@ -24,9 +25,16 @@ function Inicio() {
 }
 
 export default function App() {
+  const navigate = useNavigate();
+
+  async function alCerrarSesion() {
+    await cerrarSesion();
+    navigate('/inicio-sesion', { replace: true });
+  }
+
   return (
     <ProveedorSesion>
-      <Encabezado />
+      <Encabezado alCerrarSesion={alCerrarSesion} />
       <Routes>
         <Route path="/" element={<Inicio />} />
         <Route path="/registro" element={<SoloInvitados><RegistroPage /></SoloInvitados>} />
