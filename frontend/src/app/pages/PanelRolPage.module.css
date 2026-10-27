@@ -1,0 +1,20 @@
+.pagina {
+  max-width: 28rem;
+  margin: 0 auto;
+  padding: var(--espacio-12) var(--espacio-4);
+}
+
+.titulo {
+  margin: 0 0 var(--espacio-2);
+  font-size: var(--texto-encabezado);
+}
+
+.rol {
+  margin: 0 0 var(--espacio-4);
+  font-weight: 600;
+}
+
+.nota {
+  margin: 0;
+  color: var(--color-texto-secundario);
+}
