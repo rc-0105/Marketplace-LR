@@ -3,8 +3,10 @@ package co.edu.unbosque.marketplace.identidad.services;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -22,6 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -89,6 +92,22 @@ class AutenticacionServiceTest {
 
         verify(codificador).matches(CONTRASENA, HASH_FICTICIO);
         assertFalloAuditado();
+    }
+
+    @Test
+    @DisplayName("El hash ficticio es un BCrypt válido y del mismo costo que los hashes reales")
+    void hashFicticioEsBcryptValido() {
+        PasswordEncoder real = spy(new BCryptPasswordEncoder());
+        AutenticacionService conBcryptReal = new AutenticacionService(usuarios, real, emisor, publicador);
+        when(usuarios.findByCorreo("nadie@correo.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> conBcryptReal.iniciarSesion("nadie@correo.com", CONTRASENA))
+                .isInstanceOf(CredencialesInvalidasException.class);
+
+        ArgumentCaptor<String> hash = ArgumentCaptor.forClass(String.class);
+        verify(real).matches(eq(CONTRASENA), hash.capture());
+        String prefijoReal = real.encode(CONTRASENA).substring(0, 7);
+        assertThat(hash.getValue()).startsWith(prefijoReal).hasSize(60);
     }
 
     @Test

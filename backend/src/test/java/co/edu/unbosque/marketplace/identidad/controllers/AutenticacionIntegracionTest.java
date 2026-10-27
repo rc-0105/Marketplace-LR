@@ -14,6 +14,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,6 +35,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -102,17 +106,19 @@ class AutenticacionIntegracionTest {
     }
 
     @Test
-    @DisplayName("Contraseña errónea y correo inexistente dan el mismo 401 con el mismo cuerpo")
+    @DisplayName("Contraseña errónea y correo inexistente dan el mismo 401 con el mismo cuerpo y las mismas cabeceras")
     void respuestaGenerica() throws Exception {
-        String contrasenaErronea = login("ana@correo.com", "Otra#Clave1")
+        MockHttpServletResponse contrasenaErronea = login("ana@correo.com", "Otra#Clave1")
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.detail").value(MENSAJE))
-                .andReturn().getResponse().getContentAsString();
-        String correoInexistente = login("nadie@correo.com", "Otra#Clave1")
+                .andReturn().getResponse();
+        MockHttpServletResponse correoInexistente = login("nadie@correo.com", "Otra#Clave1")
                 .andExpect(status().isUnauthorized())
-                .andReturn().getResponse().getContentAsString();
+                .andReturn().getResponse();
 
-        assertThat(json.readTree(correoInexistente)).isEqualTo(json.readTree(contrasenaErronea));
+        assertThat(json.readTree(correoInexistente.getContentAsString()))
+                .isEqualTo(json.readTree(contrasenaErronea.getContentAsString()));
+        assertThat(cabeceras(correoInexistente)).isEqualTo(cabeceras(contrasenaErronea));
     }
 
     @Test
@@ -142,6 +148,16 @@ class AutenticacionIntegracionTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"correo\": \"ana@correo.com\", \"contrasena\": \"Segura#2026\"}"))
                 .andExpect(status().isOk());
+    }
+
+    // Se excluyen las cabeceras que cambian legítimamente en cada request (identificador de correlación y fecha).
+    private static Map<String, List<String>> cabeceras(MockHttpServletResponse respuesta) {
+        Map<String, List<String>> cabeceras = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        respuesta.getHeaderNames().stream()
+                .filter(nombre -> !nombre.equalsIgnoreCase("X-Correlation-Id")
+                        && !nombre.equalsIgnoreCase(HttpHeaders.DATE))
+                .forEach(nombre -> cabeceras.put(nombre, respuesta.getHeaders(nombre)));
+        return cabeceras;
     }
 
     private ResultActions login(String correo, String contrasena) throws Exception {
