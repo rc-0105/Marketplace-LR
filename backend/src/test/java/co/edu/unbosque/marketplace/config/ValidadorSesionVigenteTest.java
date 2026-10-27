@@ -56,4 +56,15 @@ class ValidadorSesionVigenteTest {
 
         assertThatThrownBy(() -> validador.validate(jwt)).isInstanceOf(SesionNoVerificableException.class);
     }
+
+    @Test
+    @DisplayName("Un fallo inesperado se propaga tal cual (no es 503), se registra solo su clase y no el token ni el jti")
+    void fallaInesperada(CapturedOutput salida) {
+        IllegalStateException inesperada = new IllegalStateException("detalle-del-driver jti-1");
+        when(sesiones.estaInvalidada("jti-1")).thenThrow(inesperada);
+
+        assertThatThrownBy(() -> validador.validate(jwt)).isSameAs(inesperada);
+        assertThat(salida.getAll()).contains("IllegalStateException")
+                .doesNotContain(TOKEN, "jti-1", "detalle-del-driver");
+    }
 }

@@ -1,9 +1,11 @@
 package co.edu.unbosque.marketplace.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -71,6 +73,22 @@ class ManejadorFallosSeguridadTest {
     void respondeOtrosFallos401() throws Exception {
         manejador.onAuthenticationFailure(peticion, respuesta,
                 new AuthenticationServiceException("otro", new IllegalStateException()));
+
+        assertThat(respuesta.getStatus()).isEqualTo(401);
+        assertThat(respuesta.getHeader("WWW-Authenticate")).isEqualTo("Bearer");
+    }
+
+    @Test
+    @DisplayName("Una cadena de causas cíclica no cuelga el manejador y responde 401")
+    void cadenaCiclicaResponde401() {
+        RuntimeException a = new RuntimeException("a");
+        RuntimeException b = new RuntimeException("b");
+        a.initCause(b);
+        b.initCause(a);
+
+        // Preemptivo: un bucle sin fin no responde a la interrupción de @Timeout.
+        assertTimeoutPreemptively(Duration.ofSeconds(5), () -> manejador.onAuthenticationFailure(peticion,
+                respuesta, new AuthenticationServiceException("ciclo", a)));
 
         assertThat(respuesta.getStatus()).isEqualTo(401);
         assertThat(respuesta.getHeader("WWW-Authenticate")).isEqualTo("Bearer");

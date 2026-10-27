@@ -25,6 +25,9 @@ import org.springframework.stereotype.Component;
 public class ManejadorFallosSeguridad implements AuthenticationEntryPoint, AccessDeniedHandler,
         AuthenticationFailureHandler {
 
+    /** Tope al recorrer las causas: una cadena cíclica no debe colgar la petición. */
+    private static final int PROFUNDIDAD_MAXIMA_CAUSAS = 10;
+
     private final ObjectMapper mapper;
 
     public ManejadorFallosSeguridad(ObjectMapper mapper) {
@@ -51,12 +54,14 @@ public class ManejadorFallosSeguridad implements AuthenticationEntryPoint, Acces
     @Override
     public void onAuthenticationFailure(HttpServletRequest peticion, HttpServletResponse respuesta,
             AuthenticationException error) throws IOException {
-        for (Throwable causa = error; causa != null; causa = causa.getCause()) {
+        Throwable causa = error;
+        for (int nivel = 0; causa != null && nivel < PROFUNDIDAD_MAXIMA_CAUSAS; nivel++) {
             if (causa instanceof SesionNoVerificableException) {
                 escribir(peticion, respuesta, HttpStatus.SERVICE_UNAVAILABLE,
                         "El servicio no está disponible en este momento. Intenta de nuevo en unos minutos.");
                 return;
             }
+            causa = causa.getCause();
         }
         commence(peticion, respuesta, error);
     }
