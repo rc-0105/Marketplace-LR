@@ -4,12 +4,14 @@ import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.ObjectPostProcessor;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -46,7 +48,16 @@ public class ConfiguracionSeguridad {
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(convertidor))
                         .bearerTokenResolver(resolverToken)
                         .authenticationEntryPoint(fallos)
-                        .accessDeniedHandler(fallos))
+                        .accessDeniedHandler(fallos)
+                        // El handler por defecto relanza AuthenticationServiceException (500):
+                        // el propio manejador decide entre 503 (denylist caída) y 401 (D5).
+                        .withObjectPostProcessor(new ObjectPostProcessor<BearerTokenAuthenticationFilter>() {
+                            @Override
+                            public <O extends BearerTokenAuthenticationFilter> O postProcess(O filtro) {
+                                filtro.setAuthenticationFailureHandler(fallos);
+                                return filtro;
+                            }
+                        }))
                 // Los anónimos que caen en denyAll reciben el mismo 401 ProblemDetail.
                 .exceptionHandling(errores -> errores
                         .authenticationEntryPoint(fallos)
