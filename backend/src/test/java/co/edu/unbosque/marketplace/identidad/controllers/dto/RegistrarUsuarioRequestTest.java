@@ -37,8 +37,8 @@ class RegistrarUsuarioRequestTest {
     }
 
     @ParameterizedTest(name = "contraseña \"{0}\"")
-    @ValueSource(strings = {"Corta#1", "sinmayuscula#1", "SinEspecial123"})
-    @DisplayName("Rechaza contraseñas cortas, sin mayúscula o sin carácter especial")
+    @ValueSource(strings = {"Corta#1", "sinmayuscula#1", "SinEspecial123", "SinNumero#Ab"})
+    @DisplayName("Rechaza contraseñas cortas, sin mayúscula, sin número o sin carácter especial")
     void rechazaContrasenaDebil(String contrasena) {
         assertThat(validar(contrasena))
                 .extracting(violacion -> violacion.getPropertyPath().toString())

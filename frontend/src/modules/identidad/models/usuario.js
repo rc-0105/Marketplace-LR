@@ -19,9 +19,9 @@
  * @property {boolean} activa
  */
 
-// Misma regla de formato que valida la API: 8 caracteres, una mayúscula y un
-// carácter especial (ni letra, ni número, ni espacio).
-const CONTRASENA_VALIDA = /^(?=.*\p{Lu})(?=.*[^\p{L}\p{N}\s]).{8,72}$/u;
+// Misma regla de formato que valida la API: 8 caracteres, una mayúscula, un
+// número y un carácter especial (ni letra, ni número, ni espacio).
+const CONTRASENA_VALIDA = /^(?=.*\p{Lu})(?=.*\p{Nd})(?=.*[^\p{L}\p{N}\s]).{8,72}$/u;
 const CORREO_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
@@ -30,7 +30,8 @@ const CORREO_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  */
 export const REQUISITOS_CONTRASENA = [
   { id: 'longitud', texto: 'Al menos 8 caracteres', cumple: (contrasena) => contrasena.length >= 8 },
-  { id: 'mayuscula', texto: 'Una mayúscula', cumple: (contrasena) => /\p{Lu}/u.test(contrasena) },  { id: 'especial', texto: 'Un carácter especial', cumple: (contrasena) => /[^\p{L}\p{N}\s]/u.test(contrasena) },
+  { id: 'mayuscula', texto: 'Una mayúscula', cumple: (contrasena) => /\p{Lu}/u.test(contrasena) },
+  { id: 'numero', texto: 'Un número', cumple: (contrasena) => /\p{Nd}/u.test(contrasena) },  { id: 'especial', texto: 'Un carácter especial', cumple: (contrasena) => /[^\p{L}\p{N}\s]/u.test(contrasena) },
 ];
 
 /**
@@ -49,7 +50,7 @@ export function validarRegistro(datos) {
     errores.correo = 'El correo no tiene un formato válido.';
   }
   if (!CONTRASENA_VALIDA.test(datos.contrasena)) {
-    errores.contrasena = 'La contraseña debe tener al menos 8 caracteres, una mayúscula y un carácter especial.';
+    errores.contrasena = 'La contraseña debe tener al menos 8 caracteres, una mayúscula, un número y un carácter especial.';
   }
   return errores;
 }

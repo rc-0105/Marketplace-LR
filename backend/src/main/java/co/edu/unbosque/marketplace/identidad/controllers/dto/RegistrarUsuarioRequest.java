@@ -7,7 +7,7 @@ import jakarta.validation.constraints.Size;
 
 /**
  * Datos del formulario de registro. La contraseña exige 8 caracteres, una
- * mayúscula y un carácter especial; el máximo de 72 es el límite de BCrypt.
+ * mayúscula, un número y un carácter especial; el máximo de 72 es el límite de BCrypt.
  */
 public record RegistrarUsuarioRequest(
         @NotBlank(message = "El nombre es obligatorio.")
@@ -21,8 +21,8 @@ public record RegistrarUsuarioRequest(
 
         @NotBlank(message = "La contraseña es obligatoria.")
         @Size(min = 8, max = 72, message = "La contraseña debe tener entre 8 y 72 caracteres.")
-        @Pattern(regexp = "^(?=.*\\p{Lu})(?=.*[^\\p{L}\\p{N}\\s]).*$",
-                message = "La contraseña debe incluir al menos una mayúscula y un carácter especial.")
+        @Pattern(regexp = "^(?=.*\\p{Lu})(?=.*\\p{Nd})(?=.*[^\\p{L}\\p{N}\\s]).*$",
+                message = "La contraseña debe incluir al menos una mayúscula, un número y un carácter especial.")
         String contrasena,
 
         @NotBlank(message = "El rol es obligatorio.")

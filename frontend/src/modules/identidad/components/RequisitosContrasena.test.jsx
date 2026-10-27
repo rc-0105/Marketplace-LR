@@ -7,21 +7,29 @@ function requisitos() {
 }
 
 describe('RequisitosContrasena', () => {
-  it('muestra los tres requisitos pendientes cuando la contraseña está vacía', () => {
+  it('muestra los cuatro requisitos pendientes cuando la contraseña está vacía', () => {
     render(<RequisitosContrasena contrasena="" />);
 
-    const [longitud, mayuscula, especial] = requisitos();
+    const [longitud, mayuscula, numero, especial] = requisitos();
     expect(longitud).toHaveTextContent('Pendiente: Al menos 8 caracteres');
     expect(mayuscula).toHaveTextContent('Pendiente: Una mayúscula');
+    expect(numero).toHaveTextContent('Pendiente: Un número');
     expect(especial).toHaveTextContent('Pendiente: Un carácter especial');
   });
 
   it('marca como cumplido cada requisito que la contraseña ya satisface', () => {
     render(<RequisitosContrasena contrasena="Corta#" />);
 
-    const [longitud, mayuscula, especial] = requisitos();
+    const [longitud, mayuscula, numero, especial] = requisitos();
     expect(longitud).toHaveTextContent('Pendiente: Al menos 8 caracteres');
     expect(mayuscula).toHaveTextContent('Cumplido: Una mayúscula');
+    expect(numero).toHaveTextContent('Pendiente: Un número');
     expect(especial).toHaveTextContent('Cumplido: Un carácter especial');
+  });
+
+  it('marca el número como cumplido cuando la contraseña lo incluye', () => {
+    render(<RequisitosContrasena contrasena="corta1" />);
+
+    expect(requisitos()[2]).toHaveTextContent('Cumplido: Un número');
   });
 });

@@ -78,6 +78,7 @@ describe('RegistroPage', () => {
   it.each([
     ['es corta', 'Cort#1'],
     ['no tiene mayúscula', 'sinmayuscula#1'],
+    ['no tiene número', 'SinNumero#Ab'],
     ['no tiene carácter especial', 'SinEspecial123'],
   ])('indica que la contraseña no cumple la regla cuando %s, sin enviar el formulario', (_caso, contrasena) => {
     renderizar();
@@ -85,7 +86,7 @@ describe('RegistroPage', () => {
     enviar();
 
     expect(screen.getByLabelText('Contraseña')).toHaveAccessibleDescription(
-      /debe tener al menos 8 caracteres, una mayúscula y un carácter especial/i,
+      /debe tener al menos 8 caracteres, una mayúscula, un número y un carácter especial/i,
     );
     expect(registrarUsuario).not.toHaveBeenCalled();
   });
