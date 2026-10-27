@@ -25,6 +25,7 @@ public class ConfiguracionSeguridad {
 
     private static final String RUTA_REGISTRO = "/api/v1/auth/registro";
     private static final String RUTA_LOGIN = "/api/v1/auth/login";
+    private static final String RUTA_LOGOUT = "/api/v1/auth/logout";
 
     @Bean
     public SecurityFilterChain cadena(HttpSecurity http, ManejadorFallosSeguridad fallos,
@@ -43,6 +44,7 @@ public class ConfiguracionSeguridad {
                         .requestMatchers(HttpMethod.GET, "/api/estado", "/actuator/health",
                                 "/actuator/health/**", "/actuator/info", "/v3/api-docs/**",
                                 "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers(HttpMethod.POST, RUTA_LOGOUT).authenticated()
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(oauth -> oauth
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(convertidor))

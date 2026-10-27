@@ -38,13 +38,14 @@ class AutenticacionServiceTest {
     private final PasswordEncoder codificador = mock(PasswordEncoder.class);
     private final EmisorTokens emisor = mock(EmisorTokens.class);
     private final PublicadorEventos publicador = mock(PublicadorEventos.class);
+    private final SesionService sesiones = mock(SesionService.class);
     private final Usuario ana = usuario();
     private AutenticacionService servicio;
 
     @BeforeEach
     void preparar() {
         when(codificador.encode(anyString())).thenReturn(HASH_FICTICIO);
-        servicio = new AutenticacionService(usuarios, codificador, emisor, publicador);
+        servicio = new AutenticacionService(usuarios, codificador, emisor, publicador, sesiones);
         when(usuarios.findByCorreo("ana@correo.com")).thenReturn(Optional.of(ana));
     }
 
@@ -98,7 +99,7 @@ class AutenticacionServiceTest {
     @DisplayName("El hash ficticio es un BCrypt válido y del mismo costo que los hashes reales")
     void hashFicticioEsBcryptValido() {
         PasswordEncoder real = spy(new BCryptPasswordEncoder());
-        AutenticacionService conBcryptReal = new AutenticacionService(usuarios, real, emisor, publicador);
+        AutenticacionService conBcryptReal = new AutenticacionService(usuarios, real, emisor, publicador, sesiones);
         when(usuarios.findByCorreo("nadie@correo.com")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> conBcryptReal.iniciarSesion("nadie@correo.com", CONTRASENA))
@@ -121,6 +122,22 @@ class AutenticacionServiceTest {
                 .hasMessage(MENSAJE);
 
         assertFalloAuditado();
+    }
+
+    @Test
+    @DisplayName("Cerrar sesión invalida el jti y audita el logout sin token ni correo")
+    void cierraSesion() {
+        Instant expiraEn = Instant.parse("2026-10-27T10:00:00Z");
+
+        servicio.cerrarSesion("jti-1", 7L, expiraEn);
+
+        verify(sesiones).invalidar("jti-1", 7L, expiraEn);
+        EventoCritico evento = eventoPublicado();
+        assertThat(evento.accion()).isEqualTo(AccionCritica.AUTENTICACION);
+        assertThat(evento.resultado()).isEqualTo(ResultadoEvento.EXITO);
+        assertThat(evento.usuario()).isEqualTo("7");
+        assertThat(evento.datos()).containsEntry("operacion", "logout");
+        assertThat(evento.datos().values()).doesNotContain("jti-1");
     }
 
     private void assertFalloAuditado() {
