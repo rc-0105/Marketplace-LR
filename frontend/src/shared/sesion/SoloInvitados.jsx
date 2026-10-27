@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 import { Navigate } from 'react-router-dom';
 import { homeDe } from './rutasPorRol.js';
 import { useSesion } from './useSesion.js';
@@ -8,3 +9,7 @@ export default function SoloInvitados({ children }) {
 
   return sesion ? <Navigate to={homeDe(sesion.usuario.rol)} replace /> : children;
 }
+
+SoloInvitados.propTypes = {
+  children: PropTypes.node.isRequired,
+};

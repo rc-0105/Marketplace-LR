@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 import { Navigate } from 'react-router-dom';
 import { homeDe } from './rutasPorRol.js';
 import { useSesion } from './useSesion.js';
@@ -14,3 +15,8 @@ export default function RutaProtegida({ rol, children }) {
   }
   return children;
 }
+
+RutaProtegida.propTypes = {
+  rol: PropTypes.string.isRequired,
+  children: PropTypes.node.isRequired,
+};
