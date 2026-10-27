@@ -28,4 +28,9 @@ describe('App', () => {
     renderizarEn('/registro');
     expect(screen.getByRole('heading', { name: 'Crea tu cuenta' })).toBeInTheDocument();
   });
+
+  it('muestra el encabezado con la marca en todas las páginas', () => {
+    renderizarEn('/registro');
+    expect(screen.getByRole('link', { name: 'Inversiones LR, ir al inicio' })).toBeInTheDocument();
+  });
 });

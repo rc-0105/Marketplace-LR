@@ -24,7 +24,14 @@
 const CONTRASENA_VALIDA = /^(?=.*\p{Lu})(?=.*[^\p{L}\p{N}\s]).{8,72}$/u;
 const CORREO_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export const AYUDA_CONTRASENA = 'Mínimo 8 caracteres, con una mayúscula y un carácter especial.';
+/**
+ * Los mismos requisitos de CONTRASENA_VALIDA, uno por uno, para mostrarlos mientras se escribe.
+ * @type {{id: string, texto: string, cumple: (contrasena: string) => boolean}[]}
+ */
+export const REQUISITOS_CONTRASENA = [
+  { id: 'longitud', texto: 'Al menos 8 caracteres', cumple: (contrasena) => contrasena.length >= 8 },
+  { id: 'mayuscula', texto: 'Una mayúscula', cumple: (contrasena) => /\p{Lu}/u.test(contrasena) },  { id: 'especial', texto: 'Un carácter especial', cumple: (contrasena) => /[^\p{L}\p{N}\s]/u.test(contrasena) },
+];
 
 /**
  * Valida solo el formato del formulario; las reglas de negocio las decide la API.

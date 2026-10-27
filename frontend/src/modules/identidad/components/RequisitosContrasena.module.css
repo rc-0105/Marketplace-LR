@@ -1,0 +1,40 @@
+.requisitos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espacio-1) var(--espacio-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--texto-pequeno);
+}
+
+.pendiente,
+.cumplido {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-1);
+  transition: color var(--transicion);
+}
+
+.pendiente {
+  color: var(--color-texto-secundario);
+}
+
+.cumplido {
+  color: var(--color-exito);
+  font-weight: 600;
+}
+
+.marca {
+  width: 1em;
+  text-align: center;
+}
+
+.oculto {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

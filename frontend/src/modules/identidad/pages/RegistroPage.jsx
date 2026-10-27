@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Campo from '../../../shared/components/Campo.jsx';
-import { AYUDA_CONTRASENA, validarRegistro } from '../models/usuario.js';
+import RequisitosContrasena from '../components/RequisitosContrasena.jsx';
+import { validarRegistro } from '../models/usuario.js';
 import { registrarUsuario } from '../services/identidadService.js';
 import estilos from './RegistroPage.module.css';
 
@@ -18,10 +19,35 @@ export default function RegistroPage() {
   const [errores, setErrores] = useState({});
   const [errorGeneral, setErrorGeneral] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const [visitados, setVisitados] = useState(new Set());
+
+  // Muestra el error de formato de un solo campo, sin tocar los demás.
+  function validarCampo(campo, datosActuales) {
+    const error = validarRegistro(datosActuales)[campo];
+    setErrores((previos) => {
+      const siguientes = { ...previos };
+      if (error) {
+        siguientes[campo] = error;
+      } else {
+        delete siguientes[campo];
+      }
+      return siguientes;
+    });
+  }
 
   function cambiar(evento) {
     const { name, value } = evento.target;
-    setDatos((previos) => ({ ...previos, [name]: value }));
+    const nuevosDatos = { ...datos, [name]: value };
+    setDatos(nuevosDatos);
+    if (visitados.has(name)) {
+      validarCampo(name, nuevosDatos);
+    }
+  }
+
+  function salir(evento) {
+    const { name } = evento.target;
+    setVisitados((previos) => new Set(previos).add(name));
+    validarCampo(name, datos);
   }
 
   async function enviar(evento) {
@@ -58,11 +84,14 @@ export default function RegistroPage() {
 
       <form className={estilos.formulario} onSubmit={enviar} noValidate>
         <Campo id="nombre" etiqueta="Nombre completo" autoComplete="name"
-          value={datos.nombre} onChange={cambiar} error={errores.nombre} />
+          value={datos.nombre} onChange={cambiar} onBlur={salir} error={errores.nombre} />
         <Campo id="correo" etiqueta="Correo electrónico" type="email" autoComplete="email"
-          value={datos.correo} onChange={cambiar} error={errores.correo} />
-        <Campo id="contrasena" etiqueta="Contraseña" type="password" autoComplete="new-password"
-          value={datos.contrasena} onChange={cambiar} ayuda={AYUDA_CONTRASENA} error={errores.contrasena} />
+          value={datos.correo} onChange={cambiar} onBlur={salir} error={errores.correo} />
+        <div className={estilos.contrasena}>
+          <Campo id="contrasena" etiqueta="Contraseña" type="password" autoComplete="new-password"
+            value={datos.contrasena} onChange={cambiar} onBlur={salir} error={errores.contrasena} />
+          <RequisitosContrasena contrasena={datos.contrasena} />
+        </div>
 
         <fieldset className={estilos.roles}>
           <legend className={estilos.leyenda}>¿Cómo vas a usar la plataforma?</legend>

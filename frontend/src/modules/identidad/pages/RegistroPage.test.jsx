@@ -42,6 +42,39 @@ describe('RegistroPage', () => {
     expect(screen.getByRole('radio', { name: /anfitrión/i })).not.toBeChecked();
   });
 
+  it('indica el error de un campo al salir de él, sin esperar al envío ni marcar los demás', () => {
+    renderizar();
+    const correo = screen.getByLabelText('Correo electrónico');
+    fireEvent.change(correo, { target: { value: 'ana-sin-arroba' } });
+    fireEvent.blur(correo);
+
+    expect(correo).toHaveAccessibleDescription('El correo no tiene un formato válido.');
+    expect(screen.getByLabelText('Nombre completo')).not.toBeInvalid();
+    expect(registrarUsuario).not.toHaveBeenCalled();
+  });
+
+  it('quita el error del campo en cuanto el usuario lo corrige', () => {
+    renderizar();
+    const correo = screen.getByLabelText('Correo electrónico');
+    fireEvent.change(correo, { target: { value: 'ana-sin-arroba' } });
+    fireEvent.blur(correo);
+
+    fireEvent.change(correo, { target: { value: 'ana@correo.com' } });
+
+    expect(correo).not.toBeInvalid();
+    expect(correo).toHaveAccessibleDescription('');
+  });
+
+  it('marca los requisitos de la contraseña a medida que se escribe', () => {
+    renderizar();
+    const requisitos = screen.getByRole('list', { name: 'Requisitos de la contraseña' });
+    expect(requisitos).not.toHaveTextContent('Cumplido');
+
+    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'Segura#2026' } });
+
+    expect(requisitos).not.toHaveTextContent('Pendiente');
+  });
+
   it.each([
     ['es corta', 'Cort#1'],
     ['no tiene mayúscula', 'sinmayuscula#1'],

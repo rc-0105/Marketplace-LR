@@ -1,28 +1,35 @@
 .pagina {
   max-width: 28rem;
   margin: 0 auto;
-  padding: var(--espacio-12) var(--espacio-4);
+  padding: var(--espacio-6) var(--espacio-4);
 }
 
 .titulo {
-  margin: 0 0 var(--espacio-2);
+  margin: 0 0 var(--espacio-1);
   font-size: var(--texto-encabezado);
 }
 
 .intro {
-  margin: 0 0 var(--espacio-8);
+  margin: 0 0 var(--espacio-6);
   color: var(--color-texto-secundario);
 }
 
 .formulario {
   display: flex;
   flex-direction: column;
-  gap: var(--espacio-6);
+  gap: var(--espacio-4);
 }
 
-.roles {
+.contrasena {
   display: flex;
   flex-direction: column;
+  gap: var(--espacio-2);
+}
+
+/* Dos tarjetas en fila cuando caben; en el celular se apilan. */
+.roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
   gap: var(--espacio-2);
   margin: 0;
   padding: 0;
@@ -97,6 +104,6 @@
 }
 
 .pie {
-  margin-top: var(--espacio-8);
+  margin: var(--espacio-4) 0 0;
   color: var(--color-texto-secundario);
 }
