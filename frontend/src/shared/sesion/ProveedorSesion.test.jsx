@@ -17,7 +17,8 @@ function renderizar() {
   );
 }
 
-const iniciar = (ms) => guardarSesion({ token: 'abc', usuario: { rol: 'HUESPED' }, expiraEn: new Date(Date.now() + ms).toISOString() });
+const iniciar = (ms, token = 'abc') => guardarSesion({ token, usuario: { rol: 'HUESPED' }, expiraEn: new Date(Date.now() + ms).toISOString() });
+const DIAS_40 = 40 * 24 * 60 * 60 * 1000;
 
 describe('ProveedorSesion', () => {
   beforeEach(() => {
@@ -53,6 +54,69 @@ describe('ProveedorSesion', () => {
 
     expect(obtenerSesion()).toBeNull();
     expect(screen.getByText('/inicio-sesion expirada')).toBeInTheDocument();
+  });
+
+  it('no limpia una sesión que vence en más de 2^31-1 ms al pasar un instante', () => {
+    renderizar();
+    act(() => iniciar(DIAS_40));
+
+    act(() => vi.advanceTimersByTime(1_000));
+
+    expect(obtenerSesion()).not.toBeNull();
+    expect(screen.getByText('/huesped')).toBeInTheDocument();
+  });
+
+  it('con un vencimiento lejano reprograma el temporizador y limpia al llegar al instante real', () => {
+    renderizar();
+    act(() => iniciar(DIAS_40));
+
+    act(() => vi.advanceTimersByTime(DIAS_40 - 1_000));
+    expect(obtenerSesion()).not.toBeNull();
+
+    act(() => vi.advanceTimersByTime(2_000));
+
+    expect(obtenerSesion()).toBeNull();
+    expect(screen.getByText('/inicio-sesion expirada')).toBeInTheDocument();
+  });
+
+  it('al guardar una sesión con vencimiento posterior reprograma: el plazo viejo pasa sin limpiar y el nuevo limpia', () => {
+    renderizar();
+    act(() => iniciar(5_000));
+    act(() => iniciar(20_000, 'nueva'));
+
+    act(() => vi.advanceTimersByTime(6_000));
+    expect(obtenerSesion()?.token).toBe('nueva');
+    expect(screen.getByText('/huesped')).toBeInTheDocument();
+
+    act(() => vi.advanceTimersByTime(15_000));
+
+    expect(obtenerSesion()).toBeNull();
+    expect(screen.getByText('/inicio-sesion expirada')).toBeInTheDocument();
+  });
+
+  it('cerrar sesión cancela el temporizador: no hay navegación por expiración después', () => {
+    renderizar();
+    act(() => iniciar(5_000));
+
+    act(() => limpiarSesion());
+    act(() => vi.advanceTimersByTime(10_000));
+
+    expect(vi.getTimerCount()).toBe(0);
+    expect(screen.getByText('/huesped')).toBeInTheDocument();
+  });
+
+  it('un temporizador viejo no limpia una sesión nueva aunque se dispare', () => {
+    renderizar();
+    act(() => iniciar(5_000));
+    // Se reemplaza la sesión sin avisar al proveedor: el temporizador viejo sigue vivo.
+    sessionStorage.setItem('marketplace.sesion', JSON.stringify({
+      token: 'nueva', usuario: { rol: 'HUESPED' }, expiraEn: new Date(Date.now() + 60_000).toISOString(),
+    }));
+
+    act(() => vi.advanceTimersByTime(5_001));
+
+    expect(obtenerSesion()?.token).toBe('nueva');
+    expect(screen.getByText('/huesped')).toBeInTheDocument();
   });
 
   it('cancela el temporizador y la suscripción al desmontarse', () => {
