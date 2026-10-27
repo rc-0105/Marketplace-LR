@@ -13,9 +13,11 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,6 +27,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 /** Recorre la denylist contra PostgreSQL: inserción idempotente y limpieza (S-A7, S-A16, REQ-A7). */
 @SpringBootTest
 class SesionServiceIntegracionTest {
+
+    private static final int VUELTAS_CONCURRENCIA = 10;
 
     @Autowired
     private SesionService sesiones;
@@ -61,22 +65,30 @@ class SesionServiceIntegracionTest {
     @DisplayName("Dos cierres de sesión simultáneos con el mismo jti no producen error")
     void invalidarConcurrenteNoFalla() throws Exception {
         Instant expiraEn = Instant.now().plus(1, ChronoUnit.HOURS);
-        Callable<Boolean> cierre = () -> {
-            sesiones.invalidar("jti-concurrente", usuarioId, expiraEn);
-            return true;
-        };
         ExecutorService hilos = Executors.newFixedThreadPool(2);
 
         try {
-            Future<Boolean> primero = hilos.submit(cierre);
-            Future<Boolean> segundo = hilos.submit(cierre);
-            assertThat(primero.get()).isTrue();
-            assertThat(segundo.get()).isTrue();
+            // La barrera suelta ambos hilos a la vez para forzar la carrera sobre ON CONFLICT;
+            // se repite porque una sola vuelta puede no llegar a solaparse.
+            for (int vuelta = 0; vuelta < VUELTAS_CONCURRENCIA; vuelta++) {
+                String jti = "jti-concurrente-" + vuelta;
+                CyclicBarrier largada = new CyclicBarrier(2);
+                Callable<Boolean> cierre = () -> {
+                    largada.await(5, TimeUnit.SECONDS);
+                    sesiones.invalidar(jti, usuarioId, expiraEn);
+                    return true;
+                };
+
+                Future<Boolean> primero = hilos.submit(cierre);
+                Future<Boolean> segundo = hilos.submit(cierre);
+                assertThat(primero.get()).isTrue();
+                assertThat(segundo.get()).isTrue();
+            }
         } finally {
             hilos.shutdownNow();
         }
 
-        assertThat(repositorio.count()).isEqualTo(1);
+        assertThat(repositorio.count()).isEqualTo(VUELTAS_CONCURRENCIA);
     }
 
     @Test
