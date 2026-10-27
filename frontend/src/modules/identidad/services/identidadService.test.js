@@ -3,14 +3,9 @@ import { ErrorApi, post } from '../../../shared/services/http.js';
 import { guardarSesion, obtenerSesion } from '../../../shared/services/sesion.js';
 import { cerrarSesion, iniciarSesion, registrarUsuario } from './identidadService.js';
 
-vi.mock('../../../shared/services/http.js', () => ({
+vi.mock('../../../shared/services/http.js', async (importOriginal) => ({
+  ...(await importOriginal()),
   post: vi.fn(),
-  ErrorApi: class ErrorApi extends Error {
-    constructor(estado, detalle) {
-      super(detalle);
-      this.estado = estado;
-    }
-  },
 }));
 
 const respuestaLogin = {
@@ -53,11 +48,15 @@ describe('identidadService', () => {
   it.each([400, 401])('ante un %i de login propaga el error sin guardar ni tocar la sesión', async (estado) => {
     const previa = { token: 'previa', expiraEn: '2999-01-01T00:00:00Z', usuario: { id: 1 } };
     guardarSesion(previa);
-    vi.mocked(post).mockRejectedValue(new ErrorApi(estado, 'Credenciales inválidas.'));
+    const error = new ErrorApi(estado, 'Credenciales inválidas.', { correo: 'Obligatorio.' });
+    vi.mocked(post).mockRejectedValue(error);
 
-    await expect(iniciarSesion({ correo: 'x', contrasena: 'y' })).rejects.toMatchObject({
+    await expect(iniciarSesion({ correo: 'x', contrasena: 'y' })).rejects.toBe(error);
+    expect(error).toMatchObject({
+      name: 'ErrorApi',
       estado,
       message: 'Credenciales inválidas.',
+      errores: { correo: 'Obligatorio.' },
     });
     expect(obtenerSesion()).toEqual(previa);
   });
