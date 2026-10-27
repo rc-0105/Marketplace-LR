@@ -56,13 +56,22 @@ function notificar(conjunto) {
  * @property {boolean} activa
  */
 
+function leerSesionDe(crudo) {
+  if (crudo === cache.crudo) {
+    return cache.valor;
+  }
+  return crudo === null ? null : parsear(crudo);
+}
+
 /** @returns {Sesion | null} la sesión vigente; una vencida cuenta como ausente y se borra */
 export function obtenerSesion() {
   const crudo = leerCrudo();
-  const sesion = crudo === cache.crudo ? cache.valor : (crudo === null ? null : parsear(crudo));
+  const sesion = leerSesionDe(crudo);
   // El vencimiento se revisa también con la sesión en cache: puede vencer con la pestaña abierta.
   // No se notifica desde el getter (se llama durante el render); eso lo hace el timer de expiración.
-  if (sesion && !(new Date(sesion.expiraEn) > new Date())) {
+  // Una fecha ilegible (NaN) también cuenta como vencida, igual que antes.
+  const venceEn = sesion ? new Date(sesion.expiraEn).getTime() : 0;
+  if (sesion && (Number.isNaN(venceEn) || venceEn <= Date.now())) {
     borrarCrudo();
     cache = { crudo: null, valor: null };
     return null;
