@@ -23,4 +23,10 @@ describe('PanelRolPage', () => {
     expect(screen.getByText(`Ingresaste como ${nombre}.`)).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('—');
   });
+
+  it('no falla si la sesión desaparece mientras está montado', () => {
+    render(<PanelRolPage />);
+
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument();
+  });
 });

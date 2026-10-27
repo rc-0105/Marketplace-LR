@@ -7,9 +7,12 @@ const NOMBRE_ROL = {
   ADMINISTRADOR: 'Administrador',
 };
 
-// Panel provisional de /huesped, /anfitrion y /administrador. Las rutas ya validan que hay sesión.
+// Panel provisional de /huesped, /anfitrion y /administrador. Las rutas ya validan que hay sesión,
+// pero puede desaparecer mientras el panel sigue montado (logout o expiración).
 export default function PanelRolPage() {
-  const { usuario } = useSesion();
+  const sesion = useSesion();
+  if (!sesion) return null;
+  const { usuario } = sesion;
 
   return (
     <main className={estilos.pagina}>
