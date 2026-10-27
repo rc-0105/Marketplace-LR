@@ -73,4 +73,35 @@ describe('InicioSesionPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Correo o contraseña incorrectos. Revísalos e intenta de nuevo.');
     expect(screen.getByRole('button', { name: 'Iniciar sesión' })).toBeEnabled();
   });
+
+  it.each([
+    [400, 'Revisa los datos ingresados.'],
+    [503, 'El servicio no está disponible por ahora. Intenta más tarde.'],
+    [0, 'No pudimos conectar con el servidor. Revisa tu conexión e intenta de nuevo.'],
+  ])('ante un error %s muestra su mensaje, no guarda sesión y permite reintentar', async (estado, mensaje) => {
+    iniciarSesion.mockRejectedValue(new ErrorApi(estado, mensaje));
+    renderizar(undefined);
+    ingresar('a@b.co', 'abc');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(mensaje);
+    expect(sessionStorage.length).toBe(0);
+    expect(screen.getByRole('heading', { name: 'Inicia sesión' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Iniciar sesión' })).toBeEnabled();
+  });
+
+  it('deshabilita el envío mientras espera y no repite la llamada', async () => {
+    let rechazar;
+    iniciarSesion.mockReturnValue(new Promise((_, rechazo) => { rechazar = rechazo; }));
+    renderizar(undefined);
+    ingresar('a@b.co', 'abc');
+
+    const boton = screen.getByRole('button', { name: 'Iniciando sesión…' });
+    expect(boton).toBeDisabled();
+    fireEvent.click(boton);
+    expect(iniciarSesion).toHaveBeenCalledTimes(1);
+
+    rechazar(new ErrorApi(503, 'El servicio no está disponible por ahora. Intenta más tarde.'));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Iniciar sesión' })).toBeEnabled();
+  });
 });
