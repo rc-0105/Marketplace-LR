@@ -24,6 +24,9 @@ public record PropiedadesJwt(
             throw new IllegalArgumentException(
                     "JWT_SECRET es obligatorio y debe tener al menos " + BYTES_MINIMOS + " bytes.");
         }
+        if (expiracionMinutos <= 0) {
+            throw new IllegalArgumentException("jwt.expiracionMinutos debe ser mayor que 0.");
+        }
     }
 
     @Override

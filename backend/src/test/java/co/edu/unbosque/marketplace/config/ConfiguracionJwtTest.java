@@ -76,6 +76,15 @@ class ConfiguracionJwtTest {
     }
 
     @Test
+    @DisplayName("Acepta un token vencido hace 30 s por el desfase de reloj de 60 s")
+    void aceptaVencidoDentroDelDesfase() {
+        Instant hace = Instant.now().minusSeconds(30);
+        String token = emitir(c -> c.issuedAt(hace.minusSeconds(60)).expiresAt(hace));
+
+        assertThat(decodificador.decode(token).getId()).isNotNull();
+    }
+
+    @Test
     @DisplayName("Rechaza un token de otro emisor")
     void rechazaOtroEmisor() {
         String token = emitir(c -> c.issuer("otro-emisor"));
