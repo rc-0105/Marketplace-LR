@@ -31,6 +31,9 @@ public class ConfiguracionSeguridad {
     public SecurityFilterChain cadena(HttpSecurity http, ManejadorFallosSeguridad fallos,
             JwtAuthenticationConverter convertidor, BearerTokenResolver resolverToken) throws Exception {
         http
+                // CSRF se deshabilita a propósito: la API es stateless (sin cookies ni sesión HTTP) y
+                // autentica solo con el encabezado Authorization: Bearer, que el cliente agrega de forma
+                // explícita y el navegador nunca envía por su cuenta; no hay credencial ambiente que explotar.
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(sesion -> sesion.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .formLogin(AbstractHttpConfigurer::disable)

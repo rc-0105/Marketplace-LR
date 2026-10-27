@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 public class AutenticacionService {
 
     private static final String ENTIDAD = "Usuario";
+    private static final String OPERACION = "operacion";
 
     private final UsuarioRepository usuarios;
     private final PasswordEncoder codificador;
@@ -47,7 +48,7 @@ public class AutenticacionService {
         if (encontrado.isEmpty() || !coincide || !encontrado.get().puedeIniciarSesion()) {
             publicador.publicar(new EventoCritico(null, AccionCritica.AUTENTICACION, ENTIDAD, null,
                     ResultadoEvento.FALLO, Instant.now(),
-                    Map.of("operacion", "login", "motivo", "credenciales_invalidas")));
+                    Map.of(OPERACION, "login", "motivo", "credenciales_invalidas")));
             throw new CredencialesInvalidasException();
         }
 
@@ -55,7 +56,7 @@ public class AutenticacionService {
         TokenEmitido token = emisor.emitir(usuario);
         publicador.publicar(new EventoCritico(String.valueOf(usuario.getId()), AccionCritica.AUTENTICACION,
                 ENTIDAD, String.valueOf(usuario.getId()), ResultadoEvento.EXITO, Instant.now(),
-                Map.of("operacion", "login")));
+                Map.of(OPERACION, "login")));
         return new SesionIniciada(usuario, token);
     }
 
@@ -64,6 +65,6 @@ public class AutenticacionService {
         sesiones.invalidar(jti, usuarioId, expiraEn);
         publicador.publicar(new EventoCritico(String.valueOf(usuarioId), AccionCritica.AUTENTICACION, ENTIDAD,
                 String.valueOf(usuarioId), ResultadoEvento.EXITO, Instant.now(),
-                Map.of("operacion", "logout")));
+                Map.of(OPERACION, "logout")));
     }
 }
