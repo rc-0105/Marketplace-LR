@@ -25,15 +25,17 @@ public class AutenticacionService {
     private final PasswordEncoder codificador;
     private final EmisorTokens emisor;
     private final PublicadorEventos publicador;
+    private final SesionService sesiones;
     // Con un correo desconocido se compara contra este hash para igualar el costo de BCrypt.
     private final String hashFicticio;
 
     public AutenticacionService(UsuarioRepository usuarios, PasswordEncoder codificador, EmisorTokens emisor,
-            PublicadorEventos publicador) {
+            PublicadorEventos publicador, SesionService sesiones) {
         this.usuarios = usuarios;
         this.codificador = codificador;
         this.emisor = emisor;
         this.publicador = publicador;
+        this.sesiones = sesiones;
         this.hashFicticio = codificador.encode(UUID.randomUUID().toString());
     }
 
@@ -55,5 +57,13 @@ public class AutenticacionService {
                 ENTIDAD, String.valueOf(usuario.getId()), ResultadoEvento.EXITO, Instant.now(),
                 Map.of("operacion", "login")));
         return new SesionIniciada(usuario, token);
+    }
+
+    /** Invalida el token de la sesión (RF-03). Es idempotente: repetirlo no duplica ni falla. */
+    public void cerrarSesion(String jti, Long usuarioId, Instant expiraEn) {
+        sesiones.invalidar(jti, usuarioId, expiraEn);
+        publicador.publicar(new EventoCritico(String.valueOf(usuarioId), AccionCritica.AUTENTICACION, ENTIDAD,
+                String.valueOf(usuarioId), ResultadoEvento.EXITO, Instant.now(),
+                Map.of("operacion", "logout")));
     }
 }
