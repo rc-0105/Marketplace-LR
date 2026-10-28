@@ -86,6 +86,14 @@ public class Usuario {
         this.motivoRestriccion = null;
     }
 
+    /** DESACTIVADA a ACTIVA. Una cuenta restringida no se reactiva por su cuenta. */
+    public void reactivar() {
+        if (estado != EstadoCuenta.DESACTIVADA) {
+            throw new IllegalStateException("Solo una cuenta desactivada se puede reactivar");
+        }
+        this.estado = EstadoCuenta.ACTIVA;
+    }
+
     public Long getId() {
         return id;
     }

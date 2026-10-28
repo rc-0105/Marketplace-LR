@@ -133,6 +133,19 @@ class ConfiguracionSeguridadIntegracionTest {
         assertThat(estadoLogin).isNotIn(401, 403);
     }
 
+    @Test
+    @DisplayName("La reactivación es pública pero el resto de /api/v1/perfil sigue negado por defecto")
+    void reactivarEsPublicaYElRestoDePerfilSeNiega() throws Exception {
+        int estadoReactivar = mvc.perform(post("/api/v1/perfil/reactivar").content("{}")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andReturn().getResponse().getStatus();
+        assertThat(estadoReactivar).isEqualTo(400);
+
+        mvc.perform(get("/api/v1/perfil/otra")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/perfil/otra").header(HttpHeaders.AUTHORIZATION, bearer(token(Duration.ofMinutes(5)))))
+                .andExpect(status().isForbidden());
+    }
+
     private String token(Duration vigencia) {
         Instant ahora = Instant.now();
         Instant expira = ahora.plus(vigencia);

@@ -85,4 +85,29 @@ class UsuarioTest {
         assertThatThrownBy(() -> UsuariosDePrueba.desactivada(8L).levantarRestriccion())
                 .isInstanceOf(IllegalStateException.class);
     }
+
+    @Test
+    @DisplayName("Reactivar una cuenta desactivada la deja activa")
+    void reactivaCuentaDesactivada() {
+        Usuario usuario = UsuariosDePrueba.desactivada(7L);
+
+        usuario.reactivar();
+
+        assertThat(usuario.getEstado()).isEqualTo(EstadoCuenta.ACTIVA);
+        assertThat(usuario.puedeIniciarSesion()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Una cuenta activa o restringida no se reactiva y conserva su estado")
+    void noReactivaCuentaQueNoEstaDesactivada() {
+        Usuario activa = UsuariosDePrueba.activa(7L);
+        Usuario restringida = UsuariosDePrueba.restringida(8L, "Pagos en disputa");
+
+        assertThatThrownBy(activa::reactivar).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(restringida::reactivar).isInstanceOf(IllegalStateException.class);
+
+        assertThat(activa.getEstado()).isEqualTo(EstadoCuenta.ACTIVA);
+        assertThat(restringida.getEstado()).isEqualTo(EstadoCuenta.RESTRINGIDA);
+        assertThat(restringida.getMotivoRestriccion()).isEqualTo("Pagos en disputa");
+    }
 }
