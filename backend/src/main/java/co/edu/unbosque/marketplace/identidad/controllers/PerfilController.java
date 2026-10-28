@@ -49,4 +49,11 @@ public class PerfilController {
     public void desactivar(@Valid @RequestBody ConfirmacionCuentaRequest solicitud, @AuthenticationPrincipal Jwt jwt) {
         cuentas.desactivar(Long.valueOf(jwt.getSubject()), solicitud.contrasena());
     }
+
+    @PostMapping("/eliminar")
+    @PreAuthorize(Permisos.AUTENTICADO)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void eliminar(@Valid @RequestBody ConfirmacionCuentaRequest solicitud, @AuthenticationPrincipal Jwt jwt) {
+        cuentas.eliminar(Long.valueOf(jwt.getSubject()), solicitud.contrasena());
+    }
 }
