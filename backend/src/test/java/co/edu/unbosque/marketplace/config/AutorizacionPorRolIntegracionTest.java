@@ -1,11 +1,13 @@
 package co.edu.unbosque.marketplace.config;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import co.edu.unbosque.marketplace.compartido.seguridad.Permisos;
+import co.edu.unbosque.marketplace.compartido.seguridad.Propiedad;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -20,13 +22,17 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -38,6 +44,7 @@ class AutorizacionPorRolIntegracionTest {
 
     private static final String RUTA_ADMINISTRACION = "/api/v1/prueba-roles/administracion";
     private static final String RUTA_SIN_DECLARAR = "/api/v1/prueba-roles/sin-declarar";
+    private static final String RUTA_PUBLICACION_DE_ANFITRION_2 = "/api/v1/prueba-roles/publicaciones/2";
 
     @Autowired
     private MockMvc mvc;
@@ -95,11 +102,34 @@ class AutorizacionPorRolIntegracionTest {
                 .andExpect(jsonPath("$.detail").value("No tienes permiso para realizar esta acción."));
     }
 
+    @Test
+    @DisplayName("Un anfitrión que edita la publicación de otro anfitrión recibe 403")
+    void anfitrionEditandoPublicacionAjenaResponde403() throws Exception {
+        mvc.perform(put(RUTA_PUBLICACION_DE_ANFITRION_2)
+                        .header(HttpHeaders.AUTHORIZATION, bearer("1", "ANFITRION", Duration.ofMinutes(5))))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.detail").value("No tienes permiso para realizar esta acción."));
+    }
+
+    @Test
+    @DisplayName("El anfitrión dueño sí edita su propia publicación")
+    void anfitrionEditaSuPublicacion() throws Exception {
+        mvc.perform(put(RUTA_PUBLICACION_DE_ANFITRION_2)
+                        .header(HttpHeaders.AUTHORIZATION, bearer("2", "ANFITRION", Duration.ofMinutes(5))))
+                .andExpect(status().isOk())
+                .andExpect(content().string("editada"));
+    }
+
     private String bearer(String rol, Duration vigencia) {
+        return bearer("1", rol, vigencia);
+    }
+
+    private String bearer(String usuarioId, String rol, Duration vigencia) {
         Instant ahora = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(propiedades.emisor())
-                .subject("1")
+                .subject(usuarioId)
                 .id(UUID.randomUUID().toString())
                 .claim("rol", rol)
                 .issuedAt(ahora.minus(Duration.ofHours(2)))
@@ -109,10 +139,20 @@ class AutorizacionPorRolIntegracionTest {
         return "Bearer " + codificador.encode(JwtEncoderParameters.from(cabecera, claims)).getTokenValue();
     }
 
-    /** Endpoints de prueba: uno declara el rol administrador y el otro no declara nada. */
+    /**
+     * Endpoints de prueba: uno declara el rol administrador, otro no declara nada y
+     * otro edita una publicación cuyo dueño viene en la ruta.
+     */
     @RestController
     @RequestMapping("/api/v1/prueba-roles")
     static class ControladorPrueba {
+
+        @PutMapping("/publicaciones/{propietarioId}")
+        @PreAuthorize(Permisos.ANFITRION)
+        String editarPublicacion(@PathVariable Long propietarioId, @AuthenticationPrincipal Jwt jwt) {
+            Propiedad.exigirPropietario(propietarioId, Long.valueOf(jwt.getSubject()));
+            return "editada";
+        }
 
         @GetMapping("/administracion")
         @PreAuthorize(Permisos.ADMINISTRADOR)
