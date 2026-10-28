@@ -4,7 +4,11 @@ import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
+import co.edu.unbosque.marketplace.compartido.exceptions.NegocioException;
 import co.edu.unbosque.marketplace.identidad.exceptions.CredencialesInvalidasException;
+import co.edu.unbosque.marketplace.identidad.exceptions.CuentaDesactivadaException;
+import co.edu.unbosque.marketplace.identidad.exceptions.CuentaRestringidaException;
+import co.edu.unbosque.marketplace.identidad.model.EstadoCuenta;
 import co.edu.unbosque.marketplace.identidad.model.Usuario;
 import co.edu.unbosque.marketplace.identidad.repository.UsuarioRepository;
 import java.time.Instant;
@@ -21,6 +25,7 @@ public class AutenticacionService {
 
     private static final String ENTIDAD = "Usuario";
     private static final String OPERACION = "operacion";
+    private static final String MOTIVO = "motivo";
 
     private final UsuarioRepository usuarios;
     private final PasswordEncoder codificador;
@@ -41,23 +46,41 @@ public class AutenticacionService {
     }
 
     public SesionIniciada iniciarSesion(String correo, String contrasena) {
-        Optional<Usuario> encontrado = usuarios.findByCorreo(correo.trim().toLowerCase(Locale.ROOT));
-        boolean coincide = codificador.matches(contrasena,
-                encontrado.map(Usuario::getContrasenaHash).orElse(hashFicticio));
-
-        if (encontrado.isEmpty() || !coincide || !encontrado.get().puedeIniciarSesion()) {
-            publicador.publicar(new EventoCritico(null, AccionCritica.AUTENTICACION, ENTIDAD, null,
-                    ResultadoEvento.FALLO, Instant.now(),
-                    Map.of(OPERACION, "login", "motivo", "credenciales_invalidas")));
-            throw new CredencialesInvalidasException();
+        Usuario usuario = verificarCredenciales(correo, contrasena, "login");
+        if (!usuario.puedeIniciarSesion()) {
+            throw rechazarPorEstado(usuario, "login");
         }
 
-        Usuario usuario = encontrado.get();
         TokenEmitido token = emisor.emitir(usuario);
         publicador.publicar(new EventoCritico(String.valueOf(usuario.getId()), AccionCritica.AUTENTICACION,
                 ENTIDAD, String.valueOf(usuario.getId()), ResultadoEvento.EXITO, Instant.now(),
                 Map.of(OPERACION, "login")));
         return new SesionIniciada(usuario, token);
+    }
+
+    // El estado se revisa solo después de la contraseña, para no revelar a quien no la conoce.
+    private Usuario verificarCredenciales(String correo, String contrasena, String operacion) {
+        Optional<Usuario> encontrado = usuarios.findByCorreo(correo.trim().toLowerCase(Locale.ROOT));
+        boolean coincide = codificador.matches(contrasena,
+                encontrado.map(Usuario::getContrasenaHash).orElse(hashFicticio));
+
+        if (encontrado.isEmpty() || !coincide) {
+            publicador.publicar(new EventoCritico(null, AccionCritica.AUTENTICACION, ENTIDAD, null,
+                    ResultadoEvento.FALLO, Instant.now(),
+                    Map.of(OPERACION, operacion, MOTIVO, "credenciales_invalidas")));
+            throw new CredencialesInvalidasException();
+        }
+        return encontrado.get();
+    }
+
+    private NegocioException rechazarPorEstado(Usuario usuario, String operacion) {
+        boolean restringida = usuario.getEstado() == EstadoCuenta.RESTRINGIDA;
+        publicador.publicar(new EventoCritico(String.valueOf(usuario.getId()), AccionCritica.AUTENTICACION,
+                ENTIDAD, String.valueOf(usuario.getId()), ResultadoEvento.FALLO, Instant.now(),
+                Map.of(OPERACION, operacion, MOTIVO, restringida ? "cuenta_restringida" : "cuenta_desactivada")));
+        return restringida
+                ? new CuentaRestringidaException(usuario.getMotivoRestriccion())
+                : new CuentaDesactivadaException();
     }
 
     /** Invalida el token de la sesión (RF-03). Es idempotente: repetirlo no duplica ni falla. */
