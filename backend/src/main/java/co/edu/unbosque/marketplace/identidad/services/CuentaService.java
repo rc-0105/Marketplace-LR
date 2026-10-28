@@ -15,6 +15,7 @@ import co.edu.unbosque.marketplace.identidad.repository.UsuarioRepository;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,7 @@ public class CuentaService {
     private static final String RESTRINGIR = "restringir_cuenta";
     private static final String LEVANTAR = "levantar_restriccion";
     private static final String DESACTIVAR = "desactivar_cuenta";
+    private static final String ELIMINAR = "eliminar_cuenta";
     private static final String MOTIVO = "motivo";
 
     private final UsuarioRepository usuarios;
@@ -75,6 +77,19 @@ public class CuentaService {
         usuario.desactivar();
         usuarios.save(usuario);
         auditarDueno(usuarioId, DESACTIVAR, ResultadoEvento.EXITO, Map.of());
+    }
+
+    /**
+     * El dueño elimina su cuenta (RF-10): misma confirmación que al desactivar y luego la fila se anonimiza.
+     * El hash nuevo viene de un valor aleatorio que nadie conoce, así que la contraseña original deja de servir.
+     */
+    public void eliminar(Long usuarioId, String contrasena) {
+        Usuario usuario = confirmarDueno(usuarioId, contrasena, ELIMINAR);
+        exigirActiva(usuario, ELIMINAR, "Solo se puede eliminar una cuenta activa.");
+        exigirSinReservas(usuario, ELIMINAR);
+        usuario.eliminar(codificador.encode(UUID.randomUUID().toString()));
+        usuarios.save(usuario);
+        auditarDueno(usuarioId, ELIMINAR, ResultadoEvento.EXITO, Map.of());
     }
 
     // Antes de ir a la base: un administrador nunca se encierra ni se libera a sí mismo.
