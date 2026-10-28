@@ -62,6 +62,11 @@ public class Usuario {
         return estado == EstadoCuenta.ACTIVA;
     }
 
+    /** Recibe el hash ya calculado: la entidad nunca ve la contraseña en claro. */
+    public void cambiarContrasena(String nuevoHash) {
+        this.contrasenaHash = nuevoHash;
+    }
+
     public Long getId() {
         return id;
     }

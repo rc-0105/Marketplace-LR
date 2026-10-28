@@ -1,6 +1,7 @@
 package co.edu.unbosque.marketplace.config;
 
 import jakarta.servlet.DispatcherType;
+import java.util.Set;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -27,6 +28,11 @@ public class ConfiguracionSeguridad {
 
     private static final String RUTA_REGISTRO = "/api/v1/auth/registro";
     private static final String RUTA_LOGIN = "/api/v1/auth/login";
+    private static final String RUTA_RECUPERACION = "/api/v1/auth/recuperacion";
+    private static final String RUTA_CONFIRMAR_RECUPERACION = "/api/v1/auth/recuperacion/confirmar";
+    // Rutas de quien aún no tiene sesión: públicas y sin leer el Bearer.
+    private static final Set<String> RUTAS_DE_ACCESO =
+            Set.of(RUTA_REGISTRO, RUTA_LOGIN, RUTA_RECUPERACION, RUTA_CONFIRMAR_RECUPERACION);
 
     @Bean
     public SecurityFilterChain cadena(HttpSecurity http, ManejadorFallosSeguridad fallos,
@@ -45,7 +51,7 @@ public class ConfiguracionSeguridad {
                 .authorizeHttpRequests(rutas -> rutas
                         // Los errores internos que Boot reenvía a /error no se bloquean.
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                        .requestMatchers(HttpMethod.POST, RUTA_REGISTRO, RUTA_LOGIN).permitAll()
+                        .requestMatchers(HttpMethod.POST, RUTAS_DE_ACCESO.toArray(String[]::new)).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/estado", "/actuator/health",
                                 "/actuator/health/**", "/actuator/info", "/v3/api-docs/**",
                                 "/swagger-ui/**", "/swagger-ui.html").permitAll()
@@ -74,7 +80,7 @@ public class ConfiguracionSeguridad {
     }
 
     /**
-     * Registro y login ignoran el Bearer: un token vencido que el cliente aún
+     * Registro, login y recuperación ignoran el Bearer: un token vencido que el cliente aún
      * guarda no debe impedirle volver a entrar (D7).
      */
     @Bean
@@ -82,8 +88,7 @@ public class ConfiguracionSeguridad {
         DefaultBearerTokenResolver porDefecto = new DefaultBearerTokenResolver();
         return peticion -> {
             boolean esAcceso = HttpMethod.POST.matches(peticion.getMethod())
-                    && (RUTA_LOGIN.equals(peticion.getRequestURI())
-                    || RUTA_REGISTRO.equals(peticion.getRequestURI()));
+                    && RUTAS_DE_ACCESO.contains(peticion.getRequestURI());
             return esAcceso ? null : porDefecto.resolve(peticion);
         };
     }
