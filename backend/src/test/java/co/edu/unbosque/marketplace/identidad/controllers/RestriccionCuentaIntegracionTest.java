@@ -2,6 +2,7 @@ package co.edu.unbosque.marketplace.identidad.controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -33,6 +34,7 @@ class RestriccionCuentaIntegracionTest {
 
     private static final String CONTRASENA = "Segura#2026";
     private static final String MOTIVO = "Pagos en disputa";
+    private static final String RUTA_PROTEGIDA = "/api/v1/otra";
     private static final String CODIGO = "OPERACION_CUENTA_NO_PERMITIDA";
 
     @Autowired
@@ -154,6 +156,56 @@ class RestriccionCuentaIntegracionTest {
         mvc.perform(put(ruta(idAna)).contentType(MediaType.APPLICATION_JSON).content(cuerpo(MOTIVO)))
                 .andExpect(status().isUnauthorized());
         mvc.perform(delete(ruta(idAna))).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("Al restringir a Ana su token vivo da 401, su login da 403 con motivo y al levantar vuelve a entrar")
+    void restriccionInvalidaElTokenVivo() throws Exception {
+        String admin = token("admin@correo.com");
+        String ana = token("ana@correo.com");
+        mvc.perform(get(RUTA_PROTEGIDA).header(HttpHeaders.AUTHORIZATION, "Bearer " + ana))
+                .andExpect(status().isForbidden());
+
+        restringir(admin, idAna, cuerpo(MOTIVO)).andExpect(status().isNoContent());
+
+        mvc.perform(get(RUTA_PROTEGIDA).header(HttpHeaders.AUTHORIZATION, "Bearer " + ana))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+        login("ana@correo.com").andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.codigo").value("CUENTA_RESTRINGIDA"))
+                .andExpect(jsonPath("$.motivo").value(MOTIVO));
+
+        levantar(admin, idAna).andExpect(status().isNoContent());
+
+        login("ana@correo.com").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Un administrador ya restringido que usa su token recibe 401")
+    void administradorRestringidoPierdeSuSesion() throws Exception {
+        Long otro = guardar("Otro admin", "otro@correo.com", Rol.ADMINISTRADOR);
+        String tokenOtro = token("otro@correo.com");
+        String admin = token("admin@correo.com");
+
+        restringir(admin, otro, cuerpo(MOTIVO)).andExpect(status().isNoContent());
+
+        levantar(tokenOtro, idAna).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("Un token vivo de una cuenta desactivada o eliminada recibe 401")
+    void cuentaDesactivadaOEliminadaPierdeSuSesion() throws Exception {
+        Long beto = guardar("Beto", "beto@correo.com", Rol.HUESPED);
+        String tokenAna = token("ana@correo.com");
+        String tokenBeto = token("beto@correo.com");
+
+        jdbc.update("UPDATE usuario SET estado = 'DESACTIVADA' WHERE id = ?", idAna);
+        jdbc.update("DELETE FROM usuario WHERE id = ?", beto);
+
+        for (String token : new String[] {tokenAna, tokenBeto}) {
+            mvc.perform(get(RUTA_PROTEGIDA).header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                    .andExpect(status().isUnauthorized());
+        }
     }
 
     private Long guardar(String nombre, String correo, Rol rol) {

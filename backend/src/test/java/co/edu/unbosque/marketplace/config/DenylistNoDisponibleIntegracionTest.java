@@ -1,5 +1,6 @@
 package co.edu.unbosque.marketplace.config;
 
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
@@ -55,7 +56,7 @@ class DenylistNoDisponibleIntegracionTest {
     @DisplayName("Si la denylist falla responde 503 ProblemDetail genérico y, al recuperarse, el mismo token se procesa")
     void responde503YSeRecupera() throws Exception {
         String token = token(Duration.ofMinutes(5));
-        when(sesiones.estaInvalidada(anyString())).thenThrow(new DataAccessResourceFailureException("BD caída"));
+        when(sesiones.estaInvalidada(anyString(), anyLong())).thenThrow(new DataAccessResourceFailureException("BD caída"));
 
         mvc.perform(get(RUTA_PROTEGIDA).header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isServiceUnavailable())
@@ -68,7 +69,7 @@ class DenylistNoDisponibleIntegracionTest {
                 .andExpect(header().exists(FiltroCorrelacion.CABECERA));
 
         // doReturn: when() invocaría el stub que lanza.
-        doReturn(false).when(sesiones).estaInvalidada(anyString());
+        doReturn(false).when(sesiones).estaInvalidada(anyString(), anyLong());
 
         // Sin permiso para la ruta pero autenticado: 403 prueba que el token ya no falla.
         mvc.perform(get(RUTA_PROTEGIDA).header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
@@ -82,7 +83,7 @@ class DenylistNoDisponibleIntegracionTest {
                         "Bearer " + token(Duration.ofHours(-1))))
                 .andExpect(status().isUnauthorized());
 
-        verify(sesiones, never()).estaInvalidada(anyString());
+        verify(sesiones, never()).estaInvalidada(anyString(), anyLong());
     }
 
     private String token(Duration vigencia) {

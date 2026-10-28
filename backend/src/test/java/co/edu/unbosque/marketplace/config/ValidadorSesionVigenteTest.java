@@ -3,6 +3,7 @@ package co.edu.unbosque.marketplace.config;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import co.edu.unbosque.marketplace.identidad.services.SesionService;
@@ -22,20 +23,29 @@ class ValidadorSesionVigenteTest {
 
     private final SesionService sesiones = mock(SesionService.class);
     private final ValidadorSesionVigente validador = new ValidadorSesionVigente(sesiones);
-    private final Jwt jwt = Jwt.withTokenValue(TOKEN).header("alg", "HS256").claim("jti", "jti-1").build();
+    private final Jwt jwt = Jwt.withTokenValue(TOKEN).header("alg", "HS256").claim("jti", "jti-1").subject("7")
+            .build();
 
     @Test
     @DisplayName("Un jti invalidado falla la validación")
     void rechazaJtiInvalidado() {
-        when(sesiones.estaInvalidada("jti-1")).thenReturn(true);
+        when(sesiones.estaInvalidada("jti-1", 7L)).thenReturn(true);
 
         assertThat(validador.validate(jwt).hasErrors()).isTrue();
     }
 
     @Test
+    @DisplayName("La consulta usa el id de la cuenta que viene en el sub")
+    void consultaConElIdDelSubject() {
+        validador.validate(jwt);
+
+        verify(sesiones).estaInvalidada("jti-1", 7L);
+    }
+
+    @Test
     @DisplayName("Un jti no invalidado pasa la validación")
     void aceptaJtiVigente() {
-        when(sesiones.estaInvalidada("jti-1")).thenReturn(false);
+        when(sesiones.estaInvalidada("jti-1", 7L)).thenReturn(false);
 
         assertThat(validador.validate(jwt).hasErrors()).isFalse();
     }
@@ -43,7 +53,7 @@ class ValidadorSesionVigenteTest {
     @Test
     @DisplayName("Un fallo de acceso a datos lanza SesionNoVerificableException y no registra el token")
     void fallaDeDatos(CapturedOutput salida) {
-        when(sesiones.estaInvalidada("jti-1")).thenThrow(new DataAccessResourceFailureException("sin conexión"));
+        when(sesiones.estaInvalidada("jti-1", 7L)).thenThrow(new DataAccessResourceFailureException("sin conexión"));
 
         assertThatThrownBy(() -> validador.validate(jwt)).isInstanceOf(SesionNoVerificableException.class);
         assertThat(salida.getAll()).doesNotContain(TOKEN);
@@ -52,7 +62,7 @@ class ValidadorSesionVigenteTest {
     @Test
     @DisplayName("Un fallo de transacción (conexión caída) también lanza SesionNoVerificableException")
     void fallaDeTransaccion() {
-        when(sesiones.estaInvalidada("jti-1")).thenThrow(new CannotCreateTransactionException("sin conexión"));
+        when(sesiones.estaInvalidada("jti-1", 7L)).thenThrow(new CannotCreateTransactionException("sin conexión"));
 
         assertThatThrownBy(() -> validador.validate(jwt)).isInstanceOf(SesionNoVerificableException.class);
     }
@@ -61,7 +71,7 @@ class ValidadorSesionVigenteTest {
     @DisplayName("Un fallo inesperado se propaga tal cual (no es 503), se registra solo su clase y no el token ni el jti")
     void fallaInesperada(CapturedOutput salida) {
         IllegalStateException inesperada = new IllegalStateException("detalle-del-driver jti-1");
-        when(sesiones.estaInvalidada("jti-1")).thenThrow(inesperada);
+        when(sesiones.estaInvalidada("jti-1", 7L)).thenThrow(inesperada);
 
         assertThatThrownBy(() -> validador.validate(jwt)).isSameAs(inesperada);
         assertThat(salida.getAll()).contains("IllegalStateException")
