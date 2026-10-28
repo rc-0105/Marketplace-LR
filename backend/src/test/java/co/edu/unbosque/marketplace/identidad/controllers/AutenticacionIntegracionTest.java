@@ -3,9 +3,11 @@ package co.edu.unbosque.marketplace.identidad.controllers;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import co.edu.unbosque.marketplace.auditoria.infraestructura.CapturaAuditoria;
 import co.edu.unbosque.marketplace.config.ConfiguracionJwt;
 import co.edu.unbosque.marketplace.identidad.model.Rol;
 import co.edu.unbosque.marketplace.identidad.model.Usuario;
@@ -21,11 +23,15 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -42,9 +48,11 @@ import org.springframework.test.web.servlet.ResultActions;
 /** Recorre el login completo: HTTP → validación → servicio → PostgreSQL → JWT real. */
 @SpringBootTest
 @AutoConfigureMockMvc
+@ExtendWith(OutputCaptureExtension.class)
 class AutenticacionIntegracionTest {
 
     private static final String RUTA = "/api/v1/auth/login";
+    private static final String MOTIVO = "Pagos en disputa";
     private static final String MENSAJE = "Correo o contraseña incorrectos. Revísalos e intenta de nuevo.";
 
     @Autowired
@@ -67,6 +75,9 @@ class AutenticacionIntegracionTest {
 
     @Autowired
     private ObjectMapper json;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     @BeforeEach
     void preparar() {
@@ -148,6 +159,77 @@ class AutenticacionIntegracionTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"correo\": \"ana@correo.com\", \"contrasena\": \"Segura#2026\"}"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Una cuenta restringida con la contraseña correcta recibe 403 con el código y el motivo, sin token")
+    void rechazaCuentaRestringida(CapturedOutput salida) throws Exception {
+        jdbc.update("UPDATE usuario SET estado = 'RESTRINGIDA', motivo_restriccion = ? WHERE correo = ?",
+                MOTIVO, "ana@correo.com");
+
+        try (var captura = new CapturaAuditoria()) {
+            MockHttpServletResponse respuesta = login("ana@correo.com", "Segura#2026")
+                    .andExpect(status().isForbidden())
+                    .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                    .andExpect(jsonPath("$.status").value(403))
+                    .andExpect(jsonPath("$.detail").value("Tu cuenta está restringida."))
+                    .andExpect(jsonPath("$.codigo").value("CUENTA_RESTRINGIDA"))
+                    .andExpect(jsonPath("$.motivo").value(MOTIVO))
+                    .andExpect(jsonPath("$.token").doesNotExist())
+                    .andReturn().getResponse();
+
+            assertThat(captura.cantidad()).isEqualTo(1);
+            assertThat(captura.texto(0)).contains("AUTENTICACION", "FALLO", "cuenta_restringida")
+                    .doesNotContain(MOTIVO, "ana@correo.com", "Segura#2026");
+            assertThat(salida.getAll()).doesNotContain(MOTIVO, "Segura#2026");
+            // Un JWT siempre empieza por el encabezado codificado "eyJ": no debe aparecer en ningún lado.
+            assertThat(respuesta.getContentAsString()).doesNotContain("eyJ");
+            assertThat(captura.texto(0)).doesNotContain("eyJ");
+            assertThat(salida.getAll()).doesNotContain("eyJ");
+        }
+    }
+
+    @Test
+    @DisplayName("Una cuenta desactivada con la contraseña correcta recibe 403 con el código, sin motivo ni token")
+    void rechazaCuentaDesactivada() throws Exception {
+        jdbc.update("UPDATE usuario SET estado = 'DESACTIVADA' WHERE correo = ?", "ana@correo.com");
+
+        try (var captura = new CapturaAuditoria()) {
+            login("ana@correo.com", "Segura#2026")
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.detail").value("Tu cuenta está desactivada."))
+                    .andExpect(jsonPath("$.codigo").value("CUENTA_DESACTIVADA"))
+                    .andExpect(jsonPath("$.motivo").doesNotExist())
+                    .andExpect(jsonPath("$.token").doesNotExist());
+
+            assertThat(captura.texto(0)).contains("FALLO", "cuenta_desactivada")
+                    .doesNotContain("ana@correo.com", "Segura#2026");
+        }
+    }
+
+    @Test
+    @DisplayName("Con la contraseña errónea una cuenta restringida o desactivada da el mismo 401 que un correo inexistente")
+    void contrasenaErroneaNoRevelaElEstado() throws Exception {
+        MockHttpServletResponse inexistente = login("nadie@correo.com", "Otra#Clave1")
+                .andExpect(status().isUnauthorized()).andReturn().getResponse();
+
+        jdbc.update("UPDATE usuario SET estado = 'RESTRINGIDA', motivo_restriccion = ? WHERE correo = ?",
+                MOTIVO, "ana@correo.com");
+        MockHttpServletResponse restringida = login("ana@correo.com", "Otra#Clave1")
+                .andExpect(status().isUnauthorized()).andReturn().getResponse();
+
+        jdbc.update("UPDATE usuario SET estado = 'DESACTIVADA', motivo_restriccion = NULL WHERE correo = ?",
+                "ana@correo.com");
+        MockHttpServletResponse desactivada = login("ana@correo.com", "Otra#Clave1")
+                .andExpect(status().isUnauthorized()).andReturn().getResponse();
+
+        JsonNode esperado = json.readTree(inexistente.getContentAsString());
+        assertThat(json.readTree(restringida.getContentAsString())).isEqualTo(esperado);
+        assertThat(json.readTree(desactivada.getContentAsString())).isEqualTo(esperado);
+        assertThat(esperado.has("codigo")).isFalse();
+        assertThat(esperado.has("motivo")).isFalse();
+        assertThat(cabeceras(restringida)).isEqualTo(cabeceras(inexistente));
+        assertThat(cabeceras(desactivada)).isEqualTo(cabeceras(inexistente));
     }
 
     // Se excluyen las cabeceras que cambian legítimamente en cada request (identificador de correlación y fecha).

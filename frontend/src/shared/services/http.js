@@ -13,12 +13,15 @@ export class ErrorApi extends Error {
    * @param {number} estado código HTTP; 0 si no hubo respuesta
    * @param {string} detalle mensaje para mostrar al usuario
    * @param {Record<string, string>} [errores] errores por campo
+   * @param {{codigo?: string, motivo?: string}} [extra] código de negocio y motivo que envía la API
    */
-  constructor(estado, detalle, errores = {}) {
+  constructor(estado, detalle, errores = {}, extra = {}) {
     super(detalle);
     this.name = 'ErrorApi';
     this.estado = estado;
     this.errores = errores;
+    this.codigo = extra.codigo ?? null;
+    this.motivo = extra.motivo ?? null;
   }
 }
 
@@ -56,7 +59,8 @@ async function solicitar(ruta, opciones) {
     if (respuesta.status === 401 && sesion && !ruta.startsWith(PREFIJO_AUTH) && obtenerSesion()?.token === sesion.token) {
       limpiarSesion('expirada');
     }
-    throw new ErrorApi(respuesta.status, datos?.detail ?? MENSAJE_INESPERADO, datos?.errores ?? {});
+    throw new ErrorApi(respuesta.status, datos?.detail ?? MENSAJE_INESPERADO, datos?.errores ?? {},
+      { codigo: datos?.codigo, motivo: datos?.motivo });
   }
   return datos;
 }

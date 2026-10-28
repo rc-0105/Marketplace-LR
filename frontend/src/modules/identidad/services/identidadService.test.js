@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi, post } from '../../../shared/services/http.js';
 import { guardarSesion, obtenerSesion } from '../../../shared/services/sesion.js';
-import { cerrarSesion, iniciarSesion, registrarUsuario } from './identidadService.js';
+import { cerrarSesion, iniciarSesion, reactivarCuenta, registrarUsuario } from './identidadService.js';
 
 vi.mock('../../../shared/services/http.js', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -58,6 +58,28 @@ describe('identidadService', () => {
       message: 'Credenciales inválidas.',
       errores: { correo: 'Obligatorio.' },
     });
+    expect(obtenerSesion()).toEqual(previa);
+  });
+
+  it('reactiva la cuenta con las credenciales, guarda la sesión y devuelve el usuario', async () => {
+    vi.mocked(post).mockResolvedValue(respuestaLogin);
+    const credenciales = { correo: 'ana@correo.com', contrasena: 'Segura#2026' };
+
+    const usuario = await reactivarCuenta(credenciales);
+
+    const esperado = { id: 7, nombre: 'Ana', correo: 'ana@correo.com', rol: 'HUESPED', activa: true };
+    expect(post).toHaveBeenCalledWith('/api/v1/perfil/reactivar', credenciales);
+    expect(usuario).toEqual(esperado);
+    expect(obtenerSesion()).toEqual({ token: 'jwt-abc', expiraEn: '2999-01-01T00:00:00Z', usuario: esperado });
+  });
+
+  it.each([401, 403, 409])('ante un %i al reactivar propaga el error sin guardar ni tocar la sesión', async (estado) => {
+    const previa = { token: 'previa', expiraEn: '2999-01-01T00:00:00Z', usuario: { id: 1 } };
+    guardarSesion(previa);
+    const error = new ErrorApi(estado, 'No se pudo reactivar.', {}, { codigo: 'CUENTA_ACTIVA' });
+    vi.mocked(post).mockRejectedValue(error);
+
+    await expect(reactivarCuenta({ correo: 'x', contrasena: 'y' })).rejects.toBe(error);
     expect(obtenerSesion()).toEqual(previa);
   });
 

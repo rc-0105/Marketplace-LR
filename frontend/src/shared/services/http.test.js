@@ -38,6 +38,28 @@ describe('http', () => {
     expect(error.errores).toEqual({ correo: 'Mal' });
   });
 
+  it('conserva el código y el motivo que trae el error de la API', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => respuesta(403, {
+      detail: 'Tu cuenta está restringida.', codigo: 'CUENTA_RESTRINGIDA', motivo: 'Pagos en disputa',
+    })));
+
+    const error = await post('/api/v1/auth/login', {}).catch((e) => e);
+
+    expect(error).toMatchObject({
+      estado: 403, message: 'Tu cuenta está restringida.', codigo: 'CUENTA_RESTRINGIDA', motivo: 'Pagos en disputa', errores: {},
+    });
+  });
+
+  it('deja el código y el motivo en null cuando el error no los trae', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => respuesta(400, { detail: 'Datos inválidos.' })));
+
+    const error = await post('/api/v1/recurso', {}).catch((e) => e);
+
+    expect(error.codigo).toBeNull();
+    expect(error.motivo).toBeNull();
+    expect(error.message).toBe('Datos inválidos.');
+  });
+
   it('usa un mensaje genérico cuando el error no trae detalle', async () => {
     vi.stubGlobal('fetch', vi.fn(() => respuesta(500)));
 
@@ -111,6 +133,33 @@ describe('http', () => {
       await expect(post('/api/v1/auth/login', {})).rejects.toMatchObject({ estado: 401 });
 
       expect(obtenerSesion()).not.toBeNull();
+    });
+
+    it.each([
+      ['/api/v1/auth/login', 'CUENTA_DESACTIVADA'],
+      ['/api/v1/recurso', 'CUENTA_RESTRINGIDA'],
+      ['/api/v1/perfil/reactivar', 'CUENTA_ACTIVA'],
+    ])('conserva la sesión y no avisa la expiración ante un 403 de %s', async (ruta, codigo) => {
+      iniciarSesion();
+      const expiracion = vi.fn();
+      suscribirExpiracion(expiracion);
+      vi.stubGlobal('fetch', vi.fn(() => respuesta(403, { detail: 'No.', codigo })));
+
+      await expect(post(ruta, {})).rejects.toMatchObject({ estado: 403, codigo });
+
+      expect(obtenerSesion()).not.toBeNull();
+      expect(expiracion).not.toHaveBeenCalled();
+    });
+
+    it('no limpia nada ante el 401 de /api/v1/perfil/reactivar sin sesión previa', async () => {
+      const expiracion = vi.fn();
+      suscribirExpiracion(expiracion);
+      vi.stubGlobal('fetch', vi.fn(() => respuesta(401, { detail: 'Correo o contraseña incorrectos.' })));
+
+      await expect(post('/api/v1/perfil/reactivar', {})).rejects.toMatchObject({ estado: 401 });
+
+      expect(obtenerSesion()).toBeNull();
+      expect(expiracion).not.toHaveBeenCalled();
     });
 
     it('no avisa la expiración ante un 401 sin token enviado', async () => {
