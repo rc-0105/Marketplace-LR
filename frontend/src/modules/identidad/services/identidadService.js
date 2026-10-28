@@ -36,6 +36,28 @@ async function abrirSesion(ruta, credenciales) {
   return usuarioSesion;
 }
 
+/**
+ * Desactiva la cuenta propia confirmando con la contraseña. En 204 la sesión local queda limpia
+ * sin llamar al logout (el servidor ya la invalidó). Ante un error el ErrorApi se propaga y la sesión sigue.
+ * @param {string} contrasena
+ */
+export function desactivarCuenta(contrasena) {
+  return darDeBaja('/api/v1/perfil/desactivar', contrasena);
+}
+
+/**
+ * Elimina la cuenta propia (se anonimiza) confirmando con la contraseña; mismo contrato que desactivar.
+ * @param {string} contrasena
+ */
+export function eliminarCuenta(contrasena) {
+  return darDeBaja('/api/v1/perfil/eliminar', contrasena);
+}
+
+async function darDeBaja(ruta, contrasena) {
+  await post(ruta, { contrasena });
+  limpiarSesion();
+}
+
 /** Siempre deja al usuario sin sesión local, falle o no el logout del servidor. */
 export async function cerrarSesion() {
   try {
