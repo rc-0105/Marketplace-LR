@@ -22,6 +22,25 @@ export async function iniciarSesion(credenciales) {
   return usuarioSesion;
 }
 
+/**
+ * La API responde lo mismo exista o no el correo; el mensaje se muestra tal cual.
+ * @param {string} correo
+ * @returns {Promise<string>} mensaje de la API
+ */
+export async function solicitarRecuperacion(correo) {
+  const { mensaje } = await post('/api/v1/auth/recuperacion', { correo });
+  return mensaje;
+}
+
+/**
+ * Si el código no sirve (400) el ErrorApi se propaga con el mensaje de la API.
+ * @param {{correo: string, codigo: string, contrasenaNueva: string}} datos
+ * @returns {Promise<void>}
+ */
+export async function confirmarRecuperacion(datos) {
+  await post('/api/v1/auth/recuperacion/confirmar', datos);
+}
+
 /** Siempre deja al usuario sin sesión local, falle o no el logout del servidor. */
 export async function cerrarSesion() {
   try {

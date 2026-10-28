@@ -1,0 +1,65 @@
+.pagina {
+  max-width: 28rem;
+  margin: 0 auto;
+  padding: var(--espacio-12) var(--espacio-4);
+}
+
+.titulo {
+  margin: 0 0 var(--espacio-6);
+  font-size: var(--texto-encabezado);
+}
+
+.texto {
+  margin: 0;
+  color: var(--color-texto-secundario);
+}
+
+.exito {
+  display: block;
+  margin: 0;
+  padding: var(--espacio-3) var(--espacio-4);
+  border-radius: var(--radio);
+  background: var(--color-exito-fondo);
+  color: var(--color-exito);
+}
+
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-4);
+  margin-top: var(--espacio-4);
+}
+
+.boton {
+  min-height: 2.75rem;
+  border: 0;
+  border-radius: var(--radio);
+  background: var(--color-terracota);
+  color: var(--color-sobre-terracota);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transicion);
+}
+
+.boton:hover:not(:disabled) {
+  background: var(--color-terracota-oscuro);
+}
+
+.boton:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.aviso {
+  margin: var(--espacio-4) 0 0;
+  padding: var(--espacio-3) var(--espacio-4);
+  border-radius: var(--radio);
+  background: var(--color-error-fondo);
+  color: var(--color-error);
+}
+
+.pie {
+  margin: var(--espacio-4) 0 0;
+  color: var(--color-texto-secundario);
+}

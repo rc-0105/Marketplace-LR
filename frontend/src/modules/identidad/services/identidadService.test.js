@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi, post } from '../../../shared/services/http.js';
 import { guardarSesion, obtenerSesion } from '../../../shared/services/sesion.js';
-import { cerrarSesion, iniciarSesion, registrarUsuario } from './identidadService.js';
+import {
+  cerrarSesion, confirmarRecuperacion, iniciarSesion, registrarUsuario, solicitarRecuperacion,
+} from './identidadService.js';
 
 vi.mock('../../../shared/services/http.js', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -83,5 +85,31 @@ describe('identidadService', () => {
     await expect(cerrarSesion()).resolves.toBeUndefined();
 
     expect(obtenerSesion()).toBeNull();
+  });
+
+  it('pide el código de recuperación y devuelve el mensaje de la API', async () => {
+    vi.mocked(post).mockResolvedValue({ mensaje: 'Si el correo está registrado, te enviamos un código.' });
+
+    const mensaje = await solicitarRecuperacion('ana@correo.com');
+
+    expect(post).toHaveBeenCalledWith('/api/v1/auth/recuperacion', { correo: 'ana@correo.com' });
+    expect(mensaje).toBe('Si el correo está registrado, te enviamos un código.');
+  });
+
+  it('confirma la recuperación con el código y la contraseña nueva sin abrir sesión', async () => {
+    vi.mocked(post).mockResolvedValue(null);
+    const datos = { correo: 'ana@correo.com', codigo: '123456', contrasenaNueva: 'Nueva#2027' };
+
+    await confirmarRecuperacion(datos);
+
+    expect(post).toHaveBeenCalledWith('/api/v1/auth/recuperacion/confirmar', datos);
+    expect(obtenerSesion()).toBeNull();
+  });
+
+  it('propaga el rechazo de un código inválido', async () => {
+    vi.mocked(post).mockRejectedValue(new ErrorApi(400, 'El código no es válido o ya venció. Solicita uno nuevo.'));
+
+    await expect(confirmarRecuperacion({ correo: 'a@b.co', codigo: '000000', contrasenaNueva: 'Nueva#2027' }))
+      .rejects.toThrow('El código no es válido o ya venció. Solicita uno nuevo.');
   });
 });

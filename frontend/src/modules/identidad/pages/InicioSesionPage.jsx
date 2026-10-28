@@ -13,7 +13,7 @@ export default function InicioSesionPage() {
   const [errores, setErrores] = useState({});
   const [errorGeneral, setErrorGeneral] = useState('');
   const [enviando, setEnviando] = useState(false);
-  // Los avisos que trae la navegación (registro, sesión vencida) dejan de aplicar al primer intento.
+  // Los avisos que trae la navegación (registro, recuperación, sesión vencida) dejan de aplicar al primer intento.
   const [intento, setIntento] = useState(false);
 
   function cambiar(evento) {
@@ -47,6 +47,9 @@ export default function InicioSesionPage() {
       {!intento && state?.registrado && (
         <output className={estilos.exito}>Tu cuenta quedó creada. Ya puedes iniciar sesión.</output>
       )}
+      {!intento && state?.contrasenaRestablecida && (
+        <output className={estilos.exito}>Tu contraseña quedó actualizada. Inicia sesión con la nueva.</output>
+      )}
       {!intento && state?.sesionExpirada && (
         <output className={estilos.vencida}>Tu sesión venció. Inicia sesión de nuevo para continuar.</output>
       )}
@@ -63,6 +66,7 @@ export default function InicioSesionPage() {
         </button>
       </form>
 
+      <p className={estilos.pie}><Link to="/recuperar-contrasena">¿Olvidaste tu contraseña?</Link></p>
       <p className={estilos.pie}>¿Aún no tienes cuenta? <Link to="/registro">Crea una</Link></p>
     </main>
   );

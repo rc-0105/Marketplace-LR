@@ -1,6 +1,7 @@
 import { Link, Route, Routes, useNavigate } from 'react-router-dom';
 import { cerrarSesion } from '../modules/identidad/services/identidadService.js';
 import InicioSesionPage from '../modules/identidad/pages/InicioSesionPage.jsx';
+import RecuperacionPage from '../modules/identidad/pages/RecuperacionPage.jsx';
 import RegistroPage from '../modules/identidad/pages/RegistroPage.jsx';
 import PanelRolPage from './pages/PanelRolPage.jsx';
 import Encabezado from '../shared/components/Encabezado.jsx';
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/" element={<Inicio />} />
         <Route path="/registro" element={<SoloInvitados><RegistroPage /></SoloInvitados>} />
         <Route path="/inicio-sesion" element={<SoloInvitados><InicioSesionPage /></SoloInvitados>} />
+        <Route path="/recuperar-contrasena" element={<SoloInvitados><RecuperacionPage /></SoloInvitados>} />
         {ROLES_CON_PANEL.map(({ rol, ruta }) => (
           <Route key={ruta} path={ruta} element={<RutaProtegida rol={rol}><PanelRolPage /></RutaProtegida>} />
         ))}
