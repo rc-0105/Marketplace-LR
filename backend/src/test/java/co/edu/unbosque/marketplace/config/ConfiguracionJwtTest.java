@@ -138,6 +138,26 @@ class ConfiguracionJwtTest {
         verify(sesiones, never()).estaInvalidada(any());
     }
 
+    @Test
+    @DisplayName("Rechaza un sub no numérico, vacío, ausente o de más de 18 dígitos sin consultar la sesión")
+    void rechazaSubjectMalformado() {
+        for (String sub : new String[] {"abc", "12a", "-5", " ", "", "1".repeat(19)}) {
+            String token = emitir(c -> c.subject(sub));
+            assertThatThrownBy(() -> decodificador.decode(token)).isInstanceOf(JwtException.class);
+        }
+        String sinSub = emitir(c -> c.claims(m -> m.remove("sub")));
+        assertThatThrownBy(() -> decodificador.decode(sinSub)).isInstanceOf(JwtException.class);
+
+        verify(sesiones, never()).estaInvalidada(any());
+    }
+
+    @Test
+    @DisplayName("Acepta un sub numérico de hasta 18 dígitos")
+    void aceptaSubjectNumerico() {
+        assertThat(decodificador.decode(emitir(c -> c.subject("1".repeat(18)))).getSubject())
+                .isEqualTo("1".repeat(18));
+    }
+
     private String emitir(Consumer<JwtClaimsSet.Builder> ajuste) {
         Instant ahora = Instant.now();
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
