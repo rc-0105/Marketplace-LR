@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.ObjectPostProcessor;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -16,20 +17,21 @@ import org.springframework.security.oauth2.server.resource.web.DefaultBearerToke
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * Cadena de seguridad stateless. Cada ruta declara quién entra y lo demás se
- * niega por defecto (ADR-5, REQ-A8).
+ * Cadena de seguridad stateless. Cada endpoint de /api/v1 declara sus roles con
+ * {@code @PreAuthorize} y lo demás se niega por defecto (ADR-5, REQ-A8).
  */
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class ConfiguracionSeguridad {
 
     private static final String RUTA_REGISTRO = "/api/v1/auth/registro";
     private static final String RUTA_LOGIN = "/api/v1/auth/login";
-    private static final String RUTA_LOGOUT = "/api/v1/auth/logout";
 
     @Bean
     public SecurityFilterChain cadena(HttpSecurity http, ManejadorFallosSeguridad fallos,
-            JwtAuthenticationConverter convertidor, BearerTokenResolver resolverToken) throws Exception {
+            JwtAuthenticationConverter convertidor, BearerTokenResolver resolverToken,
+            AutorizacionDeclarada autorizacionDeclarada) throws Exception {
         http
                 // CSRF se deshabilita a propósito: la API es stateless (sin cookies ni sesión HTTP) y
                 // autentica solo con el encabezado Authorization: Bearer, que el cliente agrega de forma
@@ -47,7 +49,8 @@ public class ConfiguracionSeguridad {
                         .requestMatchers(HttpMethod.GET, "/api/estado", "/actuator/health",
                                 "/actuator/health/**", "/actuator/info", "/v3/api-docs/**",
                                 "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                        .requestMatchers(HttpMethod.POST, RUTA_LOGOUT).authenticated()
+                        // El rol lo verifica el @PreAuthorize del endpoint; sin él, se niega.
+                        .requestMatchers("/api/v1/**").access(autorizacionDeclarada)
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(oauth -> oauth
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(convertidor))

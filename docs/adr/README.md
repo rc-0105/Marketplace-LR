@@ -10,7 +10,7 @@ que es lo que pide la trazabilidad ASR → decisión → implementación → med
 | ADR-2 | Comunicación entre módulos no críticos por eventos internos | Propuesta |
 | ADR-3 | Modelo de disponibilidad sin superposición y consultable | Propuesta |
 | ADR-4 | Flujo de reserva y pago | Propuesta |
-| ADR-5 | Autorización por rol | Propuesta |
+| ADR-5 | [Autorización por rol](adr-005-autorizacion-por-rol.md) | Aceptada |
 
 Al cerrar un ADR, copien aquí la versión final como `adr-00X-<nombre>.md` y
 actualicen el estado en Confluence en el mismo pull request.
