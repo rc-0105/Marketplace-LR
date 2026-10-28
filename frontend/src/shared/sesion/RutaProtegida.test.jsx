@@ -10,11 +10,12 @@ function iniciar(rol, expiraEn = FUTURO) {
   guardarSesion({ token: 't', expiraEn, usuario: { id: 1, nombre: 'Ana', correo: 'a@b.co', rol, activa: true } });
 }
 
-function renderizar() {
+function renderizar(ruta = '/administrador') {
   render(
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={['/administrador']}>
+    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={[ruta]}>
       <Routes>
         <Route path="/administrador" element={<RutaProtegida rol="ADMINISTRADOR"><p>Contenido admin</p></RutaProtegida>} />
+        <Route path="/cuenta" element={<RutaProtegida><p>Contenido de cuenta</p></RutaProtegida>} />
         <Route path="/inicio-sesion" element={<p>Pantalla de ingreso</p>} />
         <Route path="/huesped" element={<p>Panel huesped</p>} />
       </Routes>
@@ -46,5 +47,16 @@ describe('RutaProtegida', () => {
     iniciar('ADMINISTRADOR');
     renderizar();
     expect(screen.getByText('Contenido admin')).toBeInTheDocument();
+  });
+
+  it.each(['HUESPED', 'ANFITRION', 'ADMINISTRADOR'])('sin rol exigido deja pasar a un %s con sesión', (rol) => {
+    iniciar(rol);
+    renderizar('/cuenta');
+    expect(screen.getByText('Contenido de cuenta')).toBeInTheDocument();
+  });
+
+  it('sin rol exigido y sin sesión redirige al inicio de sesión', () => {
+    renderizar('/cuenta');
+    expect(screen.getByText('Pantalla de ingreso')).toBeInTheDocument();
   });
 });
