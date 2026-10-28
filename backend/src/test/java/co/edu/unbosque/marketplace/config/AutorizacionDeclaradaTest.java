@@ -12,7 +12,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.method.HandlerMethod;
@@ -27,7 +30,7 @@ class AutorizacionDeclaradaTest {
     private final MockHttpServletRequest peticion = new MockHttpServletRequest("GET", "/api/v1/recurso");
 
     @Test
-    @DisplayName("Concede el paso cuando el método del controlador declara sus roles")
+    @DisplayName("Concede el paso cuando el rol del usuario es el que declara el método")
     void concedeConMetodoDeclarado() throws Exception {
         responder(new HandlerExecutionChain(metodo("declarado")));
 
@@ -35,13 +38,45 @@ class AutorizacionDeclaradaTest {
     }
 
     @Test
+    @DisplayName("Niega el paso cuando el rol del usuario no es el que declara el método")
+    void niegaConOtroRol() throws Exception {
+        responder(new HandlerExecutionChain(metodo("declarado")));
+
+        assertThat(decidir(conRol("ANFITRION"))).isFalse();
+    }
+
+    @Test
     @DisplayName("Concede el paso cuando la clase del controlador declara sus roles")
     void concedeConClaseDeclarada() throws Exception {
-        HandlerMethod metodo = new HandlerMethod(new ControladorDeclarado(),
-                ControladorDeclarado.class.getDeclaredMethod("operacion"));
-        responder(new HandlerExecutionChain(metodo));
+        responder(new HandlerExecutionChain(metodoDeClase("operacion")));
 
         assertThat(decidir()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Niega el paso a un anónimo aunque el endpoint esté declarado")
+    void niegaAnonimo() throws Exception {
+        responder(new HandlerExecutionChain(metodoDeClase("operacion")));
+        Authentication anonimo = new AnonymousAuthenticationToken("clave", "anonimo",
+                AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS"));
+
+        assertThat(decidir(anonimo)).isFalse();
+    }
+
+    @Test
+    @DisplayName("La declaración del método manda sobre la de la clase")
+    void metodoMandaSobreClase() throws Exception {
+        responder(new HandlerExecutionChain(metodoDeClase("soloAdministrador")));
+
+        assertThat(decidir()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Niega el paso cuando la expresión declarada no se puede evaluar")
+    void niegaExpresionInvalida() throws Exception {
+        responder(new HandlerExecutionChain(metodo("expresionInvalida")));
+
+        assertThat(decidir()).isFalse();
     }
 
     @Test
@@ -94,8 +129,19 @@ class AutorizacionDeclaradaTest {
     }
 
     private boolean decidir() {
-        Authentication anonimo = mock(Authentication.class);
-        return autorizacion.check(() -> anonimo, new RequestAuthorizationContext(peticion)).isGranted();
+        return decidir(conRol("HUESPED"));
+    }
+
+    private boolean decidir(Authentication autenticacion) {
+        return autorizacion.check(() -> autenticacion, new RequestAuthorizationContext(peticion)).isGranted();
+    }
+
+    private static Authentication conRol(String rol) {
+        return new TestingAuthenticationToken("1", null, "ROLE_" + rol);
+    }
+
+    private static HandlerMethod metodoDeClase(String nombre) throws NoSuchMethodException {
+        return new HandlerMethod(new ControladorDeclarado(), ControladorDeclarado.class.getDeclaredMethod(nombre));
     }
 
     private void responder(HandlerExecutionChain cadena) throws Exception {
@@ -123,6 +169,11 @@ class AutorizacionDeclaradaTest {
         void sinDeclarar() {
             // Solo se inspecciona su anotación.
         }
+
+        @PreAuthorize("hasRole(")
+        void expresionInvalida() {
+            // Solo se inspecciona su anotación.
+        }
     }
 
     @PreAuthorize(Permisos.AUTENTICADO)
@@ -130,6 +181,11 @@ class AutorizacionDeclaradaTest {
 
         void operacion() {
             // Solo se inspecciona la anotación de la clase.
+        }
+
+        @PreAuthorize(Permisos.ADMINISTRADOR)
+        void soloAdministrador() {
+            // Solo se inspecciona su anotación.
         }
     }
 }

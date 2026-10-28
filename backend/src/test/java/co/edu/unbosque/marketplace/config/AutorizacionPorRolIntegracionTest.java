@@ -121,6 +121,23 @@ class AutorizacionPorRolIntegracionTest {
                 .andExpect(content().string("editada"));
     }
 
+    @Test
+    @DisplayName("Sin token se responde 401 antes de leer los datos de la petición, aunque sean inválidos")
+    void sinTokenConDatosInvalidosResponde401() throws Exception {
+        mvc.perform(put("/api/v1/prueba-roles/publicaciones/abc"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.detail").value("Necesitas iniciar sesión para continuar."));
+    }
+
+    @Test
+    @DisplayName("Con un rol no permitido se responde 403 antes de leer los datos de la petición, aunque sean inválidos")
+    void rolNoPermitidoConDatosInvalidosResponde403() throws Exception {
+        mvc.perform(put("/api/v1/prueba-roles/publicaciones/abc")
+                        .header(HttpHeaders.AUTHORIZATION, bearer("HUESPED", Duration.ofMinutes(5))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail").value("No tienes permiso para realizar esta acción."));
+    }
+
     private String bearer(String rol, Duration vigencia) {
         return bearer("1", rol, vigencia);
     }

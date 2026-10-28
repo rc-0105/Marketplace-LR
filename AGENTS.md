@@ -168,7 +168,9 @@ pantalla, mueve `App.jsx` a `app/` y arma la estructura de arriba.
   Se declara con `@PreAuthorize` sobre el método (o la clase) del controlador,
   usando las constantes de `compartido/seguridad/Permisos`
   (`@PreAuthorize(Permisos.ANFITRION)`). Un endpoint de `/api/v1/**` sin esa
-  anotación responde 403 con token y 401 sin él. Si además el recurso tiene
+  anotación responde 403 con token y 401 sin él. El filtro evalúa la
+  expresión antes de leer la petición, así que solo puede hablar de roles
+  (nada de `#parametro`). Si además el recurso tiene
   dueño (una publicación, una reserva), el service llama a
   `Propiedad.exigirPropietario(propietarioId, usuarioId)`, que responde 403
   cuando no es suyo.
