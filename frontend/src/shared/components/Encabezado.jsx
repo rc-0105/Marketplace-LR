@@ -6,7 +6,7 @@ import estilos from './Encabezado.module.css';
 
 /**
  * Encabezado común de todas las páginas con la marca y el enlace al inicio.
- * Con sesión ofrece "Cerrar sesión", que delega en `alCerrarSesion`.
+ * Con sesión ofrece "Mi cuenta" y "Cerrar sesión", que delega en `alCerrarSesion`.
  */
 export default function Encabezado({ alCerrarSesion }) {
   const sesion = useSesion();
@@ -28,9 +28,12 @@ export default function Encabezado({ alCerrarSesion }) {
         Inversiones LR
       </Link>
       {sesion && (
-        <button type="button" className={estilos.cerrarSesion} onClick={cerrar} disabled={cerrando}>
-          Cerrar sesión
-        </button>
+        <div className={estilos.acciones}>
+          <Link to="/mi-cuenta" className={estilos.enlace}>Mi cuenta</Link>
+          <button type="button" className={estilos.cerrarSesion} onClick={cerrar} disabled={cerrando}>
+            Cerrar sesión
+          </button>
+        </div>
       )}
     </header>
   );

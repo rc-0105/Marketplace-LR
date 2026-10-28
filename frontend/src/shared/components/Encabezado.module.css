@@ -14,8 +14,19 @@
   text-decoration: none;
 }
 
-.cerrarSesion {
+.acciones {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-3);
   margin-left: auto;
+}
+
+.enlace {
+  color: var(--color-texto);
+  font-size: var(--texto-pequeno);
+}
+
+.cerrarSesion {
   padding: var(--espacio-2) var(--espacio-3);
   border: 1px solid var(--color-borde-control);
   border-radius: var(--radio);
