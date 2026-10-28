@@ -8,6 +8,7 @@ import co.edu.unbosque.marketplace.compartido.exceptions.NegocioException;
 import co.edu.unbosque.marketplace.identidad.exceptions.CredencialesInvalidasException;
 import co.edu.unbosque.marketplace.identidad.exceptions.CuentaDesactivadaException;
 import co.edu.unbosque.marketplace.identidad.exceptions.CuentaRestringidaException;
+import co.edu.unbosque.marketplace.identidad.exceptions.CuentaYaActivaException;
 import co.edu.unbosque.marketplace.identidad.model.EstadoCuenta;
 import co.edu.unbosque.marketplace.identidad.model.Usuario;
 import co.edu.unbosque.marketplace.identidad.repository.UsuarioRepository;
@@ -18,6 +19,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /** Inicio de sesión (RF-02): respuesta genérica ante cualquier credencial inválida. */
 @Service
@@ -26,6 +28,7 @@ public class AutenticacionService {
     private static final String ENTIDAD = "Usuario";
     private static final String OPERACION = "operacion";
     private static final String MOTIVO = "motivo";
+    private static final String REACTIVAR = "reactivar_cuenta";
 
     private final UsuarioRepository usuarios;
     private final PasswordEncoder codificador;
@@ -75,12 +78,44 @@ public class AutenticacionService {
 
     private NegocioException rechazarPorEstado(Usuario usuario, String operacion) {
         boolean restringida = usuario.getEstado() == EstadoCuenta.RESTRINGIDA;
-        publicador.publicar(new EventoCritico(String.valueOf(usuario.getId()), AccionCritica.AUTENTICACION,
-                ENTIDAD, String.valueOf(usuario.getId()), ResultadoEvento.FALLO, Instant.now(),
-                Map.of(OPERACION, operacion, MOTIVO, restringida ? "cuenta_restringida" : "cuenta_desactivada")));
+        auditarFallo(usuario, operacion, restringida ? "cuenta_restringida" : "cuenta_desactivada");
         return restringida
                 ? new CuentaRestringidaException(usuario.getMotivoRestriccion())
                 : new CuentaDesactivadaException();
+    }
+
+    private void auditarFallo(Usuario usuario, String operacion, String motivo) {
+        publicador.publicar(new EventoCritico(String.valueOf(usuario.getId()), AccionCritica.AUTENTICACION,
+                ENTIDAD, String.valueOf(usuario.getId()), ResultadoEvento.FALLO, Instant.now(),
+                Map.of(OPERACION, operacion, MOTIVO, motivo)));
+    }
+
+    /**
+     * Reactiva una cuenta desactivada con las credenciales de su dueño y le inicia sesión (RF-06).
+     * Una cuenta restringida no se reactiva: solo un administrador levanta la restricción.
+     */
+    @Transactional
+    public SesionIniciada reactivarCuenta(String correo, String contrasena) {
+        Usuario usuario = verificarCredenciales(correo, contrasena, REACTIVAR);
+        // Sin default: un estado nuevo no compila hasta que se decida qué hacer con él.
+        Usuario reactivada = switch (usuario.getEstado()) {
+            case RESTRINGIDA -> throw rechazarPorEstado(usuario, REACTIVAR);
+            case ACTIVA -> {
+                auditarFallo(usuario, REACTIVAR, "cuenta_activa");
+                throw new CuentaYaActivaException();
+            }
+            case DESACTIVADA -> {
+                usuario.reactivar();
+                usuarios.save(usuario);
+                yield usuario;
+            }
+        };
+
+        TokenEmitido token = emisor.emitir(reactivada);
+        publicador.publicar(new EventoCritico(String.valueOf(reactivada.getId()), AccionCritica.AUTENTICACION,
+                ENTIDAD, String.valueOf(reactivada.getId()), ResultadoEvento.EXITO, Instant.now(),
+                Map.of(OPERACION, REACTIVAR)));
+        return new SesionIniciada(reactivada, token);
     }
 
     /** Invalida el token de la sesión (RF-03). Es idempotente: repetirlo no duplica ni falla. */
