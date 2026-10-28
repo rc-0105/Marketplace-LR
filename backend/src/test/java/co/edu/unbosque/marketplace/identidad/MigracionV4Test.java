@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
-import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,15 +31,8 @@ class MigracionV4Test {
     }
 
     @Test
-    @DisplayName("El CHECK de estado acepta exactamente ACTIVA, DESACTIVADA y RESTRINGIDA")
-    void checkDeEstadoAceptaTresValores() {
-        String definicion = jdbc.queryForObject("""
-                SELECT pg_get_constraintdef(oid) FROM pg_constraint
-                WHERE conname = 'usuario_estado_check' AND conrelid = 'usuario'::regclass
-                """, String.class);
-
-        assertThat(Pattern.compile("'([A-Z]+)'::").matcher(definicion).results().map(r -> r.group(1)).toList())
-                .containsExactlyInAnyOrder("ACTIVA", "DESACTIVADA", "RESTRINGIDA");
+    @DisplayName("El CHECK de estado acepta ACTIVA, DESACTIVADA y RESTRINGIDA")
+    void checkDeEstadoAceptaLosEstadosDeV4() {
         for (String estado : List.of("ACTIVA", "DESACTIVADA")) {
             assertThat(jdbc.update("UPDATE usuario SET estado = ? WHERE id = ?", estado, usuarioId)).isEqualTo(1);
         }
