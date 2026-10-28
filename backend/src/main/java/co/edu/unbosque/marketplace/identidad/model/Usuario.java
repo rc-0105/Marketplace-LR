@@ -94,6 +94,14 @@ public class Usuario {
         this.estado = EstadoCuenta.ACTIVA;
     }
 
+    /** ACTIVA a DESACTIVADA, por decisión de su dueño. */
+    public void desactivar() {
+        if (estado != EstadoCuenta.ACTIVA) {
+            throw new IllegalStateException("Solo una cuenta activa se puede desactivar");
+        }
+        this.estado = EstadoCuenta.DESACTIVADA;
+    }
+
     public Long getId() {
         return id;
     }

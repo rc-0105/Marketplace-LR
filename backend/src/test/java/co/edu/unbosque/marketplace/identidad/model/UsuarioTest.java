@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import co.edu.unbosque.marketplace.identidad.UsuariosDePrueba;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 class UsuarioTest {
 
@@ -110,5 +112,27 @@ class UsuarioTest {
         assertThat(activa.getEstado()).isEqualTo(EstadoCuenta.ACTIVA);
         assertThat(restringida.getEstado()).isEqualTo(EstadoCuenta.RESTRINGIDA);
         assertThat(restringida.getMotivoRestriccion()).isEqualTo("Pagos en disputa");
+    }
+
+    @Test
+    @DisplayName("Desactivar una cuenta activa la deja desactivada y sin acceso")
+    void desactivaCuentaActiva() {
+        Usuario usuario = UsuariosDePrueba.activa(7L);
+
+        usuario.desactivar();
+
+        assertThat(usuario.getEstado()).isEqualTo(EstadoCuenta.DESACTIVADA);
+        assertThat(usuario.puedeIniciarSesion()).isFalse();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = EstadoCuenta.class, names = {"DESACTIVADA", "RESTRINGIDA"})
+    @DisplayName("Solo una cuenta activa se puede desactivar y las demás no mutan")
+    void noDesactivaCuentaQueNoEstaActiva(EstadoCuenta estado) {
+        Usuario usuario = UsuariosDePrueba.conEstado(7L, estado, estado == EstadoCuenta.RESTRINGIDA ? "Motivo" : null);
+
+        assertThatThrownBy(usuario::desactivar).isInstanceOf(IllegalStateException.class);
+
+        assertThat(usuario.getEstado()).isEqualTo(estado);
     }
 }
