@@ -56,6 +56,24 @@
   opacity: 0.7;
 }
 
+.botonSecundario {
+  min-height: 2.75rem;
+  margin-top: var(--espacio-3);
+  padding: 0 var(--espacio-4);
+  border: 1px solid var(--color-terracota);
+  border-radius: var(--radio);
+  background: var(--color-superficie);
+  color: var(--color-terracota);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.botonSecundario:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
 .aviso {
   margin: var(--espacio-4) 0 0;
   padding: var(--espacio-3) var(--espacio-4);
