@@ -10,7 +10,8 @@ import org.springframework.http.HttpStatus;
 public abstract class NegocioException extends RuntimeException {
 
     private final HttpStatus estado;
-    private final Map<String, Object> propiedades;
+    // Nunca se serializa: ManejadorErrores la traduce a ProblemDetail en el mismo proceso.
+    private final transient Map<String, Object> propiedades;
 
     protected NegocioException(HttpStatus estado, String mensaje) {
         this(estado, mensaje, Map.of());

@@ -85,7 +85,8 @@ class MigracionV4Test {
         assertThat(jdbc.update("UPDATE usuario SET motivo_restriccion = ? WHERE id = ?", "a".repeat(500),
                 usuarioId)).isEqualTo(1);
 
+        String demasiadoLargo = "a".repeat(501);
         assertThatThrownBy(() -> jdbc.update("UPDATE usuario SET motivo_restriccion = ? WHERE id = ?",
-                "a".repeat(501), usuarioId)).isInstanceOf(DataIntegrityViolationException.class);
+                demasiadoLargo, usuarioId)).isInstanceOf(DataIntegrityViolationException.class);
     }
 }

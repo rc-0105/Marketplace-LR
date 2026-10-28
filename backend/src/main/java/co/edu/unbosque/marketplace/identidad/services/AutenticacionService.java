@@ -28,6 +28,7 @@ public class AutenticacionService {
     private static final String ENTIDAD = "Usuario";
     private static final String OPERACION = "operacion";
     private static final String MOTIVO = "motivo";
+    private static final String LOGIN = "login";
     private static final String REACTIVAR = "reactivar_cuenta";
 
     private final UsuarioRepository usuarios;
@@ -49,15 +50,15 @@ public class AutenticacionService {
     }
 
     public SesionIniciada iniciarSesion(String correo, String contrasena) {
-        Usuario usuario = verificarCredenciales(correo, contrasena, "login");
+        Usuario usuario = verificarCredenciales(correo, contrasena, LOGIN);
         if (!usuario.puedeIniciarSesion()) {
-            throw rechazarPorEstado(usuario, "login");
+            throw rechazarPorEstado(usuario, LOGIN);
         }
 
         TokenEmitido token = emisor.emitir(usuario);
         publicador.publicar(new EventoCritico(String.valueOf(usuario.getId()), AccionCritica.AUTENTICACION,
                 ENTIDAD, String.valueOf(usuario.getId()), ResultadoEvento.EXITO, Instant.now(),
-                Map.of(OPERACION, "login")));
+                Map.of(OPERACION, LOGIN)));
         return new SesionIniciada(usuario, token);
     }
 

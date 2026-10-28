@@ -49,10 +49,10 @@ class UsuarioTest {
     @DisplayName("Solo una cuenta activa se puede restringir")
     void noRestringeCuentaQueNoEstaActiva() {
         Usuario restringida = UsuariosDePrueba.restringida(7L, "Motivo previo");
+        Usuario desactivada = UsuariosDePrueba.desactivada(8L);
 
         assertThatThrownBy(() -> restringida.restringir("Otro")).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> UsuariosDePrueba.desactivada(8L).restringir("Otro"))
-                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> desactivada.restringir("Otro")).isInstanceOf(IllegalStateException.class);
         assertThat(restringida.getMotivoRestriccion()).isEqualTo("Motivo previo");
     }
 
@@ -80,10 +80,11 @@ class UsuarioTest {
     @Test
     @DisplayName("Solo una cuenta restringida se puede liberar")
     void noLevantaRestriccionDeCuentaNoRestringida() {
-        assertThatThrownBy(() -> UsuariosDePrueba.activa(7L).levantarRestriccion())
-                .isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> UsuariosDePrueba.desactivada(8L).levantarRestriccion())
-                .isInstanceOf(IllegalStateException.class);
+        Usuario activa = UsuariosDePrueba.activa(7L);
+        Usuario desactivada = UsuariosDePrueba.desactivada(8L);
+
+        assertThatThrownBy(activa::levantarRestriccion).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(desactivada::levantarRestriccion).isInstanceOf(IllegalStateException.class);
     }
 
     @Test
