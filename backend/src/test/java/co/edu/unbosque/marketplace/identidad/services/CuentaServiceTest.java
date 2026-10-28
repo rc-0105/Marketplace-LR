@@ -2,28 +2,38 @@ package co.edu.unbosque.marketplace.identidad.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasFuturas;
 import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
 import co.edu.unbosque.marketplace.identidad.UsuariosDePrueba;
+import co.edu.unbosque.marketplace.identidad.exceptions.ConfirmacionInvalidaException;
 import co.edu.unbosque.marketplace.identidad.exceptions.OperacionCuentaNoPermitidaException;
+import co.edu.unbosque.marketplace.identidad.exceptions.ReservasFuturasException;
 import co.edu.unbosque.marketplace.identidad.exceptions.UsuarioNoEncontradoException;
 import co.edu.unbosque.marketplace.identidad.model.EstadoCuenta;
 import co.edu.unbosque.marketplace.identidad.model.Rol;
 import co.edu.unbosque.marketplace.identidad.model.Usuario;
 import co.edu.unbosque.marketplace.identidad.repository.UsuarioRepository;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.InOrder;
 import org.mockito.ArgumentCaptor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class CuentaServiceTest {
@@ -31,14 +41,22 @@ class CuentaServiceTest {
     private static final Long ADMIN = 1L;
     private static final Long AFECTADO = 7L;
     private static final String MOTIVO = "Pagos en disputa";
+    private static final String CONTRASENA = "Segura#2026";
+    private static final String INTENTO = "Otra#Clave1";
+    private static final String OPERACION = "operacion";
+    private static final String MOTIVO_FALLO = "motivo";
+    private static final String DESACTIVAR = "desactivar_cuenta";
+    private static final String BLOQUEANTES = "reservasBloqueantes";
 
     private final UsuarioRepository usuarios = mock(UsuarioRepository.class);
     private final PublicadorEventos publicador = mock(PublicadorEventos.class);
+    private final PasswordEncoder codificador = mock(PasswordEncoder.class);
+    private final ConsultaReservasFuturas reservas = mock(ConsultaReservasFuturas.class);
     private CuentaService servicio;
 
     @BeforeEach
     void preparar() {
-        servicio = new CuentaService(usuarios, publicador);
+        servicio = new CuentaService(usuarios, publicador, codificador, reservas);
     }
 
     @Test
@@ -151,6 +169,131 @@ class CuentaServiceTest {
                 .isInstanceOf(OperacionCuentaNoPermitidaException.class);
 
         verifyNoInteractions(publicador);
+    }
+
+    @Test
+    @DisplayName("Desactivar con la contraseña correcta y sin reservas guarda la cuenta desactivada y audita el éxito")
+    void desactivaCuentaDelDueno() {
+        Usuario ana = dueno(UsuariosDePrueba.activa(AFECTADO));
+        contrasenaCorrecta(ana);
+        when(reservas.contarConfirmadasFuturas(AFECTADO)).thenReturn(0L);
+
+        servicio.desactivar(AFECTADO, CONTRASENA);
+
+        assertThat(ana.getEstado()).isEqualTo(EstadoCuenta.DESACTIVADA);
+        verify(usuarios).save(ana);
+        EventoCritico evento = eventoPublicado();
+        assertThat(evento.accion()).isEqualTo(AccionCritica.AUTENTICACION);
+        assertThat(evento.resultado()).isEqualTo(ResultadoEvento.EXITO);
+        assertThat(evento.usuario()).isEqualTo("7");
+        assertThat(evento.entidad()).isEqualTo("Usuario");
+        assertThat(evento.entidadId()).isEqualTo("7");
+        assertThat(evento.datos()).containsOnly(Map.entry(OPERACION, DESACTIVAR));
+        sinDatosPersonales(evento);
+    }
+
+    @Test
+    @DisplayName("Una contraseña incorrecta da 403, audita el fallo y no consulta reservas ni guarda")
+    void rechazaContrasenaIncorrecta() {
+        Usuario ana = dueno(UsuariosDePrueba.activa(AFECTADO));
+
+        assertThatThrownBy(() -> servicio.desactivar(AFECTADO, INTENTO))
+                .isInstanceOf(ConfirmacionInvalidaException.class);
+
+        assertThat(ana.getEstado()).isEqualTo(EstadoCuenta.ACTIVA);
+        verify(usuarios, never()).save(ana);
+        verifyNoInteractions(reservas);
+        EventoCritico evento = eventoPublicado();
+        assertThat(evento.resultado()).isEqualTo(ResultadoEvento.FALLO);
+        assertThat(evento.usuario()).isEqualTo("7");
+        assertThat(evento.datos()).containsOnly(Map.entry(OPERACION, DESACTIVAR),
+                Map.entry(MOTIVO_FALLO, "credenciales_invalidas"));
+        sinDatosPersonales(evento);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = EstadoCuenta.class, names = {"RESTRINGIDA", "DESACTIVADA"})
+    @DisplayName("Una cuenta que no está activa da 409, audita el fallo y no toca el puerto de reservas")
+    void rechazaCuentaQueNoEstaActiva(EstadoCuenta estado) {
+        Usuario ana = dueno(UsuariosDePrueba.conEstado(AFECTADO, estado,
+                estado == EstadoCuenta.RESTRINGIDA ? MOTIVO : null));
+        contrasenaCorrecta(ana);
+
+        assertThatThrownBy(() -> servicio.desactivar(AFECTADO, CONTRASENA))
+                .isInstanceOf(OperacionCuentaNoPermitidaException.class)
+                .hasMessage("Solo se puede desactivar una cuenta activa.");
+
+        assertThat(ana.getEstado()).isEqualTo(estado);
+        verify(usuarios, never()).save(ana);
+        verifyNoInteractions(reservas);
+        EventoCritico evento = eventoPublicado();
+        assertThat(evento.resultado()).isEqualTo(ResultadoEvento.FALLO);
+        assertThat(evento.datos()).containsOnly(Map.entry(OPERACION, DESACTIVAR),
+                Map.entry(MOTIVO_FALLO, "estado_no_permitido"));
+        sinDatosPersonales(evento);
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = {2L, 3L})
+    @DisplayName("Con reservas pendientes da 409 con el conteo, audita el fallo con el número y no guarda")
+    void rechazaCuentaConReservasFuturas(long pendientes) {
+        Usuario ana = dueno(UsuariosDePrueba.activa(AFECTADO));
+        contrasenaCorrecta(ana);
+        when(reservas.contarConfirmadasFuturas(AFECTADO)).thenReturn(pendientes);
+
+        assertThatThrownBy(() -> servicio.desactivar(AFECTADO, CONTRASENA))
+                .isInstanceOfSatisfying(ReservasFuturasException.class, error -> {
+                    assertThat(error.getPropiedades()).containsEntry(BLOQUEANTES, pendientes);
+                    assertThat(error.getMessage()).contains("(" + pendientes + ")");
+                });
+
+        assertThat(ana.getEstado()).isEqualTo(EstadoCuenta.ACTIVA);
+        verify(usuarios, never()).save(ana);
+        EventoCritico evento = eventoPublicado();
+        assertThat(evento.resultado()).isEqualTo(ResultadoEvento.FALLO);
+        assertThat(evento.datos()).containsOnly(Map.entry(OPERACION, DESACTIVAR),
+                Map.entry(MOTIVO_FALLO, "reservas_futuras"), Map.entry(BLOQUEANTES, pendientes));
+        sinDatosPersonales(evento);
+    }
+
+    @Test
+    @DisplayName("El orden es contraseña, reservas y recién entonces se guarda")
+    void verificaEnOrden() {
+        Usuario ana = dueno(UsuariosDePrueba.activa(AFECTADO));
+        contrasenaCorrecta(ana);
+        when(reservas.contarConfirmadasFuturas(AFECTADO)).thenReturn(0L);
+
+        servicio.desactivar(AFECTADO, CONTRASENA);
+
+        InOrder orden = inOrder(codificador, reservas, usuarios);
+        orden.verify(codificador).matches(CONTRASENA, ana.getContrasenaHash());
+        orden.verify(reservas).contarConfirmadasFuturas(AFECTADO);
+        orden.verify(usuarios).save(ana);
+    }
+
+    @Test
+    @DisplayName("Desactivar un usuario inexistente da 404, sin evento ni consulta de reservas")
+    void desactivarUsuarioInexistente() {
+        when(usuarios.findById(AFECTADO)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.desactivar(AFECTADO, CONTRASENA))
+                .isInstanceOf(UsuarioNoEncontradoException.class);
+
+        verifyNoInteractions(publicador, reservas);
+    }
+
+    private Usuario dueno(Usuario usuario) {
+        when(usuarios.findById(AFECTADO)).thenReturn(Optional.of(usuario));
+        return usuario;
+    }
+
+    private void contrasenaCorrecta(Usuario usuario) {
+        when(codificador.matches(CONTRASENA, usuario.getContrasenaHash())).thenReturn(true);
+    }
+
+    // Ni la contraseña (correcta o intentada), ni el correo, el nombre o el hash llegan a la auditoría.
+    private void sinDatosPersonales(EventoCritico evento) {
+        assertThat(evento.toString()).doesNotContain(CONTRASENA, INTENTO, "ana@correo.com", "Ana Gómez", "hash-real");
     }
 
     private EventoCritico eventoPublicado() {
