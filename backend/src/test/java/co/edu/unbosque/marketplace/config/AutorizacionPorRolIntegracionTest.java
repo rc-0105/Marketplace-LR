@@ -8,9 +8,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import co.edu.unbosque.marketplace.compartido.seguridad.Permisos;
 import co.edu.unbosque.marketplace.compartido.seguridad.Propiedad;
+import co.edu.unbosque.marketplace.identidad.model.Rol;
+import co.edu.unbosque.marketplace.identidad.model.Usuario;
+import co.edu.unbosque.marketplace.identidad.repository.UsuarioRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -44,7 +49,7 @@ class AutorizacionPorRolIntegracionTest {
 
     private static final String RUTA_ADMINISTRACION = "/api/v1/prueba-roles/administracion";
     private static final String RUTA_SIN_DECLARAR = "/api/v1/prueba-roles/sin-declarar";
-    private static final String RUTA_PUBLICACION_DE_ANFITRION_2 = "/api/v1/prueba-roles/publicaciones/2";
+    private static final String RUTA_PUBLICACIONES = "/api/v1/prueba-roles/publicaciones/";
 
     @Autowired
     private MockMvc mvc;
@@ -54,6 +59,29 @@ class AutorizacionPorRolIntegracionTest {
 
     @Autowired
     private PropiedadesJwt propiedades;
+
+    @Autowired
+    private UsuarioRepository usuarios;
+
+    private Long idAdministrador;
+    private Long idHuesped;
+    private Long idAnfitrion;
+    private Long idOtroAnfitrion;
+
+    // El validador consulta la cuenta del sub: cada token se firma con un usuario que sí existe.
+    @BeforeEach
+    void guardarUsuarios() {
+        usuarios.deleteAll();
+        idAdministrador = guardar("Admin", "admin@correo.com", Rol.ADMINISTRADOR);
+        idHuesped = guardar("Hugo", "hugo@correo.com", Rol.HUESPED);
+        idAnfitrion = guardar("Ana", "ana@correo.com", Rol.ANFITRION);
+        idOtroAnfitrion = guardar("Beto", "beto@correo.com", Rol.ANFITRION);
+    }
+
+    @AfterEach
+    void limpiar() {
+        usuarios.deleteAll();
+    }
 
     @ParameterizedTest
     @ValueSource(strings = {"HUESPED", "ANFITRION"})
@@ -105,8 +133,8 @@ class AutorizacionPorRolIntegracionTest {
     @Test
     @DisplayName("Un anfitrión que edita la publicación de otro anfitrión recibe 403")
     void anfitrionEditandoPublicacionAjenaResponde403() throws Exception {
-        mvc.perform(put(RUTA_PUBLICACION_DE_ANFITRION_2)
-                        .header(HttpHeaders.AUTHORIZATION, bearer("1", "ANFITRION", Duration.ofMinutes(5))))
+        mvc.perform(put(RUTA_PUBLICACIONES + idOtroAnfitrion)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(idAnfitrion, "ANFITRION", Duration.ofMinutes(5))))
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.detail").value("No tienes permiso para realizar esta acción."));
@@ -115,8 +143,9 @@ class AutorizacionPorRolIntegracionTest {
     @Test
     @DisplayName("El anfitrión dueño sí edita su propia publicación")
     void anfitrionEditaSuPublicacion() throws Exception {
-        mvc.perform(put(RUTA_PUBLICACION_DE_ANFITRION_2)
-                        .header(HttpHeaders.AUTHORIZATION, bearer("2", "ANFITRION", Duration.ofMinutes(5))))
+        mvc.perform(put(RUTA_PUBLICACIONES + idOtroAnfitrion)
+                        .header(HttpHeaders.AUTHORIZATION,
+                                bearer(idOtroAnfitrion, "ANFITRION", Duration.ofMinutes(5))))
                 .andExpect(status().isOk())
                 .andExpect(content().string("editada"));
     }
@@ -138,15 +167,24 @@ class AutorizacionPorRolIntegracionTest {
                 .andExpect(jsonPath("$.detail").value("No tienes permiso para realizar esta acción."));
     }
 
-    private String bearer(String rol, Duration vigencia) {
-        return bearer("1", rol, vigencia);
+    private Long guardar(String nombre, String correo, Rol rol) {
+        return usuarios.save(Usuario.nuevo(nombre, correo, "hash", rol)).getId();
     }
 
-    private String bearer(String usuarioId, String rol, Duration vigencia) {
+    private String bearer(String rol, Duration vigencia) {
+        Long id = switch (rol) {
+            case "ADMINISTRADOR" -> idAdministrador;
+            case "ANFITRION" -> idAnfitrion;
+            default -> idHuesped;
+        };
+        return bearer(id, rol, vigencia);
+    }
+
+    private String bearer(Long usuarioId, String rol, Duration vigencia) {
         Instant ahora = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(propiedades.emisor())
-                .subject(usuarioId)
+                .subject(String.valueOf(usuarioId))
                 .id(UUID.randomUUID().toString())
                 .claim("rol", rol)
                 .issuedAt(ahora.minus(Duration.ofHours(2)))

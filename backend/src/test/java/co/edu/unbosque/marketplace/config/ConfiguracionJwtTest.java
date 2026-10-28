@@ -3,6 +3,7 @@ package co.edu.unbosque.marketplace.config;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -115,7 +116,7 @@ class ConfiguracionJwtTest {
     @Test
     @DisplayName("Un token válido pero en la denylist es rechazado")
     void rechazaTokenInvalidado() {
-        when(sesiones.estaInvalidada(anyString())).thenReturn(true);
+        when(sesiones.estaInvalidada(anyString(), anyLong())).thenReturn(true);
 
         String token = emitir(c -> { });
 
@@ -135,7 +136,7 @@ class ConfiguracionJwtTest {
         }
 
         // any() y no anyString(): este último no casa con null y no cubriría el caso sin jti.
-        verify(sesiones, never()).estaInvalidada(any());
+        verify(sesiones, never()).estaInvalidada(any(), any());
     }
 
     @Test
@@ -148,7 +149,7 @@ class ConfiguracionJwtTest {
         String sinSub = emitir(c -> c.claims(m -> m.remove("sub")));
         assertThatThrownBy(() -> decodificador.decode(sinSub)).isInstanceOf(JwtException.class);
 
-        verify(sesiones, never()).estaInvalidada(any());
+        verify(sesiones, never()).estaInvalidada(any(), any());
     }
 
     @Test

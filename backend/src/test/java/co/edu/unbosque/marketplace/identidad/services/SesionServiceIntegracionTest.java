@@ -23,6 +23,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** Recorre la denylist contra PostgreSQL: inserción idempotente y limpieza (S-A7, S-A16, REQ-A7). */
 @SpringBootTest
@@ -38,6 +39,9 @@ class SesionServiceIntegracionTest {
 
     @Autowired
     private UsuarioRepository usuarios;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     private Long usuarioId;
 
@@ -92,12 +96,33 @@ class SesionServiceIntegracionTest {
     }
 
     @Test
-    @DisplayName("estaInvalidada responde true solo para los jti guardados")
+    @DisplayName("estaInvalidada responde true solo para los jti guardados de una cuenta activa")
     void estaInvalidadaDistingueJti() {
         sesiones.invalidar("jti-cerrado", usuarioId, Instant.now().plus(1, ChronoUnit.HOURS));
 
-        assertThat(sesiones.estaInvalidada("jti-cerrado")).isTrue();
-        assertThat(sesiones.estaInvalidada(UUID.randomUUID().toString())).isFalse();
+        assertThat(sesiones.estaInvalidada("jti-cerrado", usuarioId)).isTrue();
+        assertThat(sesiones.estaInvalidada(UUID.randomUUID().toString(), usuarioId)).isFalse();
+    }
+
+    @Test
+    @DisplayName("Un usuario que no existe tiene la sesión invalidada aunque el jti no esté en la denylist")
+    void usuarioInexistenteEstaInvalidado() {
+        assertThat(sesiones.estaInvalidada(UUID.randomUUID().toString(), usuarioId + 1_000L)).isTrue();
+    }
+
+    @Test
+    @DisplayName("Una cuenta restringida o desactivada tiene la sesión invalidada y al reactivarla vuelve a valer")
+    void cuentaNoActivaEstaInvalidada() {
+        String jti = UUID.randomUUID().toString();
+
+        jdbc.update("UPDATE usuario SET estado = 'RESTRINGIDA', motivo_restriccion = 'Pagos' WHERE id = ?", usuarioId);
+        assertThat(sesiones.estaInvalidada(jti, usuarioId)).isTrue();
+
+        jdbc.update("UPDATE usuario SET estado = 'DESACTIVADA', motivo_restriccion = NULL WHERE id = ?", usuarioId);
+        assertThat(sesiones.estaInvalidada(jti, usuarioId)).isTrue();
+
+        jdbc.update("UPDATE usuario SET estado = 'ACTIVA' WHERE id = ?", usuarioId);
+        assertThat(sesiones.estaInvalidada(jti, usuarioId)).isFalse();
     }
 
     @Test
@@ -111,9 +136,9 @@ class SesionServiceIntegracionTest {
         int borradas = sesiones.limpiarVencidas();
 
         assertThat(borradas).isEqualTo(1);
-        assertThat(sesiones.estaInvalidada("jti-viejo")).isFalse();
-        assertThat(sesiones.estaInvalidada("jti-en-margen")).isTrue();
-        assertThat(sesiones.estaInvalidada("jti-vigente")).isTrue();
+        assertThat(sesiones.estaInvalidada("jti-viejo", usuarioId)).isFalse();
+        assertThat(sesiones.estaInvalidada("jti-en-margen", usuarioId)).isTrue();
+        assertThat(sesiones.estaInvalidada("jti-vigente", usuarioId)).isTrue();
     }
 
     @Test

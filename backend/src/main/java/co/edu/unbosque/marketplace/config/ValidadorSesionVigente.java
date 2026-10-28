@@ -11,7 +11,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.TransactionException;
 
-/** Rechaza los tokens cuyo jti está en la denylist de sesiones cerradas (RF-03). */
+/** Rechaza los tokens cerrados (RF-03) o de una cuenta que ya no está activa (RF-06). */
 @Component
 public class ValidadorSesionVigente implements OAuth2TokenValidator<Jwt> {
 
@@ -26,7 +26,7 @@ public class ValidadorSesionVigente implements OAuth2TokenValidator<Jwt> {
     @Override
     public OAuth2TokenValidatorResult validate(Jwt jwt) {
         try {
-            if (sesiones.estaInvalidada(jwt.getId())) {
+            if (sesiones.estaInvalidada(jwt.getId(), Long.valueOf(jwt.getSubject()))) {
                 return OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token"));
             }
             return OAuth2TokenValidatorResult.success();
