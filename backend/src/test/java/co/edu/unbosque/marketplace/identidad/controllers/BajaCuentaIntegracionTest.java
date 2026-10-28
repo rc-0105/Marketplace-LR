@@ -1,5 +1,6 @@
 package co.edu.unbosque.marketplace.identidad.controllers;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -17,6 +18,8 @@ import co.edu.unbosque.marketplace.identidad.model.Usuario;
 import co.edu.unbosque.marketplace.identidad.repository.SesionInvalidadaRepository;
 import co.edu.unbosque.marketplace.identidad.repository.UsuarioRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Map;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,6 +43,11 @@ import org.springframework.test.web.servlet.ResultActions;
 class BajaCuentaIntegracionTest {
 
     private static final String RUTA = "/api/v1/perfil/desactivar";
+    private static final String RUTA_ELIMINAR = "/api/v1/perfil/eliminar";
+    private static final String RUTA_REACTIVAR = "/api/v1/perfil/reactivar";
+    private static final String RUTA_REGISTRO = "/api/v1/auth/registro";
+    private static final String RUTA_LOGIN = "/api/v1/auth/login";
+    private static final String DETALLE = "$.detail";
     private static final String RUTA_PROTEGIDA = "/api/v1/otra";
     private static final String CORREO = "ana@correo.com";
     private static final String CONTRASENA = "Segura#2026";
@@ -69,8 +77,14 @@ class BajaCuentaIntegracionTest {
     @Autowired
     private JdbcTemplate jdbc;
 
+    @AfterEach
+    void limpiarPublicaciones() {
+        jdbc.update("DELETE FROM publicacion");
+    }
+
     @BeforeEach
     void preparar() {
+        jdbc.update("DELETE FROM publicacion");
         usuarios.deleteAll();
         crear(CORREO, Rol.HUESPED);
     }
@@ -106,9 +120,9 @@ class BajaCuentaIntegracionTest {
             assertThat(captura.texto(0)).contains("AUTENTICACION", "desactivar_cuenta", "EXITO")
                     .doesNotContain(CONTRASENA, token, CORREO);
         }
-        mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content(credenciales()))
+        mvc.perform(post(RUTA_LOGIN).contentType(MediaType.APPLICATION_JSON).content(credenciales(CORREO)))
                 .andExpect(status().isForbidden()).andExpect(jsonPath(CODIGO).value("CUENTA_DESACTIVADA"));
-        mvc.perform(post("/api/v1/perfil/reactivar").contentType(MediaType.APPLICATION_JSON).content(credenciales()))
+        mvc.perform(post(RUTA_REACTIVAR).contentType(MediaType.APPLICATION_JSON).content(credenciales(CORREO)))
                 .andExpect(status().isOk());
         assertThat(estado(CORREO)).isEqualTo(ACTIVA);
     }
@@ -123,7 +137,7 @@ class BajaCuentaIntegracionTest {
                     .andExpect(status().isForbidden())
                     .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                     .andExpect(jsonPath(CODIGO).value("CONFIRMACION_INVALIDA"))
-                    .andExpect(jsonPath("$.detail").value("La contraseña no es correcta."));
+                    .andExpect(jsonPath(DETALLE).value("La contraseña no es correcta."));
 
             assertThat(captura.texto(0)).contains("credenciales_invalidas", "FALLO")
                     .doesNotContain(INTENTO, CONTRASENA, token);
@@ -161,17 +175,110 @@ class BajaCuentaIntegracionTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath(CODIGO).value("RESERVAS_FUTURAS_ACTIVAS"))
                 .andExpect(jsonPath("$.reservasBloqueantes").value(2))
-                .andExpect(jsonPath("$.detail").value(containsString("(2)")));
+                .andExpect(jsonPath(DETALLE).value(containsString("(2)")));
+
+        assertThat(estado(CORREO)).isEqualTo(ACTIVA);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {RUTA, RUTA_ELIMINAR})
+    @DisplayName("Sin token da 401 ProblemDetail y la cuenta no cambia")
+    void sinTokenDa401(String ruta) throws Exception {
+        mvc.perform(post(ruta).contentType(MediaType.APPLICATION_JSON).content(cuerpo(CONTRASENA)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+
+        assertThat(estado(CORREO)).isEqualTo(ACTIVA);
+    }
+
+    @ParameterizedTest
+    @EnumSource(Rol.class)
+    @DisplayName("Cualquier rol elimina su cuenta con 204: la fila queda anónima en la base y su token deja de valer")
+    void eliminaLaCuentaAnonimizandolaEnLaBase(Rol rol) throws Exception {
+        usuarios.deleteAll();
+        crear(CORREO, rol);
+        Long id = usuarios.findAll().get(0).getId();
+        String hashAnterior = hashDe(id);
+        Long borrador = jdbc.queryForObject(
+                "INSERT INTO publicacion (anfitrion_id, titulo, estado) VALUES (?, 'Casa', 'BORRADOR') RETURNING id",
+                Long.class, id);
+        String token = iniciarSesion(CORREO);
+
+        try (var captura = new CapturaAuditoria()) {
+            eliminar(token, CONTRASENA).andExpect(status().isNoContent()).andExpect(content().string(""));
+
+            assertThat(captura.cantidad()).isEqualTo(1);
+            assertThat(captura.texto(0)).contains("AUTENTICACION", "eliminar_cuenta", "EXITO")
+                    .doesNotContain(CONTRASENA, token, CORREO, "Ana");
+        }
+
+        Map<String, Object> fila = jdbc.queryForMap("SELECT * FROM usuario WHERE id = ?", id);
+        assertThat(fila).containsEntry("estado", "ELIMINADA").containsEntry("nombre", "Usuario eliminado")
+                .containsEntry("correo", "eliminada-" + id + "@eliminada.invalid")
+                .containsEntry("motivo_restriccion", null);
+        // Se anonimiza en vez de borrar para que lo que apunta al usuario siga siendo válido.
+        assertThat(jdbc.queryForObject("SELECT anfitrion_id FROM publicacion WHERE id = ?", Long.class, borrador))
+                .isEqualTo(id);
+        assertThat(hashDe(id)).isNotEqualTo(hashAnterior);
+        assertThat(codificador.matches(CONTRASENA, hashDe(id))).isFalse();
+        mvc.perform(get(RUTA_PROTEGIDA).header(HttpHeaders.AUTHORIZATION, BEARER + token))
+                .andExpect(status().isUnauthorized());
+        assertThat(sesiones.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("Tras eliminar, el correo original ya no entra ni reactiva igual que uno desconocido y puede registrarse")
+    void elCorreoOriginalQuedaLibre() throws Exception {
+        String token = iniciarSesion(CORREO);
+        Long id = usuarios.findAll().get(0).getId();
+        eliminar(token, CONTRASENA).andExpect(status().isNoContent());
+        String respuestaDesconocido = mvc.perform(post(RUTA_LOGIN).contentType(MediaType.APPLICATION_JSON)
+                        .content(credenciales("nadie@correo.com")))
+                .andExpect(status().isUnauthorized()).andReturn().getResponse().getContentAsString(UTF_8);
+
+        mvc.perform(post(RUTA_LOGIN).contentType(MediaType.APPLICATION_JSON).content(credenciales(CORREO)))
+                .andExpect(status().isUnauthorized()).andExpect(content().json(respuestaDesconocido))
+                .andExpect(jsonPath(CODIGO).doesNotExist());
+        mvc.perform(post(RUTA_REACTIVAR).contentType(MediaType.APPLICATION_JSON).content(credenciales(CORREO)))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath(CODIGO).doesNotExist());
+        mvc.perform(post(RUTA_REGISTRO).contentType(MediaType.APPLICATION_JSON).content("""
+                        {"nombre": "Ana Nueva", "correo": "%s", "contrasena": "%s", "rol": "HUESPED"}
+                        """.formatted(CORREO, CONTRASENA)))
+                .andExpect(status().isCreated());
+
+        assertThat(jdbc.queryForObject("SELECT correo FROM usuario WHERE id = ?", String.class, id))
+                .isEqualTo("eliminada-" + id + "@eliminada.invalid");
+        assertThat(jdbc.queryForObject("SELECT estado FROM usuario WHERE id = ?", String.class, id))
+                .isEqualTo("ELIMINADA");
+        assertThat(jdbc.queryForObject("SELECT id FROM usuario WHERE correo = ?", Long.class, CORREO))
+                .isNotEqualTo(id);
+        assertThat(estado(CORREO)).isEqualTo(ACTIVA);
+    }
+
+    @Test
+    @DisplayName("Eliminar con una contraseña incorrecta da el mismo 403 que desactivar y la cuenta no cambia")
+    void eliminarConContrasenaIncorrectaDa403() throws Exception {
+        String token = iniciarSesion(CORREO);
+
+        eliminar(token, INTENTO)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath(CODIGO).value("CONFIRMACION_INVALIDA"))
+                .andExpect(jsonPath(DETALLE).value("La contraseña no es correcta."));
 
         assertThat(estado(CORREO)).isEqualTo(ACTIVA);
     }
 
     @Test
-    @DisplayName("Sin token da 401 ProblemDetail y la cuenta no cambia")
-    void sinTokenDa401() throws Exception {
-        mvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON).content(cuerpo(CONTRASENA)))
-                .andExpect(status().isUnauthorized())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+    @DisplayName("Eliminar con reservas pendientes da 409 con el conteo y la fila no se anonimiza")
+    void eliminarConReservasPendientesDa409() throws Exception {
+        String token = iniciarSesion(CORREO);
+        Long id = usuarios.findAll().get(0).getId();
+        when(reservas.contarConfirmadasFuturas(id)).thenReturn(3L);
+
+        eliminar(token, CONTRASENA)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath(CODIGO).value("RESERVAS_FUTURAS_ACTIVAS"))
+                .andExpect(jsonPath("$.reservasBloqueantes").value(3));
 
         assertThat(estado(CORREO)).isEqualTo(ACTIVA);
     }
@@ -182,7 +289,7 @@ class BajaCuentaIntegracionTest {
 
     private String iniciarSesion(String correo) throws Exception {
         String cuerpoLogin = "{\"correo\": \"%s\", \"contrasena\": \"%s\"}".formatted(correo, CONTRASENA);
-        String respuesta = mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+        String respuesta = mvc.perform(post(RUTA_LOGIN).contentType(MediaType.APPLICATION_JSON)
                         .content(cuerpoLogin))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         return json.readTree(respuesta).get("token").asText();
@@ -193,12 +300,21 @@ class BajaCuentaIntegracionTest {
                 .contentType(MediaType.APPLICATION_JSON).content(cuerpo(contrasena)));
     }
 
+    private ResultActions eliminar(String token, String contrasena) throws Exception {
+        return mvc.perform(post(RUTA_ELIMINAR).header(HttpHeaders.AUTHORIZATION, BEARER + token)
+                .contentType(MediaType.APPLICATION_JSON).content(cuerpo(contrasena)));
+    }
+
+    private String hashDe(Long id) {
+        return jdbc.queryForObject("SELECT contrasena_hash FROM usuario WHERE id = ?", String.class, id);
+    }
+
     private static String cuerpo(String contrasena) {
         return "{\"contrasena\": \"%s\"}".formatted(contrasena);
     }
 
-    private static String credenciales() {
-        return "{\"correo\": \"%s\", \"contrasena\": \"%s\"}".formatted(CORREO, CONTRASENA);
+    private static String credenciales(String correo) {
+        return "{\"correo\": \"%s\", \"contrasena\": \"%s\"}".formatted(correo, CONTRASENA);
     }
 
     private String estado(String correo) {
