@@ -165,6 +165,10 @@ pantalla, mueve `App.jsx` a `app/` y arma la estructura de arriba.
   Las operaciones que crean o confirman reservas son idempotentes.
 - **Autorización (ADR-5):** cada endpoint declara los roles que pueden usarlo
   (huésped, anfitrión, administrador). Lo que no está declarado se niega.
+  Se declara con `@PreAuthorize` sobre el método (o la clase) del controlador,
+  usando las constantes de `compartido/seguridad/Permisos`
+  (`@PreAuthorize(Permisos.ANFITRION)`). Un endpoint de `/api/v1/**` sin esa
+  anotación responde 403 con token y 401 sin él.
 - **Trazabilidad (RF-45):** los eventos críticos se registran en el log de
   auditoría, y el log nunca contiene contraseñas, tokens ni datos de pago.
 - **Credenciales (RNF-17):** ninguna clave se versiona. Toda configuración
