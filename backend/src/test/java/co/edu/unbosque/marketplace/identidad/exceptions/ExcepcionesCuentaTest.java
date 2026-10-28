@@ -21,7 +21,7 @@ class ExcepcionesCuentaTest {
         assertThat(error.getEstado()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(error.getMessage()).isEqualTo("Tu cuenta está restringida.");
         assertThat(error.getPropiedades())
-                .containsEntry("codigo", "CUENTA_RESTRINGIDA")
+                .containsEntry(CODIGO, "CUENTA_RESTRINGIDA")
                 .containsEntry("motivo", "Pagos en disputa")
                 .hasSize(2);
     }
@@ -40,7 +40,7 @@ class ExcepcionesCuentaTest {
         assertThat(error).isInstanceOf(NegocioException.class);
         assertThat(error.getEstado()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(error.getMessage()).isEqualTo("Tu cuenta está desactivada.");
-        assertThat(error.getPropiedades()).containsOnlyKeys("codigo").containsEntry("codigo", "CUENTA_DESACTIVADA");
+        assertThat(error.getPropiedades()).containsOnlyKeys(CODIGO).containsEntry(CODIGO, "CUENTA_DESACTIVADA");
     }
 
     @Test

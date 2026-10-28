@@ -76,7 +76,7 @@ class CuentaServiceTest {
         assertThat(evento.usuario()).isEqualTo("1");
         assertThat(evento.entidad()).isEqualTo("Usuario");
         assertThat(evento.entidadId()).isEqualTo("7");
-        assertThat(evento.datos()).containsEntry("operacion", "restringir_cuenta");
+        assertThat(evento.datos()).containsEntry(OPERACION, "restringir_cuenta");
     }
 
     @Test
@@ -154,7 +154,7 @@ class CuentaServiceTest {
         assertThat(evento.accion()).isEqualTo(AccionCritica.ACCION_ADMINISTRATIVA);
         assertThat(evento.usuario()).isEqualTo("1");
         assertThat(evento.entidadId()).isEqualTo("7");
-        assertThat(evento.datos()).containsEntry("operacion", "levantar_restriccion");
+        assertThat(evento.datos()).containsEntry(OPERACION, "levantar_restriccion");
     }
 
     @Test
