@@ -36,6 +36,9 @@ public class Usuario {
     @Column(nullable = false, length = 20)
     private EstadoCuenta estado;
 
+    @Column(name = "motivo_restriccion", length = 500)
+    private String motivoRestriccion;
+
     @Column(name = "creado_en", nullable = false, updatable = false)
     private Instant creadoEn;
 
@@ -57,7 +60,7 @@ public class Usuario {
         return new Usuario(nombre, correo, contrasenaHash, rol);
     }
 
-    /** Gancho para SOF-15 y SOF-17: hoy toda cuenta activa puede entrar. */
+    /** Solo una cuenta activa puede entrar; la desactivada y la restringida no. */
     public boolean puedeIniciarSesion() {
         return estado == EstadoCuenta.ACTIVA;
     }
@@ -84,6 +87,10 @@ public class Usuario {
 
     public EstadoCuenta getEstado() {
         return estado;
+    }
+
+    public String getMotivoRestriccion() {
+        return motivoRestriccion;
     }
 
     public Instant getCreadoEn() {

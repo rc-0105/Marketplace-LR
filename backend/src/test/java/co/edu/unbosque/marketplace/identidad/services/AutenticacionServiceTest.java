@@ -2,11 +2,13 @@ package co.edu.unbosque.marketplace.identidad.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -14,7 +16,10 @@ import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
+import co.edu.unbosque.marketplace.identidad.UsuariosDePrueba;
 import co.edu.unbosque.marketplace.identidad.exceptions.CredencialesInvalidasException;
+import co.edu.unbosque.marketplace.identidad.exceptions.CuentaDesactivadaException;
+import co.edu.unbosque.marketplace.identidad.exceptions.CuentaRestringidaException;
 import co.edu.unbosque.marketplace.identidad.model.Rol;
 import co.edu.unbosque.marketplace.identidad.model.Usuario;
 import co.edu.unbosque.marketplace.identidad.repository.UsuarioRepository;
@@ -24,6 +29,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -33,6 +39,7 @@ class AutenticacionServiceTest {
     private static final String MENSAJE = "Correo o contraseña incorrectos. Revísalos e intenta de nuevo.";
     private static final String CONTRASENA = "Segura#2026";
     private static final String HASH_FICTICIO = "hash-ficticio";
+    private static final String MOTIVO = "Pagos en disputa";
 
     private final UsuarioRepository usuarios = mock(UsuarioRepository.class);
     private final PasswordEncoder codificador = mock(PasswordEncoder.class);
@@ -112,16 +119,49 @@ class AutenticacionServiceTest {
     }
 
     @Test
-    @DisplayName("Una cuenta que no puede iniciar sesión recibe el mismo error aunque la contraseña coincida")
-    void rechazaCuentaSinAcceso() {
-        ReflectionTestUtils.setField(ana, "estado", null);
-        when(codificador.matches(CONTRASENA, "hash-real")).thenReturn(true);
+    @DisplayName("Con la contraseña errónea una cuenta restringida da el 401 genérico y no revela el estado")
+    void contrasenaErroneaEnCuentaRestringidaDa401() {
+        when(usuarios.findByCorreo("ana@correo.com")).thenReturn(Optional.of(UsuariosDePrueba.restringida(7L, MOTIVO)));
+        when(codificador.matches("mala", "hash-real")).thenReturn(false);
 
-        assertThatThrownBy(() -> servicio.iniciarSesion("ana@correo.com", CONTRASENA))
+        assertThatThrownBy(() -> servicio.iniciarSesion("ana@correo.com", "mala"))
                 .isInstanceOf(CredencialesInvalidasException.class)
                 .hasMessage(MENSAJE);
 
+        verify(codificador, times(1)).matches(anyString(), anyString());
         assertFalloAuditado();
+        assertThat(texto(eventoPublicado())).doesNotContain(MOTIVO);
+    }
+
+    @Test
+    @DisplayName("Con la contraseña correcta una cuenta restringida da 403 con el motivo y audita al usuario")
+    void rechazaCuentaRestringida() {
+        when(usuarios.findByCorreo("ana@correo.com")).thenReturn(Optional.of(UsuariosDePrueba.restringida(7L, MOTIVO)));
+        when(codificador.matches(CONTRASENA, "hash-real")).thenReturn(true);
+
+        assertThatThrownBy(() -> servicio.iniciarSesion("ana@correo.com", CONTRASENA))
+                .isInstanceOfSatisfying(CuentaRestringidaException.class, error -> {
+                    assertThat(error.getEstado()).isEqualTo(HttpStatus.FORBIDDEN);
+                    assertThat(error.getPropiedades()).containsEntry("motivo", MOTIVO);
+                });
+
+        verify(codificador, times(1)).matches(anyString(), anyString());
+        verify(emisor, never()).emitir(any());
+        assertFalloPorEstado("cuenta_restringida");
+    }
+
+    @Test
+    @DisplayName("Con la contraseña correcta una cuenta desactivada da 403 y audita al usuario")
+    void rechazaCuentaDesactivada() {
+        when(usuarios.findByCorreo("ana@correo.com")).thenReturn(Optional.of(UsuariosDePrueba.desactivada(7L)));
+        when(codificador.matches(CONTRASENA, "hash-real")).thenReturn(true);
+
+        assertThatThrownBy(() -> servicio.iniciarSesion("ana@correo.com", CONTRASENA))
+                .isInstanceOf(CuentaDesactivadaException.class);
+
+        verify(codificador, times(1)).matches(anyString(), anyString());
+        verify(emisor, never()).emitir(any());
+        assertFalloPorEstado("cuenta_desactivada");
     }
 
     @Test
@@ -149,6 +189,20 @@ class AutenticacionServiceTest {
                 .containsEntry("operacion", "login")
                 .containsEntry("motivo", "credenciales_invalidas");
         assertThat(evento.datos().values()).doesNotContain("ana@correo.com", CONTRASENA, "mala");
+    }
+
+    private void assertFalloPorEstado(String motivo) {
+        EventoCritico evento = eventoPublicado();
+        assertThat(evento.resultado()).isEqualTo(ResultadoEvento.FALLO);
+        assertThat(evento.accion()).isEqualTo(AccionCritica.AUTENTICACION);
+        assertThat(evento.usuario()).isEqualTo("7");
+        assertThat(evento.entidadId()).isEqualTo("7");
+        assertThat(evento.datos()).containsEntry("operacion", "login").containsEntry("motivo", motivo);
+        assertThat(texto(evento)).doesNotContain(MOTIVO, "ana@correo.com", CONTRASENA, "hash-real");
+    }
+
+    private static String texto(EventoCritico evento) {
+        return evento.datos().values().toString() + evento.usuario() + evento.entidadId();
     }
 
     private EventoCritico eventoPublicado() {

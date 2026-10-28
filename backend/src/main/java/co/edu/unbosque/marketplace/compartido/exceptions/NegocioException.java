@@ -1,5 +1,6 @@
 package co.edu.unbosque.marketplace.compartido.exceptions;
 
+import java.util.Map;
 import org.springframework.http.HttpStatus;
 
 /**
@@ -9,13 +10,24 @@ import org.springframework.http.HttpStatus;
 public abstract class NegocioException extends RuntimeException {
 
     private final HttpStatus estado;
+    private final Map<String, Object> propiedades;
 
     protected NegocioException(HttpStatus estado, String mensaje) {
+        this(estado, mensaje, Map.of());
+    }
+
+    /** Las propiedades extra viajan en el ProblemDetail; {@code Map.copyOf} rechaza los valores nulos. */
+    protected NegocioException(HttpStatus estado, String mensaje, Map<String, Object> propiedades) {
         super(mensaje);
         this.estado = estado;
+        this.propiedades = Map.copyOf(propiedades);
     }
 
     public HttpStatus getEstado() {
         return estado;
+    }
+
+    public Map<String, Object> getPropiedades() {
+        return propiedades;
     }
 }
