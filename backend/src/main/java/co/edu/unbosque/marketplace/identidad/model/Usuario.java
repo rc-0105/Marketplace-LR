@@ -65,6 +65,27 @@ public class Usuario {
         return estado == EstadoCuenta.ACTIVA;
     }
 
+    /** ACTIVA a RESTRINGIDA. El motivo es obligatorio y se guarda sin espacios sobrantes. */
+    public void restringir(String motivo) {
+        if (estado != EstadoCuenta.ACTIVA) {
+            throw new IllegalStateException("Solo una cuenta activa se puede restringir");
+        }
+        if (motivo == null || motivo.isBlank()) {
+            throw new IllegalArgumentException("El motivo de la restricción es obligatorio");
+        }
+        this.estado = EstadoCuenta.RESTRINGIDA;
+        this.motivoRestriccion = motivo.strip();
+    }
+
+    /** RESTRINGIDA a ACTIVA; el motivo deja de existir. */
+    public void levantarRestriccion() {
+        if (estado != EstadoCuenta.RESTRINGIDA) {
+            throw new IllegalStateException("Solo una cuenta restringida se puede liberar");
+        }
+        this.estado = EstadoCuenta.ACTIVA;
+        this.motivoRestriccion = null;
+    }
+
     public Long getId() {
         return id;
     }
