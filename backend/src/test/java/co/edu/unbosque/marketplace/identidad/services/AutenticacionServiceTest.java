@@ -246,6 +246,38 @@ class AutenticacionServiceTest {
     }
 
     @Test
+    @DisplayName("Una cuenta eliminada da el 401 genérico al iniciar sesión y se audita con su id")
+    void rechazaCuentaEliminada() {
+        when(usuarios.findByCorreo("ana@correo.com")).thenReturn(Optional.of(UsuariosDePrueba.eliminada(7L)));
+        when(codificador.matches(CONTRASENA, "hash-real")).thenReturn(true);
+
+        assertThatThrownBy(() -> servicio.iniciarSesion("ana@correo.com", CONTRASENA))
+                .isInstanceOf(CredencialesInvalidasException.class)
+                .hasMessage(MENSAJE);
+
+        verify(codificador, times(1)).matches(anyString(), anyString());
+        verify(emisor, never()).emitir(any());
+        assertFalloPorEstado("cuenta_eliminada");
+    }
+
+    @Test
+    @DisplayName("Reactivar una cuenta eliminada da el 401 genérico, no la cambia y audita el fallo")
+    void reactivarRechazaCuentaEliminada() {
+        Usuario eliminada = UsuariosDePrueba.eliminada(7L);
+        when(usuarios.findByCorreo("ana@correo.com")).thenReturn(Optional.of(eliminada));
+        when(codificador.matches(CONTRASENA, "hash-real")).thenReturn(true);
+
+        assertThatThrownBy(() -> servicio.reactivarCuenta("ana@correo.com", CONTRASENA))
+                .isInstanceOf(CredencialesInvalidasException.class)
+                .hasMessage(MENSAJE);
+
+        assertThat(eliminada.getEstado()).isEqualTo(EstadoCuenta.ELIMINADA);
+        verify(usuarios, never()).save(any());
+        verify(emisor, never()).emitir(any());
+        assertFalloReactivarPorEstado("cuenta_eliminada");
+    }
+
+    @Test
     @DisplayName("Reactivar una cuenta restringida da 403 con el motivo, no la cambia y audita el fallo")
     void reactivarNoLevantaRestriccion() {
         Usuario restringida = UsuariosDePrueba.restringida(7L, MOTIVO);
