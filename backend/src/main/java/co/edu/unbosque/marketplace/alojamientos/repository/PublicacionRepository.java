@@ -16,7 +16,8 @@ public interface PublicacionRepository extends JpaRepository<Publicacion, Long> 
     @EntityGraph(attributePaths = {"tipo", "servicios", "imagenes"})
     Optional<Publicacion> findById(Long id);
 
-    // Mismo motivo: el listado reporta los campos faltantes, que miran servicios e imágenes.
-    @EntityGraph(attributePaths = {"servicios", "imagenes"})
+    // Mismo motivo: el listado devuelve el tipo y reporta los campos faltantes,
+    // que miran servicios e imágenes.
+    @EntityGraph(attributePaths = {"tipo", "servicios", "imagenes"})
     List<Publicacion> findByAnfitrionIdOrderByCreadoEnDesc(Long anfitrionId);
 }
