@@ -8,8 +8,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface PublicacionRepository extends JpaRepository<Publicacion, Long> {
 
     // open-in-view está apagado: la respuesta se arma fuera de la transacción,
-    // así que los servicios y las imágenes se traen en la misma consulta.
+    // así que el tipo, los servicios y las imágenes se traen en la misma consulta.
+    // El tipo va explícito: con un fetch graph, lo que no se nombra queda LAZY
+    // aunque la relación sea EAGER.
     @Override
-    @EntityGraph(attributePaths = {"servicios", "imagenes"})
+    @EntityGraph(attributePaths = {"tipo", "servicios", "imagenes"})
     Optional<Publicacion> findById(Long id);
 }
