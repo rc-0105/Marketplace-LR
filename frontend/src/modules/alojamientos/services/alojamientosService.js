@@ -54,6 +54,24 @@ export function listarServicios() {
 }
 
 /**
+ * @returns {Promise<import('../models/publicacion.js').PoliticaCancelacion[]>} de la más flexible a la más estricta
+ */
+export function listarPoliticasCancelacion() {
+  return get('/api/v1/catalogos/politicas-cancelacion');
+}
+
+/**
+ * Reemplaza solo las condiciones de reserva: tarifa de limpieza, modo, política
+ * de cancelación y servicios adicionales (RF-20, RF-21, RF-22).
+ * @param {number | string} id
+ * @param {ReturnType<typeof import('../models/publicacion.js').solicitudConfiguracionDesde>} solicitud
+ * @returns {Promise<import('../models/publicacion.js').Publicacion>}
+ */
+export async function actualizarConfiguracion(id, solicitud) {
+  return publicacionDesdeApi(await put(`${RUTA}/${id}/configuracion`, solicitud));
+}
+
+/**
  * Reemplaza solo los servicios de la publicación por los ids enviados (RF-18).
  * @param {number | string} id
  * @param {number[]} servicioIds

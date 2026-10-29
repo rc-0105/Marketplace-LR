@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Campo from '../../../shared/components/Campo.jsx';
+import ConfiguracionPublicacion from '../components/ConfiguracionPublicacion.jsx';
 import ImagenesPublicacion from '../components/ImagenesPublicacion.jsx';
 import ServiciosPublicacion from '../components/ServiciosPublicacion.jsx';
 import { FORMULARIO_VACIO, formularioDesde, solicitudDesde, validarFormulario } from '../models/publicacion.js';
@@ -137,6 +138,7 @@ export default function PublicacionFormPage() {
         <>
           <ServiciosPublicacion publicacionId={id} seleccionados={publicacion.servicios} alGuardar={setPublicacion} />
           <ImagenesPublicacion publicacionId={id} imagenes={publicacion.imagenes} alGuardar={setPublicacion} />
+          <ConfiguracionPublicacion publicacionId={id} publicacion={publicacion} alGuardar={setPublicacion} />
         </>
       )}
     </main>
