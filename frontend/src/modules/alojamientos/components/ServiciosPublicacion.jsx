@@ -6,7 +6,9 @@ import estilos from './ServiciosPublicacion.module.css';
 /** Servicios de la publicación elegidos del catálogo; se guardan sin tocar el resto (RF-18). */
 export default function ServiciosPublicacion({ publicacionId, seleccionados, alGuardar }) {
   const [catalogo, setCatalogo] = useState(null);
-  const [marcados, setMarcados] = useState(() => new Set(seleccionados.map((servicio) => servicio.id)));
+  const [guardados, setGuardados] = useState(() => new Set(seleccionados.map((servicio) => servicio.id)));
+  const [marcados, setMarcados] = useState(guardados);
+  const sinGuardar = marcados.size !== guardados.size || [...marcados].some((id) => !guardados.has(id));
   const [enviando, setEnviando] = useState(false);
   const [mensaje, setMensaje] = useState(null);
 
@@ -37,7 +39,9 @@ export default function ServiciosPublicacion({ publicacionId, seleccionados, alG
     setEnviando(true);
     setMensaje(null);
     try {
-      alGuardar(await actualizarServicios(publicacionId, [...marcados]));
+      const actualizada = await actualizarServicios(publicacionId, [...marcados]);
+      setGuardados(new Set(actualizada.servicios.map((servicio) => servicio.id)));
+      alGuardar(actualizada);
       setMensaje({ error: false, texto: 'Guardamos los servicios.' });
     } catch (error) {
       setMensaje({ error: true, texto: error.message });
@@ -61,6 +65,7 @@ export default function ServiciosPublicacion({ publicacionId, seleccionados, alG
           ))}
         </fieldset>
       )}
+      {sinGuardar && <p className={estilos.nota}>Hay cambios en los servicios sin guardar.</p>}
       {mensaje && (
         <p role={mensaje.error ? 'alert' : 'status'} className={mensaje.error ? estilos.error : estilos.aviso}>
           {mensaje.texto}

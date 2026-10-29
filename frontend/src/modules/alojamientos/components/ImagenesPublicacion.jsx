@@ -10,7 +10,9 @@ import estilos from './ImagenesPublicacion.module.css';
  * Los cambios quedan en la lista hasta que se guardan (RF-19).
  */
 export default function ImagenesPublicacion({ publicacionId, imagenes, alGuardar }) {
+  const [guardadas, setGuardadas] = useState(imagenes);
   const [lista, setLista] = useState(imagenes);
+  const sinGuardar = lista.length !== guardadas.length || lista.some((url, indice) => url !== guardadas[indice]);
   const [nueva, setNueva] = useState('');
   const [errorNueva, setErrorNueva] = useState(undefined);
   const [enviando, setEnviando] = useState(false);
@@ -44,6 +46,7 @@ export default function ImagenesPublicacion({ publicacionId, imagenes, alGuardar
     try {
       const actualizada = await actualizarImagenes(publicacionId, lista);
       setLista(actualizada.imagenes);
+      setGuardadas(actualizada.imagenes);
       alGuardar(actualizada);
       setMensaje({ error: false, texto: 'Guardamos las imágenes.' });
     } catch (error) {
@@ -84,6 +87,7 @@ export default function ImagenesPublicacion({ publicacionId, imagenes, alGuardar
           onChange={(evento) => setNueva(evento.target.value)} />
         <button type="submit" className={estilos.botonSecundario}>Agregar imagen</button>
       </form>
+      {sinGuardar && <p className={estilos.nota}>Hay cambios en las imágenes sin guardar.</p>}
       {mensaje && (
         <p role={mensaje.error ? 'alert' : 'status'} className={mensaje.error ? estilos.error : estilos.aviso}>
           {mensaje.texto}

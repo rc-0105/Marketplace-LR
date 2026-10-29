@@ -96,4 +96,18 @@ describe('ImagenesPublicacion', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('No tienes permiso.');
   });
+
+  it('avisa que hay cambios sin guardar hasta que se guardan', async () => {
+    vi.mocked(actualizarImagenes).mockResolvedValue({ id: 5, imagenes: [DOS, UNO] });
+    renderizar([UNO, DOS]);
+
+    expect(screen.queryByText('Hay cambios en las imágenes sin guardar.')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Subir la imagen 2' }));
+    expect(screen.getByText('Hay cambios en las imágenes sin guardar.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar imágenes' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Guardamos las imágenes.');
+    expect(screen.queryByText('Hay cambios en las imágenes sin guardar.')).not.toBeInTheDocument();
+  });
 });

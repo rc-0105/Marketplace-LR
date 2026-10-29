@@ -176,4 +176,11 @@ describe('PublicacionFormPage', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos cargar la publicación. Intenta de nuevo.');
   });
+
+  it('avisa si no se pueden cargar los tipos de alojamiento', async () => {
+    vi.mocked(listarTiposAlojamiento).mockRejectedValue(new ErrorApi(500, 'Error.'));
+    renderizarEn('/anfitrion/publicaciones/nueva');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos cargar los tipos de alojamiento.');
+  });
 });

@@ -53,4 +53,26 @@ describe('ServiciosPublicacion', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos cargar el catálogo de servicios.');
     expect(screen.getByRole('button', { name: 'Guardar servicios' })).toBeDisabled();
   });
+
+  it('avisa que hay cambios sin guardar hasta que se guardan', async () => {
+    vi.mocked(actualizarServicios).mockResolvedValue({ id: 5, servicios: [{ id: 1, nombre: 'Cocina' }] });
+    render(<ServiciosPublicacion publicacionId={5} seleccionados={[]} alGuardar={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Cocina' }));
+    expect(screen.getByText('Hay cambios en los servicios sin guardar.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar servicios' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Guardamos los servicios.');
+    expect(screen.queryByText('Hay cambios en los servicios sin guardar.')).not.toBeInTheDocument();
+  });
+
+  it('no avisa cambios si se vuelve a la selección guardada', async () => {
+    render(<ServiciosPublicacion publicacionId={5} seleccionados={[{ id: 3, nombre: 'Wifi' }]} alGuardar={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Wifi' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Wifi' }));
+
+    expect(screen.queryByText('Hay cambios en los servicios sin guardar.')).not.toBeInTheDocument();
+  });
 });

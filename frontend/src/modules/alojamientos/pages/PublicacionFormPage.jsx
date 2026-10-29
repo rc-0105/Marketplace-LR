@@ -11,6 +11,7 @@ import estilos from './PublicacionFormPage.module.css';
 
 const MENSAJE_CARGA = 'No pudimos cargar la publicación. Intenta de nuevo.';
 const MENSAJE_PROHIBIDO = 'Esta publicación no es tuya.';
+const MENSAJE_TIPOS = 'No pudimos cargar los tipos de alojamiento.';
 
 /** Crea una publicación en borrador o, si la ruta trae un id, edita una existente (RF-11, RF-13). */
 export default function PublicacionFormPage() {
@@ -18,6 +19,7 @@ export default function PublicacionFormPage() {
   const editando = id !== undefined;
   const navegar = useNavigate();
   const [tipos, setTipos] = useState([]);
+  const [errorTipos, setErrorTipos] = useState(false);
   const [publicacion, setPublicacion] = useState(null);
   const [formulario, setFormulario] = useState(editando ? null : FORMULARIO_VACIO);
   const [errores, setErrores] = useState({});
@@ -27,7 +29,9 @@ export default function PublicacionFormPage() {
 
   useEffect(() => {
     let vigente = true;
-    listarTiposAlojamiento().then((lista) => vigente && setTipos(lista)).catch(() => {});
+    listarTiposAlojamiento()
+      .then((lista) => vigente && setTipos(lista))
+      .catch(() => vigente && setErrorTipos(true));
     if (editando) {
       consultarPublicacion(id)
         .then((cargada) => {
@@ -109,6 +113,7 @@ export default function PublicacionFormPage() {
               <option value="">Sin definir</option>
               {tipos.map((tipo) => <option key={tipo.id} value={String(tipo.id)}>{tipo.nombre}</option>)}
             </select>
+            {errorTipos && <p role="alert" className={estilos.errorCampo}>{MENSAJE_TIPOS}</p>}
             {errores.tipo && <p className={estilos.errorCampo}>{errores.tipo}</p>}
           </div>
           <div className={estilos.fila}>
