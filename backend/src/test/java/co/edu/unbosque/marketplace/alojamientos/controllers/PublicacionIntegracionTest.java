@@ -222,7 +222,8 @@ class PublicacionIntegracionTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].titulo").value("Apartamento en el centro"))
-                .andExpect(jsonPath("$[1].titulo").value("Casa en la playa"));
+                .andExpect(jsonPath("$[1].titulo").value("Casa en la playa"))
+                .andExpect(jsonPath("$[1].tipo.nombre").value("Casa"));
     }
 
     @Test
