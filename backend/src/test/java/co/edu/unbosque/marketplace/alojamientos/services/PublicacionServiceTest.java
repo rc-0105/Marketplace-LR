@@ -289,6 +289,16 @@ class PublicacionServiceTest {
     }
 
     @Test
+    @DisplayName("Lista las publicaciones del anfitrión tal como las ordena el repositorio")
+    void listaLasPublicacionesDelAnfitrion() {
+        Publicacion reciente = publicacionDe(ANFITRION_ID);
+        Publicacion antigua = publicacionDe(ANFITRION_ID);
+        when(publicaciones.findByAnfitrionIdOrderByCreadoEnDesc(ANFITRION_ID)).thenReturn(List.of(reciente, antigua));
+
+        assertThat(servicio.listarDelAnfitrion(ANFITRION_ID)).containsExactly(reciente, antigua);
+    }
+
+    @Test
     @DisplayName("Otro anfitrión no puede consultar un borrador ajeno: lanza 403")
     void otroAnfitrionNoPuedeConsultar() {
         when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(publicacionDe(ANFITRION_ID)));

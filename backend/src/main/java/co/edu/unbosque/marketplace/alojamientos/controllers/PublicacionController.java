@@ -8,6 +8,7 @@ import co.edu.unbosque.marketplace.alojamientos.model.Publicacion;
 import co.edu.unbosque.marketplace.alojamientos.services.PublicacionService;
 import co.edu.unbosque.marketplace.compartido.seguridad.Permisos;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -47,6 +48,14 @@ public class PublicacionController {
 		Long anfitrionId = Long.valueOf(jwt.getSubject());
 		Publicacion creada = publicacionService.crearBorrador(anfitrionId, data.aSolicitud());
 		return PublicacionResponse.desde(creada);
+	}
+
+	/** Las publicaciones del anfitrión autenticado, la más reciente primero. */
+	@GetMapping("/mias")
+	@PreAuthorize(Permisos.ANFITRION)
+	public List<PublicacionResponse> listarMias(@AuthenticationPrincipal Jwt jwt) {
+		return publicacionService.listarDelAnfitrion(usuarioDe(jwt)).stream()
+				.map(PublicacionResponse::desde).toList();
 	}
 
 	/** Detalle para editarla: el PUT reemplaza todo, así que primero se cargan los datos actuales. */
