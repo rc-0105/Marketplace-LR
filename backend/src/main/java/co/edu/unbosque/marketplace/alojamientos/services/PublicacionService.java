@@ -148,7 +148,7 @@ public class PublicacionService {
                 recortados(solicitud.imagenes()));
     }
 
-    // Los ids repetidos cuentan una vez; si alguno no está en el catálogo se rechaza todo.
+    // Los ids repetidos cuentan una vez; si alguno no está en el catálogo se rechaza la solicitud completa.
     private Set<Servicio> serviciosDe(List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
             return Set.of();

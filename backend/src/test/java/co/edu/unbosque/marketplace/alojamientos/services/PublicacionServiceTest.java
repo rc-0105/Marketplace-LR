@@ -401,9 +401,9 @@ class PublicacionServiceTest {
     @DisplayName("Otro anfitrión no puede cambiar los servicios: lanza 403 y no guarda nada")
     void otroAnfitrionNoPuedeCambiarServicios() {
         when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(publicacionDe(ANFITRION_ID)));
+        List<Long> servicios = List.of(1L);
 
-        assertThatThrownBy(() -> servicio.actualizarServicios(PUBLICACION_ID, OTRO_ANFITRION_ID, false,
-                List.of(1L)))
+        assertThatThrownBy(() -> servicio.actualizarServicios(PUBLICACION_ID, OTRO_ANFITRION_ID, false, servicios))
                 .isInstanceOf(AccesoDenegadoException.class);
         verify(publicaciones, never()).save(any(Publicacion.class));
     }
@@ -414,8 +414,9 @@ class PublicacionServiceTest {
         Publicacion existente = publicacionDe(ANFITRION_ID);
         when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(existente));
         when(catalogo.findAllById(Set.of(99L))).thenReturn(List.of());
+        List<Long> servicios = List.of(99L);
 
-        assertThatThrownBy(() -> servicio.actualizarServicios(PUBLICACION_ID, ANFITRION_ID, false, List.of(99L)))
+        assertThatThrownBy(() -> servicio.actualizarServicios(PUBLICACION_ID, ANFITRION_ID, false, servicios))
                 .isInstanceOf(ServicioNoValidoException.class);
         assertThat(existente.getServicios()).containsExactly(PISCINA);
         verify(publicaciones, never()).save(any(Publicacion.class));
@@ -452,9 +453,9 @@ class PublicacionServiceTest {
     @DisplayName("Otro anfitrión no puede cambiar las imágenes: lanza 403 y no guarda nada")
     void otroAnfitrionNoPuedeCambiarImagenes() {
         when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(publicacionDe(ANFITRION_ID)));
+        List<String> imagenes = List.of("https://imagenes.com/2.jpg");
 
-        assertThatThrownBy(() -> servicio.actualizarImagenes(PUBLICACION_ID, OTRO_ANFITRION_ID, false,
-                List.of("https://imagenes.com/2.jpg")))
+        assertThatThrownBy(() -> servicio.actualizarImagenes(PUBLICACION_ID, OTRO_ANFITRION_ID, false, imagenes))
                 .isInstanceOf(AccesoDenegadoException.class);
         verify(publicaciones, never()).save(any(Publicacion.class));
     }
