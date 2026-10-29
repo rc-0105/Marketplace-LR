@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
@@ -50,8 +51,9 @@ public class Publicacion {
 	@Column(length = 200)
 	private String direccion;
 
-	@Enumerated(EnumType.STRING)
-	@Column(length = 20)
+	// EAGER (el valor por defecto): la respuesta se arma fuera de la transacción.
+	@ManyToOne
+	@JoinColumn(name = "tipo_id")
 	private TipoAlojamiento tipo;
 
 	private Integer capacidad;

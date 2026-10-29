@@ -11,6 +11,7 @@ import co.edu.unbosque.marketplace.alojamientos.model.Servicio;
 import co.edu.unbosque.marketplace.alojamientos.model.TipoAlojamiento;
 import co.edu.unbosque.marketplace.alojamientos.repository.PublicacionRepository;
 import co.edu.unbosque.marketplace.alojamientos.repository.ServicioRepository;
+import co.edu.unbosque.marketplace.alojamientos.repository.TipoAlojamientoRepository;
 import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
@@ -33,12 +34,14 @@ public class PublicacionService {
 
     private final PublicacionRepository publicaciones;
     private final ServicioRepository catalogo;
+    private final TipoAlojamientoRepository tipos;
     private final PublicadorEventos publicador;
 
     public PublicacionService(PublicacionRepository publicaciones, ServicioRepository catalogo,
-            PublicadorEventos publicador) {
+            TipoAlojamientoRepository tipos, PublicadorEventos publicador) {
         this.publicaciones = publicaciones;
         this.catalogo = catalogo;
+        this.tipos = tipos;
         this.publicador = publicador;
     }
 
@@ -152,17 +155,11 @@ public class PublicacionService {
         return new LinkedHashSet<>(encontrados);
     }
 
-    private static TipoAlojamiento tipoDe(String tipo) {
-        if (tipo == null || tipo.isBlank()) {
+    private TipoAlojamiento tipoDe(Long tipoId) {
+        if (tipoId == null) {
             return null;
         }
-        String buscado = tipo.trim();
-        for (TipoAlojamiento candidato : TipoAlojamiento.values()) {
-            if (candidato.name().equals(buscado)) {
-                return candidato;
-            }
-        }
-        throw new TipoAlojamientoNoValidoException();
+        return tipos.findById(tipoId).orElseThrow(TipoAlojamientoNoValidoException::new);
     }
 
     private static String textoOpcional(String valor) {

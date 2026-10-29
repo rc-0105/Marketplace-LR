@@ -12,8 +12,9 @@ import org.hibernate.validator.constraints.URL;
 
 /**
  * Datos del borrador. Solo el título es obligatorio; si llegan la capacidad o
- * el precio, deben ser positivos (RF-12). Los servicios son ids del catálogo
- * ({@code GET /api/v1/catalogos/servicios}).
+ * el precio, deben ser positivos (RF-12). El tipo y los servicios son ids del
+ * catálogo ({@code GET /api/v1/catalogos/tipos-alojamiento} y
+ * {@code GET /api/v1/catalogos/servicios}).
  */
 public record CrearPublicacionRequest(
         @NotBlank(message = "El título es obligatorio.")
@@ -29,7 +30,7 @@ public record CrearPublicacionRequest(
         @Size(max = 200, message = "La dirección admite máximo 200 caracteres.")
         String direccion,
 
-        String tipo,
+        Long tipo,
 
         @Positive(message = "La capacidad debe ser mayor que cero.")
         Integer capacidad,

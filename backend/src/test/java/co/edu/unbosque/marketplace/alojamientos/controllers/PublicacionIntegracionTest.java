@@ -12,6 +12,7 @@ import co.edu.unbosque.marketplace.alojamientos.model.Publicacion;
 import co.edu.unbosque.marketplace.alojamientos.model.Servicio;
 import co.edu.unbosque.marketplace.alojamientos.repository.PublicacionRepository;
 import co.edu.unbosque.marketplace.alojamientos.repository.ServicioRepository;
+import co.edu.unbosque.marketplace.alojamientos.repository.TipoAlojamientoRepository;
 import co.edu.unbosque.marketplace.identidad.model.Rol;
 import co.edu.unbosque.marketplace.identidad.model.Usuario;
 import co.edu.unbosque.marketplace.identidad.repository.UsuarioRepository;
@@ -52,6 +53,9 @@ class PublicacionIntegracionTest {
     private ServicioRepository catalogo;
 
     @Autowired
+    private TipoAlojamientoRepository tipos;
+
+    @Autowired
     private JdbcTemplate jdbc;
 
     @Autowired
@@ -84,12 +88,13 @@ class PublicacionIntegracionTest {
         String token = iniciarSesion("luis@correo.com");
 
         crear(token, """
-                {"titulo": "Casa en la playa", "tipo": "CASA", "capacidad": 4}
-                """)
+                {"titulo": "Casa en la playa", "tipo": %d, "capacidad": 4}
+                """.formatted(idTipo("Casa")))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.anfitrionId").value(anfitrion.getId().intValue()))
                 .andExpect(jsonPath("$.titulo").value("Casa en la playa"))
+                .andExpect(jsonPath("$.tipo.nombre").value("Casa"))
                 .andExpect(jsonPath("$.estado").value("BORRADOR"))
                 .andExpect(jsonPath("$.camposFaltantes[0]").value("descripcion"));
 
@@ -167,10 +172,10 @@ class PublicacionIntegracionTest {
         String token = iniciarSesion("luis@correo.com");
 
         crear(token, """
-                {"titulo": "Casa en la playa", "tipo": "CASTILLO"}
+                {"titulo": "Casa en la playa", "tipo": 999999}
                 """)
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail").value("El tipo debe ser CASA, APARTAMENTO o HABITACION."));
+                .andExpect(jsonPath("$.detail").value("El tipo de alojamiento no existe en el catálogo."));
 
         assertThat(publicaciones.count()).isZero();
     }
@@ -182,11 +187,12 @@ class PublicacionIntegracionTest {
         Long id = idCreado(token);
 
         editar(token, id, """
-                {"titulo": "Casa renovada", "tipo": "APARTAMENTO", "precioNoche": 300000}
-                """)
+                {"titulo": "Casa renovada", "tipo": %d, "precioNoche": 300000}
+                """.formatted(idTipo("Apartamento")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.titulo").value("Casa renovada"))
-                .andExpect(jsonPath("$.tipo").value("APARTAMENTO"))
+                .andExpect(jsonPath("$.tipo.id").value(idTipo("Apartamento").intValue()))
+                .andExpect(jsonPath("$.tipo.nombre").value("Apartamento"))
                 .andExpect(jsonPath("$.anfitrionId").value(anfitrion.getId().intValue()))
                 .andExpect(jsonPath("$.editadoPor").value(anfitrion.getId().intValue()))
                 .andExpect(jsonPath("$.editadoEn").isNotEmpty());
@@ -319,6 +325,23 @@ class PublicacionIntegracionTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].nombre").value("Aire acondicionado"))
                 .andExpect(jsonPath("$[?(@.nombre == 'Wifi')].id").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("El catálogo de tipos de alojamiento se lista con sesión y en orden alfabético")
+    void listaElCatalogoDeTipos() throws Exception {
+        mvc.perform(get("/api/v1/catalogos/tipos-alojamiento")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + iniciarSesion("ana@correo.com")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].nombre").value("Apartamento"))
+                .andExpect(jsonPath("$[1].nombre").value("Casa"))
+                .andExpect(jsonPath("$[2].nombre").value("Habitación"));
+    }
+
+    @Test
+    @DisplayName("Sin token el catálogo de tipos de alojamiento responde 401")
+    void catalogoDeTiposSinTokenRecibe401() throws Exception {
+        mvc.perform(get("/api/v1/catalogos/tipos-alojamiento")).andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -616,10 +639,16 @@ class PublicacionIntegracionTest {
                 .findFirst().orElseThrow().getId();
     }
 
+    private Long idTipo(String nombre) {
+        return tipos.findAllByOrderByNombreAsc().stream()
+                .filter(tipo -> tipo.getNombre().equals(nombre))
+                .findFirst().orElseThrow().getId();
+    }
+
     private Long idCreado(String token) throws Exception {
         String respuesta = crear(token, """
-                {"titulo": "Casa en la playa", "tipo": "CASA", "capacidad": 4}
-                """)
+                {"titulo": "Casa en la playa", "tipo": %d, "capacidad": 4}
+                """.formatted(idTipo("Casa")))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return json.readTree(respuesta).get("id").asLong();

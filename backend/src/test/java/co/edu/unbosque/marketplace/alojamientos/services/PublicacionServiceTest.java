@@ -18,6 +18,7 @@ import co.edu.unbosque.marketplace.alojamientos.model.Servicio;
 import co.edu.unbosque.marketplace.alojamientos.model.TipoAlojamiento;
 import co.edu.unbosque.marketplace.alojamientos.repository.PublicacionRepository;
 import co.edu.unbosque.marketplace.alojamientos.repository.ServicioRepository;
+import co.edu.unbosque.marketplace.alojamientos.repository.TipoAlojamientoRepository;
 import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
@@ -43,22 +44,32 @@ class PublicacionServiceTest {
     private final PublicacionRepository publicaciones = mock(PublicacionRepository.class);
     private final PublicadorEventos publicador = mock(PublicadorEventos.class);
     private final ServicioRepository catalogo = mock(ServicioRepository.class);
-    private final PublicacionService servicio = new PublicacionService(publicaciones, catalogo, publicador);
+    private final TipoAlojamientoRepository tipos = mock(TipoAlojamientoRepository.class);
+    private final PublicacionService servicio = new PublicacionService(publicaciones, catalogo, tipos, publicador);
 
     private static final Servicio WIFI = new Servicio("Wifi");
     private static final Servicio PISCINA = new Servicio("Piscina");
+
+    private static final Long CASA_ID = 10L;
+    private static final Long APARTAMENTO_ID = 11L;
+    private static final Long TIPO_INEXISTENTE_ID = 99L;
+    private static final TipoAlojamiento CASA = new TipoAlojamiento("Casa");
+    private static final TipoAlojamiento APARTAMENTO = new TipoAlojamiento("Apartamento");
 
     @BeforeEach
     void preparar() {
         // El repositorio devuelve la misma publicación que recibe.
         when(publicaciones.save(any(Publicacion.class))).thenAnswer(AdditionalAnswers.returnsFirstArg());
+        when(tipos.findById(CASA_ID)).thenReturn(Optional.of(CASA));
+        when(tipos.findById(APARTAMENTO_ID)).thenReturn(Optional.of(APARTAMENTO));
+        when(tipos.findById(TIPO_INEXISTENTE_ID)).thenReturn(Optional.empty());
     }
 
     @Test
     @DisplayName("Con datos completos guarda la publicación en BORRADOR a nombre del anfitrión")
     void guardaBorradorDelAnfitrion() {
         SolicitudBorrador solicitud = new SolicitudBorrador("Casa en la playa", "Frente al mar", "Santa Marta",
-                "Calle 1 # 2-3", "CASA", 4, new BigDecimal("250000"), List.of(1L, 2L),
+                "Calle 1 # 2-3", CASA_ID, 4, new BigDecimal("250000"), List.of(1L, 2L),
                 "No se admiten fiestas", List.of("https://imagenes.com/1.jpg"));
         when(catalogo.findAllById(Set.of(1L, 2L))).thenReturn(List.of(WIFI, PISCINA));
 
@@ -66,7 +77,7 @@ class PublicacionServiceTest {
 
         assertThat(publicacion.getAnfitrionId()).isEqualTo(ANFITRION_ID);
         assertThat(publicacion.getEstado()).isEqualTo(EstadoPublicacion.BORRADOR);
-        assertThat(publicacion.getTipo()).isEqualTo(TipoAlojamiento.CASA);
+        assertThat(publicacion.getTipo()).isEqualTo(CASA);
         assertThat(publicacion.getCapacidad()).isEqualTo(4);
         assertThat(publicacion.getServicios()).containsExactly(PISCINA, WIFI);
         assertThat(publicacion.getImagenes()).containsExactly("https://imagenes.com/1.jpg");
@@ -93,21 +104,21 @@ class PublicacionServiceTest {
     @DisplayName("Quita los espacios sobrantes de los textos y las imágenes")
     void recortaLosEspacios() {
         SolicitudBorrador solicitud = new SolicitudBorrador("  Casa en la playa  ", "  Frente al mar ", " Santa Marta ",
-                null, " CASA ", null, null, null, null, List.of(" https://imagenes.com/1.jpg "));
+                null, CASA_ID, null, null, null, null, List.of(" https://imagenes.com/1.jpg "));
 
         Publicacion publicacion = servicio.crearBorrador(ANFITRION_ID, solicitud);
 
         assertThat(publicacion.getTitulo()).isEqualTo("Casa en la playa");
         assertThat(publicacion.getDescripcion()).isEqualTo("Frente al mar");
         assertThat(publicacion.getCiudad()).isEqualTo("Santa Marta");
-        assertThat(publicacion.getTipo()).isEqualTo(TipoAlojamiento.CASA);
+        assertThat(publicacion.getTipo()).isEqualTo(CASA);
         assertThat(publicacion.getImagenes()).containsExactly("https://imagenes.com/1.jpg");
     }
 
     @Test
-    @DisplayName("Un texto opcional que solo tiene espacios se guarda como vacío")
+    @DisplayName("Un texto opcional que solo tiene espacios se guarda como vacío, y sin tipo queda vacío")
     void guardaTextoEnBlancoComoNulo() {
-        SolicitudBorrador solicitud = new SolicitudBorrador("Casa en la playa", "   ", null, null, "  ", null,
+        SolicitudBorrador solicitud = new SolicitudBorrador("Casa en la playa", "   ", null, null, null, null,
                 null, null, null, null);
 
         Publicacion publicacion = servicio.crearBorrador(ANFITRION_ID, solicitud);
@@ -144,24 +155,14 @@ class PublicacionServiceTest {
     @Test
     @DisplayName("Si el tipo no existe lanza la excepción y no guarda nada")
     void rechazaTipoInexistente() {
-        SolicitudBorrador solicitud = new SolicitudBorrador("Casa en la playa", null, null, null, "CASTILLO",
+        SolicitudBorrador solicitud = new SolicitudBorrador("Casa en la playa", null, null, null, TIPO_INEXISTENTE_ID,
                 null, null, null, null, null);
 
         assertThatThrownBy(() -> servicio.crearBorrador(ANFITRION_ID, solicitud))
                 .isInstanceOf(TipoAlojamientoNoValidoException.class)
-                .hasMessage("El tipo debe ser CASA, APARTAMENTO o HABITACION.");
+                .hasMessage("El tipo de alojamiento no existe en el catálogo.");
         verify(publicaciones, never()).save(any(Publicacion.class));
         verify(publicador, never()).publicar(any(EventoCritico.class));
-    }
-
-    @Test
-    @DisplayName("El tipo distingue mayúsculas: 'casa' en minúsculas no es válido")
-    void rechazaTipoEnMinusculas() {
-        SolicitudBorrador solicitud = new SolicitudBorrador("Casa en la playa", null, null, null, "casa",
-                null, null, null, null, null);
-
-        assertThatThrownBy(() -> servicio.crearBorrador(ANFITRION_ID, solicitud))
-                .isInstanceOf(TipoAlojamientoNoValidoException.class);
     }
 
     @Test
@@ -188,7 +189,7 @@ class PublicacionServiceTest {
         Publicacion existente = publicacionDe(ANFITRION_ID);
         when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(existente));
         SolicitudBorrador cambios = new SolicitudBorrador(" Casa renovada ", "Con vista al mar", null, null,
-                "APARTAMENTO", 6, new BigDecimal("300000"), List.of(1L), null, List.of());
+                APARTAMENTO_ID, 6, new BigDecimal("300000"), List.of(1L), null, List.of());
         when(catalogo.findAllById(Set.of(1L))).thenReturn(List.of(WIFI));
 
         Publicacion editada = servicio.editar(PUBLICACION_ID, ANFITRION_ID, false, cambios);
@@ -196,7 +197,7 @@ class PublicacionServiceTest {
         assertThat(editada.getTitulo()).isEqualTo("Casa renovada");
         assertThat(editada.getDescripcion()).isEqualTo("Con vista al mar");
         assertThat(editada.getCiudad()).isNull();
-        assertThat(editada.getTipo()).isEqualTo(TipoAlojamiento.APARTAMENTO);
+        assertThat(editada.getTipo()).isEqualTo(APARTAMENTO);
         assertThat(editada.getCapacidad()).isEqualTo(6);
         assertThat(editada.getPrecioNoche()).isEqualByComparingTo("300000");
         assertThat(editada.getServicios()).containsExactly(WIFI);
@@ -269,7 +270,7 @@ class PublicacionServiceTest {
     void editarRechazaTipoInexistente() {
         Publicacion existente = publicacionDe(ANFITRION_ID);
         when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(existente));
-        SolicitudBorrador cambios = new SolicitudBorrador("Casa renovada", null, null, null, "CASTILLO", null,
+        SolicitudBorrador cambios = new SolicitudBorrador("Casa renovada", null, null, null, TIPO_INEXISTENTE_ID, null,
                 null, null, null, null);
 
         assertThatThrownBy(() -> servicio.editar(PUBLICACION_ID, ANFITRION_ID, false, cambios))
@@ -458,7 +459,7 @@ class PublicacionServiceTest {
 
     private static Publicacion publicacionDe(Long anfitrionId) {
         return Publicacion.borrador(anfitrionId, new DatosBorrador("Casa en la playa", null, "Santa Marta", null,
-                TipoAlojamiento.CASA, 4, null, Set.of(PISCINA), null, List.of("https://imagenes.com/1.jpg")));
+                CASA, 4, null, Set.of(PISCINA), null, List.of("https://imagenes.com/1.jpg")));
     }
 
     private static SolicitudBorrador soloTitulo(String titulo) {
