@@ -229,9 +229,9 @@ class PublicacionServiceTest {
     void otroAnfitrionNoPuedeEditar() {
         Publicacion existente = publicacionDe(ANFITRION_ID);
         when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(existente));
+        SolicitudBorrador cambios = soloTitulo("Casa ajena");
 
-        assertThatThrownBy(() -> servicio.editar(PUBLICACION_ID, OTRO_ANFITRION_ID, false,
-                soloTitulo("Casa ajena")))
+        assertThatThrownBy(() -> servicio.editar(PUBLICACION_ID, OTRO_ANFITRION_ID, false, cambios))
                 .isInstanceOf(AccesoDenegadoException.class);
         assertThat(existente.getTitulo()).isEqualTo("Casa en la playa");
         verify(publicaciones, never()).save(any(Publicacion.class));
@@ -258,8 +258,9 @@ class PublicacionServiceTest {
     @DisplayName("Si la publicación no existe lanza 404 y no guarda nada")
     void rechazaPublicacionInexistente() {
         when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.empty());
+        SolicitudBorrador cambios = soloTitulo("Casa");
 
-        assertThatThrownBy(() -> servicio.editar(PUBLICACION_ID, ANFITRION_ID, false, soloTitulo("Casa")))
+        assertThatThrownBy(() -> servicio.editar(PUBLICACION_ID, ANFITRION_ID, false, cambios))
                 .isInstanceOf(PublicacionNoEncontradaException.class)
                 .hasMessage("No encontramos esa publicación.");
         verify(publicaciones, never()).save(any(Publicacion.class));

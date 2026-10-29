@@ -87,7 +87,7 @@ export default function PublicacionFormPage() {
       <Link to="/anfitrion/publicaciones" className={estilos.volver}>Volver a mis publicaciones</Link>
       <h1 className={estilos.titulo}>{titulo}</h1>
       {errorGeneral && <p role="alert" className={estilos.error}>{errorGeneral}</p>}
-      {aviso && <p role="status" className={estilos.aviso}>{aviso}</p>}
+      {aviso && <output className={estilos.aviso}>{aviso}</output>}
       {!formulario && !errorGeneral && <p className={estilos.nota}>Cargando la publicación…</p>}
       {formulario && (
         <form className={estilos.formulario} onSubmit={enviar} noValidate>

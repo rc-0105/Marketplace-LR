@@ -71,6 +71,7 @@
 }
 
 .aviso {
+  display: block;
   background: var(--color-exito-fondo);
   color: var(--color-exito);
 }
