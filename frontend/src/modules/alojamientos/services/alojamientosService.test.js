@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { get, post, put } from '../../../shared/services/http.js';
 import {
-  consultarPublicacion, crearPublicacion, editarPublicacion, listarMisPublicaciones,
+  consultarPublicacion, crearPublicacion, editarPublicacion, listarMisPublicaciones, listarTiposAlojamiento,
 } from './alojamientosService.js';
 
 vi.mock('../../../shared/services/http.js', async (importOriginal) => ({
@@ -16,7 +16,7 @@ describe('alojamientosService', () => {
 
   it('lista las publicaciones del anfitrión y las convierte al modelo del frontend', async () => {
     vi.mocked(get).mockResolvedValue([
-      { id: 3, titulo: 'Casa en la playa', tipo: 'CASA', estado: 'BORRADOR', camposFaltantes: ['reglas'] },
+      { id: 3, titulo: 'Casa en la playa', tipo: { id: 2, nombre: 'Casa' }, estado: 'BORRADOR', camposFaltantes: ['reglas'] },
     ]);
 
     const publicaciones = await listarMisPublicaciones();
@@ -25,7 +25,7 @@ describe('alojamientosService', () => {
     expect(publicaciones).toEqual([expect.objectContaining({
       id: 3,
       titulo: 'Casa en la playa',
-      tipo: 'CASA',
+      tipo: { id: 2, nombre: 'Casa' },
       ciudad: null,
       servicios: [],
       imagenes: [],
@@ -47,5 +47,12 @@ describe('alojamientosService', () => {
     expect(get).toHaveBeenCalledWith('/api/v1/publicaciones/5');
     expect(post).toHaveBeenCalledWith('/api/v1/publicaciones', solicitud);
     expect(put).toHaveBeenCalledWith('/api/v1/publicaciones/5', solicitud);
+  });
+
+  it('lista el catálogo de tipos de alojamiento', async () => {
+    vi.mocked(get).mockResolvedValue([{ id: 1, nombre: 'Casa' }]);
+
+    await expect(listarTiposAlojamiento()).resolves.toEqual([{ id: 1, nombre: 'Casa' }]);
+    expect(get).toHaveBeenCalledWith('/api/v1/catalogos/tipos-alojamiento');
   });
 });

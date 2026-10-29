@@ -3,7 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi } from '../../../shared/services/http.js';
 import {
-  consultarPublicacion, crearPublicacion, editarPublicacion,
+  consultarPublicacion, crearPublicacion, editarPublicacion, listarTiposAlojamiento,
 } from '../services/alojamientosService.js';
 import PublicacionFormPage from './PublicacionFormPage.jsx';
 
@@ -11,12 +11,15 @@ vi.mock('../services/alojamientosService.js', () => ({
   consultarPublicacion: vi.fn(),
   crearPublicacion: vi.fn(),
   editarPublicacion: vi.fn(),
+  listarTiposAlojamiento: vi.fn(),
 }));
+
+const TIPOS = [{ id: 1, nombre: 'Apartamento' }, { id: 2, nombre: 'Casa' }];
 
 const EXISTENTE = {
   id: 5, titulo: 'Casa en la playa', descripcion: null, ciudad: 'Santa Marta', direccion: null,
-  tipo: 'CASA', capacidad: 4, precioNoche: 250000, reglas: null,
-  servicios: ['Wifi'], imagenes: ['https://imagenes.com/1.jpg'],
+  tipo: { id: 2, nombre: 'Casa' }, capacidad: 4, precioNoche: 250000, reglas: null,
+  servicios: [{ id: 9, nombre: 'Wifi' }], imagenes: ['https://imagenes.com/1.jpg'],
   estado: 'BORRADOR', camposFaltantes: [],
 };
 
@@ -36,7 +39,10 @@ function escribir(etiqueta, valor) {
 }
 
 describe('PublicacionFormPage', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(listarTiposAlojamiento).mockResolvedValue(TIPOS);
+  });
 
   it('crea el borrador con los datos escritos y lleva a editarlo', async () => {
     vi.mocked(crearPublicacion).mockResolvedValue({ ...EXISTENTE, id: 12 });
@@ -44,21 +50,23 @@ describe('PublicacionFormPage', () => {
     renderizarEn('/anfitrion/publicaciones/nueva');
 
     expect(screen.getByRole('heading', { name: 'Nueva publicación' })).toBeInTheDocument();
+    await screen.findByRole('option', { name: 'Casa' });
     escribir('Título', '  Casa en la playa ');
-    escribir('Tipo de alojamiento', 'CASA');
+    escribir('Tipo de alojamiento', '2');
     escribir('Capacidad (huéspedes)', '4');
     escribir('Precio por noche (COP)', '250000.50');
     fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador' }));
 
     expect(await screen.findByRole('heading', { name: 'Editar publicación' })).toBeInTheDocument();
     expect(crearPublicacion).toHaveBeenCalledWith({
-      titulo: 'Casa en la playa', descripcion: null, ciudad: null, direccion: null, tipo: 'CASA',
+      titulo: 'Casa en la playa', descripcion: null, ciudad: null, direccion: null, tipo: 2,
       capacidad: 4, precioNoche: 250000.5, reglas: null, servicios: [], imagenes: [],
     });
   });
 
-  it('sin título muestra el error y no llama a la API', () => {
+  it('sin título muestra el error y no llama a la API', async () => {
     renderizarEn('/anfitrion/publicaciones/nueva');
+    await screen.findByRole('option', { name: 'Casa' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador' }));
 
@@ -66,8 +74,9 @@ describe('PublicacionFormPage', () => {
     expect(crearPublicacion).not.toHaveBeenCalled();
   });
 
-  it('rechaza una capacidad o un precio con formato inválido', () => {
+  it('rechaza una capacidad o un precio con formato inválido', async () => {
     renderizarEn('/anfitrion/publicaciones/nueva');
+    await screen.findByRole('option', { name: 'Casa' });
 
     escribir('Título', 'Casa');
     escribir('Capacidad (huéspedes)', '2.5');
@@ -83,6 +92,7 @@ describe('PublicacionFormPage', () => {
     vi.mocked(crearPublicacion).mockRejectedValue(
       new ErrorApi(400, 'Datos inválidos.', { ciudad: 'La ciudad admite máximo 100 caracteres.' }));
     renderizarEn('/anfitrion/publicaciones/nueva');
+    await screen.findByRole('option', { name: 'Casa' });
 
     escribir('Título', 'Casa');
     fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador' }));
@@ -104,8 +114,8 @@ describe('PublicacionFormPage', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('Guardamos los cambios.');
     expect(consultarPublicacion).toHaveBeenCalledWith('5');
     expect(editarPublicacion).toHaveBeenCalledWith('5', expect.objectContaining({
-      titulo: 'Casa en la playa', ciudad: 'Santa Marta', tipo: 'CASA', precioNoche: 300000,
-      servicios: ['Wifi'], imagenes: ['https://imagenes.com/1.jpg'],
+      titulo: 'Casa en la playa', ciudad: 'Santa Marta', tipo: 2, precioNoche: 300000,
+      servicios: [9], imagenes: ['https://imagenes.com/1.jpg'],
     }));
   });
 

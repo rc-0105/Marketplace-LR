@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Campo from '../../../shared/components/Campo.jsx';
+import { FORMULARIO_VACIO, formularioDesde, solicitudDesde, validarFormulario } from '../models/publicacion.js';
 import {
-  FORMULARIO_VACIO, TIPOS_ALOJAMIENTO, formularioDesde, solicitudDesde, validarFormulario,
-} from '../models/publicacion.js';
-import { consultarPublicacion, crearPublicacion, editarPublicacion } from '../services/alojamientosService.js';
+  consultarPublicacion, crearPublicacion, editarPublicacion, listarTiposAlojamiento,
+} from '../services/alojamientosService.js';
 import estilos from './PublicacionFormPage.module.css';
 
 const MENSAJE_CARGA = 'No pudimos cargar la publicación. Intenta de nuevo.';
@@ -15,6 +15,7 @@ export default function PublicacionFormPage() {
   const { id } = useParams();
   const editando = id !== undefined;
   const navegar = useNavigate();
+  const [tipos, setTipos] = useState([]);
   const [publicacion, setPublicacion] = useState(null);
   const [formulario, setFormulario] = useState(editando ? null : FORMULARIO_VACIO);
   const [errores, setErrores] = useState({});
@@ -24,6 +25,7 @@ export default function PublicacionFormPage() {
 
   useEffect(() => {
     let vigente = true;
+    listarTiposAlojamiento().then((lista) => vigente && setTipos(lista)).catch(() => {});
     if (editando) {
       consultarPublicacion(id)
         .then((cargada) => {
@@ -103,7 +105,7 @@ export default function PublicacionFormPage() {
             <label className={estilos.etiqueta} htmlFor="tipo">Tipo de alojamiento</label>
             <select id="tipo" name="tipo" className={estilos.control} value={formulario.tipo} onChange={cambiar}>
               <option value="">Sin definir</option>
-              {TIPOS_ALOJAMIENTO.map((tipo) => <option key={tipo.codigo} value={tipo.codigo}>{tipo.nombre}</option>)}
+              {tipos.map((tipo) => <option key={tipo.id} value={String(tipo.id)}>{tipo.nombre}</option>)}
             </select>
             {errores.tipo && <p className={estilos.errorCampo}>{errores.tipo}</p>}
           </div>

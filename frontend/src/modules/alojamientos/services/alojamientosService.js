@@ -39,3 +39,9 @@ export async function editarPublicacion(id, solicitud) {
   return publicacionDesdeApi(await put(`${RUTA}/${id}`, solicitud));
 }
 
+/**
+ * @returns {Promise<import('../models/publicacion.js').OpcionCatalogo[]>} tipos en orden alfabético
+ */
+export function listarTiposAlojamiento() {
+  return get('/api/v1/catalogos/tipos-alojamiento');
+}
