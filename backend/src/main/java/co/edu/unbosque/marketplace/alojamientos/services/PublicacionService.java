@@ -1,7 +1,10 @@
 package co.edu.unbosque.marketplace.alojamientos.services;
 
+import co.edu.unbosque.marketplace.alojamientos.exceptions.PublicacionNoEliminableException;
+import co.edu.unbosque.marketplace.alojamientos.exceptions.PublicacionNoEncontradaException;
 import co.edu.unbosque.marketplace.alojamientos.exceptions.TipoAlojamientoNoValidoException;
 import co.edu.unbosque.marketplace.alojamientos.model.DatosBorrador;
+import co.edu.unbosque.marketplace.alojamientos.model.EstadoPublicacion;
 import co.edu.unbosque.marketplace.alojamientos.model.Publicacion;
 import co.edu.unbosque.marketplace.alojamientos.model.TipoAlojamiento;
 import co.edu.unbosque.marketplace.alojamientos.repository.PublicacionRepository;
@@ -9,6 +12,7 @@ import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
+import co.edu.unbosque.marketplace.compartido.seguridad.Propiedad;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -17,7 +21,7 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Creación de publicaciones por parte de los anfitriones (RF-11, RF-12). */
+/** Creación, consulta, edición y eliminación de publicaciones (RF-11, RF-12, RF-13). */
 @Service
 public class PublicacionService {
 
@@ -34,7 +38,72 @@ public class PublicacionService {
     /** Guarda la publicación en BORRADOR a nombre del anfitrión autenticado. */
     @Transactional
     public Publicacion crearBorrador(Long anfitrionId, SolicitudBorrador solicitud) {
-        DatosBorrador datos = new DatosBorrador(
+        Publicacion publicacion = publicaciones.save(Publicacion.borrador(anfitrionId, datosDe(solicitud)));
+
+        publicador.publicar(new EventoCritico(String.valueOf(anfitrionId), AccionCritica.PUBLICACION, ENTIDAD,
+                String.valueOf(publicacion.getId()), ResultadoEvento.EXITO, Instant.now(),
+                Map.of("operacion", "crear_borrador")));
+        return publicacion;
+    }
+
+    /**
+     * Reemplaza los datos de la publicación (RF-13). El anfitrión solo edita las
+     * suyas; el administrador edita cualquiera y queda como acción administrativa.
+     */
+    @Transactional
+    public Publicacion editar(Long publicacionId, Long usuarioId, boolean esAdministrador,
+            SolicitudBorrador solicitud) {
+        Publicacion publicacion = buscarConAcceso(publicacionId, usuarioId, esAdministrador);
+        publicacion.editar(datosDe(solicitud), usuarioId);
+        Publicacion guardada = publicaciones.save(publicacion);
+        auditar(publicacionId, usuarioId, esAdministrador, "editar");
+        return guardada;
+    }
+
+    /** Detalle para el dueño o un administrador: un borrador no es público. */
+    @Transactional(readOnly = true)
+    public Publicacion consultar(Long publicacionId, Long usuarioId, boolean esAdministrador) {
+        return buscarConAcceso(publicacionId, usuarioId, esAdministrador);
+    }
+
+    /** Publicaciones del anfitrión, la más reciente primero: de aquí elige cuál editar. */
+    @Transactional(readOnly = true)
+    public List<Publicacion> listarDelAnfitrion(Long anfitrionId) {
+        return publicaciones.findByAnfitrionIdOrderByCreadoEnDesc(anfitrionId);
+    }
+
+    /**
+     * Borra la publicación con sus imágenes y servicios. Solo un BORRADOR: nunca
+     * fue público, así que no tiene reservas ni reseñas que dependan de él.
+     */
+    @Transactional
+    public void eliminar(Long publicacionId, Long usuarioId, boolean esAdministrador) {
+        Publicacion publicacion = buscarConAcceso(publicacionId, usuarioId, esAdministrador);
+        if (publicacion.getEstado() != EstadoPublicacion.BORRADOR) {
+            throw new PublicacionNoEliminableException();
+        }
+        publicaciones.delete(publicacion);
+        auditar(publicacionId, usuarioId, esAdministrador, "eliminar");
+    }
+
+    // La propiedad va antes que el contenido: a quien no es dueño no se le revela nada más.
+    private Publicacion buscarConAcceso(Long publicacionId, Long usuarioId, boolean esAdministrador) {
+        Publicacion publicacion = publicaciones.findById(publicacionId)
+                .orElseThrow(PublicacionNoEncontradaException::new);
+        if (!esAdministrador) {
+            Propiedad.exigirPropietario(publicacion.getAnfitrionId(), usuarioId);
+        }
+        return publicacion;
+    }
+
+    private void auditar(Long publicacionId, Long usuarioId, boolean esAdministrador, String operacion) {
+        AccionCritica accion = esAdministrador ? AccionCritica.ACCION_ADMINISTRATIVA : AccionCritica.PUBLICACION;
+        publicador.publicar(new EventoCritico(String.valueOf(usuarioId), accion, ENTIDAD,
+                String.valueOf(publicacionId), ResultadoEvento.EXITO, Instant.now(), Map.of("operacion", operacion)));
+    }
+
+    private static DatosBorrador datosDe(SolicitudBorrador solicitud) {
+        return new DatosBorrador(
                 solicitud.titulo().trim(),
                 textoOpcional(solicitud.descripcion()),
                 textoOpcional(solicitud.ciudad()),
@@ -45,13 +114,6 @@ public class PublicacionService {
                 new LinkedHashSet<>(recortados(solicitud.servicios())),
                 textoOpcional(solicitud.reglas()),
                 recortados(solicitud.imagenes()));
-
-        Publicacion publicacion = publicaciones.save(Publicacion.borrador(anfitrionId, datos));
-
-        publicador.publicar(new EventoCritico(String.valueOf(anfitrionId), AccionCritica.PUBLICACION, ENTIDAD,
-                String.valueOf(publicacion.getId()), ResultadoEvento.EXITO, Instant.now(),
-                Map.of("operacion", "crear_borrador")));
-        return publicacion;
     }
 
     private static TipoAlojamiento tipoDe(String tipo) {

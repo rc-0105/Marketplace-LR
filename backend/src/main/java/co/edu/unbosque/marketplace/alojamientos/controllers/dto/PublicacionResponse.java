@@ -8,6 +8,7 @@ import java.util.List;
 /**
  * Vista de una publicación. {@code camposFaltantes} indica qué le falta al
  * borrador para poder activarse; vacío significa que está completo.
+ * {@code editadoPor} y {@code editadoEn} son nulos mientras nadie la edite.
  */
 public record PublicacionResponse(
         Long id,
@@ -24,6 +25,8 @@ public record PublicacionResponse(
         List<String> imagenes,
         String estado,
         Instant creadoEn,
+        Long editadoPor,
+        Instant editadoEn,
         List<String> camposFaltantes) {
 
     public static PublicacionResponse desde(Publicacion publicacion) {
@@ -42,6 +45,8 @@ public record PublicacionResponse(
                 publicacion.getImagenes(),
                 publicacion.getEstado().name(),
                 publicacion.getCreadoEn(),
+                publicacion.getEditadoPor(),
+                publicacion.getEditadoEn(),
                 publicacion.camposFaltantesParaActivar());
     }
 }
