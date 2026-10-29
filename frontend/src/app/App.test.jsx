@@ -61,6 +61,17 @@ describe('App', () => {
     expect(screen.getByText(/^Ingresaste como/)).toBeInTheDocument();
   });
 
+  it.each(['HUESPED', 'ANFITRION', 'ADMINISTRADOR'])('muestra Mi cuenta a un %s con sesión', (rol) => {
+    iniciar(rol);
+    renderizarEn('/mi-cuenta');
+    expect(screen.getByRole('heading', { name: 'Mi cuenta' })).toBeInTheDocument();
+  });
+
+  it('sin sesión Mi cuenta lleva al inicio de sesión', () => {
+    renderizarEn('/mi-cuenta');
+    expect(screen.getByRole('heading', { name: 'Inicia sesión' })).toBeInTheDocument();
+  });
+
   it('sin sesión un panel lleva al inicio de sesión', () => {
     renderizarEn('/huesped');
     expect(screen.getByRole('heading', { name: 'Inicia sesión' })).toBeInTheDocument();
