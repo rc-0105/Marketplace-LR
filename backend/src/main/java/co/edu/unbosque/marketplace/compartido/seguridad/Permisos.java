@@ -10,6 +10,8 @@ public final class Permisos {
     public static final String HUESPED = "hasRole('HUESPED')";
     public static final String ANFITRION = "hasRole('ANFITRION')";
     public static final String ADMINISTRADOR = "hasRole('ADMINISTRADOR')";
+    /** Recurso con dueño: el filtro solo mira el rol; que sea el dueño lo verifica el service. */
+    public static final String ANFITRION_O_ADMINISTRADOR = "hasAnyRole('ANFITRION', 'ADMINISTRADOR')";
     /** Cualquier rol con sesión vigente. */
     public static final String AUTENTICADO = "isAuthenticated()";
 

@@ -29,8 +29,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class PublicacionController {
 
 	private static final String ROL_ADMINISTRADOR = "ADMINISTRADOR";
-	// El filtro solo mira el rol; que sea el dueño lo verifica el service.
-	private static final String ANFITRION_O_ADMINISTRADOR = "hasAnyRole('ANFITRION', 'ADMINISTRADOR')";
 
 	private final PublicacionService publicacionService;
 
@@ -51,15 +49,18 @@ public class PublicacionController {
 
 	/** Detalle para editarla: el PUT reemplaza todo, así que primero se cargan los datos actuales. */
 	@GetMapping("/{id}")
-	@PreAuthorize(ANFITRION_O_ADMINISTRADOR)
+	@PreAuthorize(Permisos.ANFITRION_O_ADMINISTRADOR)
 	public PublicacionResponse consultar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
 		Publicacion publicacion = publicacionService.consultar(id, usuarioDe(jwt), esAdministrador(jwt));
 		return PublicacionResponse.desde(publicacion);
 	}
 
-	/** Reemplaza los datos de la publicación; recibe el mismo cuerpo que la creación (RF-13). */
+	/**
+	 * Reemplaza los datos de la publicación; recibe el mismo cuerpo que la creación
+	 * (RF-13). Lo que no llegue queda vacío, incluidos los servicios y las imágenes.
+	 */
 	@PutMapping("/{id}")
-	@PreAuthorize(ANFITRION_O_ADMINISTRADOR)
+	@PreAuthorize(Permisos.ANFITRION_O_ADMINISTRADOR)
 	public PublicacionResponse editar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
 			@Valid @RequestBody CrearPublicacionRequest data) {
 		Publicacion editada = publicacionService.editar(id, usuarioDe(jwt), esAdministrador(jwt),
@@ -70,7 +71,7 @@ public class PublicacionController {
 	/** Elimina un borrador con sus imágenes y servicios. */
 	@DeleteMapping("/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
-	@PreAuthorize(ANFITRION_O_ADMINISTRADOR)
+	@PreAuthorize(Permisos.ANFITRION_O_ADMINISTRADOR)
 	public void eliminar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
 		publicacionService.eliminar(id, usuarioDe(jwt), esAdministrador(jwt));
 	}
