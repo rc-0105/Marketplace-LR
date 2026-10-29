@@ -1,0 +1,126 @@
+.seccion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-3);
+  margin-top: var(--espacio-8);
+  padding-top: var(--espacio-6);
+  border-top: 1px solid var(--color-borde);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--texto-titulo);
+}
+
+.nota {
+  margin: 0;
+  color: var(--color-texto-secundario);
+  font-size: var(--texto-pequeno);
+}
+
+.lista {
+  display: grid;
+  gap: var(--espacio-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.imagen {
+  display: grid;
+  grid-template-columns: 4rem 1fr auto;
+  align-items: center;
+  gap: var(--espacio-3);
+  padding: var(--espacio-2);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  background: var(--color-superficie);
+}
+
+.miniatura {
+  width: 4rem;
+  height: 3rem;
+  border-radius: var(--radio);
+  object-fit: cover;
+  background: var(--color-borde);
+}
+
+.url {
+  overflow-wrap: anywhere;
+  font-size: var(--texto-pequeno);
+}
+
+.principal {
+  color: var(--color-terracota);
+}
+
+.acciones {
+  display: flex;
+  gap: var(--espacio-1);
+}
+
+.acciones button {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border: 1px solid var(--color-borde-control);
+  border-radius: var(--radio);
+  background: var(--color-fondo);
+  color: var(--color-texto);
+  font: inherit;
+  cursor: pointer;
+}
+
+.acciones button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.agregar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--espacio-3);
+}
+
+.agregar > :first-child {
+  flex: 1 1 16rem;
+}
+
+.error,
+.aviso {
+  margin: 0;
+  padding: var(--espacio-3) var(--espacio-4);
+  border-radius: var(--radio);
+}
+
+.error {
+  background: var(--color-error-fondo);
+  color: var(--color-error);
+}
+
+.aviso {
+  background: var(--color-exito-fondo);
+  color: var(--color-exito);
+}
+
+.boton,
+.botonSecundario {
+  min-height: 2.75rem;
+  padding: 0 var(--espacio-4);
+  border: 1px solid var(--color-terracota);
+  border-radius: var(--radio);
+  background: var(--color-superficie);
+  color: var(--color-terracota);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.boton {
+  align-self: flex-start;
+}
+
+.boton:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
