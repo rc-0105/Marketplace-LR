@@ -2,12 +2,16 @@ package co.edu.unbosque.marketplace.alojamientos.services;
 
 import co.edu.unbosque.marketplace.alojamientos.exceptions.PublicacionNoEliminableException;
 import co.edu.unbosque.marketplace.alojamientos.exceptions.PublicacionNoEncontradaException;
+import co.edu.unbosque.marketplace.alojamientos.exceptions.ServicioNoValidoException;
 import co.edu.unbosque.marketplace.alojamientos.exceptions.TipoAlojamientoNoValidoException;
 import co.edu.unbosque.marketplace.alojamientos.model.DatosBorrador;
 import co.edu.unbosque.marketplace.alojamientos.model.EstadoPublicacion;
 import co.edu.unbosque.marketplace.alojamientos.model.Publicacion;
+import co.edu.unbosque.marketplace.alojamientos.model.Servicio;
 import co.edu.unbosque.marketplace.alojamientos.model.TipoAlojamiento;
 import co.edu.unbosque.marketplace.alojamientos.repository.PublicacionRepository;
+import co.edu.unbosque.marketplace.alojamientos.repository.ServicioRepository;
+import co.edu.unbosque.marketplace.alojamientos.repository.TipoAlojamientoRepository;
 import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
@@ -18,6 +22,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,10 +33,15 @@ public class PublicacionService {
     private static final String ENTIDAD = "Publicacion";
 
     private final PublicacionRepository publicaciones;
+    private final ServicioRepository catalogo;
+    private final TipoAlojamientoRepository tipos;
     private final PublicadorEventos publicador;
 
-    public PublicacionService(PublicacionRepository publicaciones, PublicadorEventos publicador) {
+    public PublicacionService(PublicacionRepository publicaciones, ServicioRepository catalogo,
+            TipoAlojamientoRepository tipos, PublicadorEventos publicador) {
         this.publicaciones = publicaciones;
+        this.catalogo = catalogo;
+        this.tipos = tipos;
         this.publicador = publicador;
     }
 
@@ -57,6 +67,28 @@ public class PublicacionService {
         publicacion.editar(datosDe(solicitud), usuarioId);
         Publicacion guardada = publicaciones.save(publicacion);
         auditar(publicacionId, usuarioId, esAdministrador, "editar");
+        return guardada;
+    }
+
+    /** Reemplaza solo los servicios por los del catálogo indicados (RF-18). */
+    @Transactional
+    public Publicacion actualizarServicios(Long publicacionId, Long usuarioId, boolean esAdministrador,
+            List<Long> servicioIds) {
+        Publicacion publicacion = buscarConAcceso(publicacionId, usuarioId, esAdministrador);
+        publicacion.cambiarServicios(serviciosDe(servicioIds), usuarioId);
+        Publicacion guardada = publicaciones.save(publicacion);
+        auditar(publicacionId, usuarioId, esAdministrador, "editar_servicios");
+        return guardada;
+    }
+
+    /** Reemplaza solo las imágenes; el orden enviado define la principal (RF-19). */
+    @Transactional
+    public Publicacion actualizarImagenes(Long publicacionId, Long usuarioId, boolean esAdministrador,
+            List<String> urls) {
+        Publicacion publicacion = buscarConAcceso(publicacionId, usuarioId, esAdministrador);
+        publicacion.cambiarImagenes(recortados(urls), usuarioId);
+        Publicacion guardada = publicaciones.save(publicacion);
+        auditar(publicacionId, usuarioId, esAdministrador, "editar_imagenes");
         return guardada;
     }
 
@@ -102,7 +134,7 @@ public class PublicacionService {
                 String.valueOf(publicacionId), ResultadoEvento.EXITO, Instant.now(), Map.of("operacion", operacion)));
     }
 
-    private static DatosBorrador datosDe(SolicitudBorrador solicitud) {
+    private DatosBorrador datosDe(SolicitudBorrador solicitud) {
         return new DatosBorrador(
                 solicitud.titulo().trim(),
                 textoOpcional(solicitud.descripcion()),
@@ -111,22 +143,29 @@ public class PublicacionService {
                 tipoDe(solicitud.tipo()),
                 solicitud.capacidad(),
                 solicitud.precioNoche(),
-                new LinkedHashSet<>(recortados(solicitud.servicios())),
+                serviciosDe(solicitud.servicios()),
                 textoOpcional(solicitud.reglas()),
                 recortados(solicitud.imagenes()));
     }
 
-    private static TipoAlojamiento tipoDe(String tipo) {
-        if (tipo == null || tipo.isBlank()) {
+    // Los ids repetidos cuentan una vez; si alguno no está en el catálogo se rechaza la solicitud completa.
+    private Set<Servicio> serviciosDe(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Set.of();
+        }
+        Set<Long> unicos = new LinkedHashSet<>(ids);
+        List<Servicio> encontrados = catalogo.findAllById(unicos);
+        if (encontrados.size() != unicos.size()) {
+            throw new ServicioNoValidoException();
+        }
+        return new LinkedHashSet<>(encontrados);
+    }
+
+    private TipoAlojamiento tipoDe(Long tipoId) {
+        if (tipoId == null) {
             return null;
         }
-        String buscado = tipo.trim();
-        for (TipoAlojamiento candidato : TipoAlojamiento.values()) {
-            if (candidato.name().equals(buscado)) {
-                return candidato;
-            }
-        }
-        throw new TipoAlojamientoNoValidoException();
+        return tipos.findById(tipoId).orElseThrow(TipoAlojamientoNoValidoException::new);
     }
 
     private static String textoOpcional(String valor) {

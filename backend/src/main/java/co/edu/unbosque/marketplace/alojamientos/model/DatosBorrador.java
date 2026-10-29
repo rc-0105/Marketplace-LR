@@ -19,13 +19,13 @@ public record DatosBorrador(
         TipoAlojamiento tipo,
         Integer capacidad,
         BigDecimal precioNoche,
-        Set<String> servicios,
+        Set<Servicio> servicios,
         String reglas,
         List<String> imagenes) {
 
     public DatosBorrador {
         Objects.requireNonNull(titulo, "titulo");
-        // LinkedHashSet conserva el orden en que el anfitrión escribió los servicios.
+        // LinkedHashSet conserva el orden en que llegaron los servicios.
         if (servicios == null) {
             servicios = Set.of();
         } else {

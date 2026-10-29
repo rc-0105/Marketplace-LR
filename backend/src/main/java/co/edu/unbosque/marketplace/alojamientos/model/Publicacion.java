@@ -1,8 +1,7 @@
 package co.edu.unbosque.marketplace.alojamientos.model;
 
-import jakarta.persistence.CollectionTable;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -10,14 +9,20 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OrderColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /** Publicación de un alojamiento (RF-11). Siempre nace en BORRADOR. */
@@ -46,8 +51,9 @@ public class Publicacion {
 	@Column(length = 200)
 	private String direccion;
 
-	@Enumerated(EnumType.STRING)
-	@Column(length = 20)
+	// EAGER (el valor por defecto): la respuesta se arma fuera de la transacción.
+	@ManyToOne
+	@JoinColumn(name = "tipo_id")
 	private TipoAlojamiento tipo;
 
 	private Integer capacidad;
@@ -58,16 +64,18 @@ public class Publicacion {
 	@Column(length = 2000)
 	private String reglas;
 
-	@ElementCollection
-	@CollectionTable(name = "publicacion_servicio", joinColumns = @JoinColumn(name = "publicacion_id"))
-	@Column(name = "servicio", nullable = false, length = 60)
-	private Set<String> servicios = new LinkedHashSet<>();
+	// N:M con el catálogo, como en el modelo relacional (AlojamientoServicio).
+	@ManyToMany
+	@JoinTable(name = "publicacion_servicio", joinColumns = @JoinColumn(name = "publicacion_id"),
+			inverseJoinColumns = @JoinColumn(name = "servicio_id"))
+	@OrderBy("nombre")
+	private Set<Servicio> servicios = new LinkedHashSet<>();
 
-	@ElementCollection
-	@CollectionTable(name = "publicacion_imagen", joinColumns = @JoinColumn(name = "publicacion_id"))
-	@OrderColumn(name = "posicion")
-	@Column(name = "url", nullable = false, length = 500)
-	private List<String> imagenes = new ArrayList<>();
+	// Set y no List: findById trae servicios e imágenes en la misma consulta, y una
+	// List sin columna de orden (bag) repetiría cada imagen una vez por servicio.
+	@OneToMany(mappedBy = "publicacion", cascade = CascadeType.ALL, orphanRemoval = true)
+	@OrderBy("posicion")
+	private Set<ImagenPublicacion> imagenes = new LinkedHashSet<>();
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
@@ -104,6 +112,22 @@ public class Publicacion {
 	 */
 	public void editar(DatosBorrador datos, Long editorId) {
 		aplicar(datos);
+		registrarEdicion(editorId);
+	}
+
+	/** Reemplaza solo los servicios (RF-18); el resto de la publicación no cambia. */
+	public void cambiarServicios(Set<Servicio> nuevos, Long editorId) {
+		reemplazarServicios(nuevos);
+		registrarEdicion(editorId);
+	}
+
+	/** Reemplaza solo las imágenes, en el orden recibido (RF-19); el resto no cambia. */
+	public void cambiarImagenes(List<String> urls, Long editorId) {
+		reemplazarImagenes(urls);
+		registrarEdicion(editorId);
+	}
+
+	private void registrarEdicion(Long editorId) {
 		this.editadoPor = editorId;
 		this.editadoEn = Instant.now();
 	}
@@ -117,10 +141,41 @@ public class Publicacion {
 		this.capacidad = datos.capacidad();
 		this.precioNoche = datos.precioNoche();
 		this.reglas = datos.reglas();
-		this.servicios.clear();
-		this.servicios.addAll(datos.servicios());
-		this.imagenes.clear();
-		this.imagenes.addAll(datos.imagenes());
+		reemplazarServicios(datos.servicios());
+		reemplazarImagenes(datos.imagenes());
+	}
+
+	// Sin clear(): Hibernate lo toma como vaciar la colección y reescribe todas
+	// las filas de la tabla intermedia. Así solo cambian las que de verdad cambian.
+	private void reemplazarServicios(Set<Servicio> nuevos) {
+		this.servicios.retainAll(nuevos);
+		this.servicios.addAll(nuevos);
+	}
+
+	/**
+	 * Compara por URL con las imágenes guardadas: la que sigue en la lista conserva
+	 * su fila y solo cambia de posición, la nueva se inserta y la que ya no viene la
+	 * borra orphanRemoval. Así editar sin tocar las imágenes no reescribe ninguna fila.
+	 */
+	private void reemplazarImagenes(List<String> urls) {
+		Map<String, ImagenPublicacion> actuales = new HashMap<>();
+		for (ImagenPublicacion imagen : imagenes) {
+			actuales.put(imagen.getUrl(), imagen);
+		}
+		List<ImagenPublicacion> resultado = new ArrayList<>();
+		for (int posicion = 0; posicion < urls.size(); posicion++) {
+			String url = urls.get(posicion);
+			// remove: si la misma URL llega dos veces, la segunda es una imagen nueva.
+			ImagenPublicacion imagen = actuales.remove(url);
+			if (imagen == null) {
+				imagen = new ImagenPublicacion(this, url, posicion);
+			} else {
+				imagen.moverA(posicion);
+			}
+			resultado.add(imagen);
+		}
+		imagenes.clear();
+		imagenes.addAll(resultado);
 	}
 
 	/**
@@ -191,12 +246,15 @@ public class Publicacion {
 		return reglas;
 	}
 
-	public Set<String> getServicios() {
-		return Collections.unmodifiableSet(servicios);
+	/** Servicios en orden alfabético, igual que los aplica @OrderBy al leer. */
+	public List<Servicio> getServicios() {
+		return servicios.stream().sorted(Comparator.comparing(Servicio::getNombre)).toList();
 	}
 
+	/** URL de cada imagen en orden; la primera es la principal. */
 	public List<String> getImagenes() {
-		return Collections.unmodifiableList(imagenes);
+		return imagenes.stream().sorted(Comparator.comparingInt(ImagenPublicacion::getPosicion))
+				.map(ImagenPublicacion::getUrl).toList();
 	}
 
 	public EstadoPublicacion getEstado() {

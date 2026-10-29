@@ -1,20 +1,25 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Campo from '../../../shared/components/Campo.jsx';
+import ImagenesPublicacion from '../components/ImagenesPublicacion.jsx';
+import ServiciosPublicacion from '../components/ServiciosPublicacion.jsx';
+import { FORMULARIO_VACIO, formularioDesde, solicitudDesde, validarFormulario } from '../models/publicacion.js';
 import {
-  FORMULARIO_VACIO, TIPOS_ALOJAMIENTO, formularioDesde, solicitudDesde, validarFormulario,
-} from '../models/publicacion.js';
-import { consultarPublicacion, crearPublicacion, editarPublicacion } from '../services/alojamientosService.js';
+  consultarPublicacion, crearPublicacion, editarPublicacion, listarTiposAlojamiento,
+} from '../services/alojamientosService.js';
 import estilos from './PublicacionFormPage.module.css';
 
 const MENSAJE_CARGA = 'No pudimos cargar la publicación. Intenta de nuevo.';
 const MENSAJE_PROHIBIDO = 'Esta publicación no es tuya.';
+const MENSAJE_TIPOS = 'No pudimos cargar los tipos de alojamiento.';
 
 /** Crea una publicación en borrador o, si la ruta trae un id, edita una existente (RF-11, RF-13). */
 export default function PublicacionFormPage() {
   const { id } = useParams();
   const editando = id !== undefined;
   const navegar = useNavigate();
+  const [tipos, setTipos] = useState([]);
+  const [errorTipos, setErrorTipos] = useState(false);
   const [publicacion, setPublicacion] = useState(null);
   const [formulario, setFormulario] = useState(editando ? null : FORMULARIO_VACIO);
   const [errores, setErrores] = useState({});
@@ -24,6 +29,9 @@ export default function PublicacionFormPage() {
 
   useEffect(() => {
     let vigente = true;
+    listarTiposAlojamiento()
+      .then((lista) => vigente && setTipos(lista))
+      .catch(() => vigente && setErrorTipos(true));
     if (editando) {
       consultarPublicacion(id)
         .then((cargada) => {
@@ -103,8 +111,9 @@ export default function PublicacionFormPage() {
             <label className={estilos.etiqueta} htmlFor="tipo">Tipo de alojamiento</label>
             <select id="tipo" name="tipo" className={estilos.control} value={formulario.tipo} onChange={cambiar}>
               <option value="">Sin definir</option>
-              {TIPOS_ALOJAMIENTO.map((tipo) => <option key={tipo.codigo} value={tipo.codigo}>{tipo.nombre}</option>)}
+              {tipos.map((tipo) => <option key={tipo.id} value={String(tipo.id)}>{tipo.nombre}</option>)}
             </select>
+            {errorTipos && <p role="alert" className={estilos.errorCampo}>{MENSAJE_TIPOS}</p>}
             {errores.tipo && <p className={estilos.errorCampo}>{errores.tipo}</p>}
           </div>
           <div className={estilos.fila}>
@@ -122,6 +131,13 @@ export default function PublicacionFormPage() {
             {editando ? 'Guardar cambios' : 'Guardar borrador'}
           </button>
         </form>
+      )}
+      {/* Cada panel guarda por su lado; la publicación que devuelve mantiene al día lo que envía el PUT. */}
+      {publicacion && (
+        <>
+          <ServiciosPublicacion publicacionId={id} seleccionados={publicacion.servicios} alGuardar={setPublicacion} />
+          <ImagenesPublicacion publicacionId={id} imagenes={publicacion.imagenes} alGuardar={setPublicacion} />
+        </>
       )}
     </main>
   );
