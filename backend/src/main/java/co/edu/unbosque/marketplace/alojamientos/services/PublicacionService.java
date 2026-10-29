@@ -67,6 +67,28 @@ public class PublicacionService {
         return guardada;
     }
 
+    /** Reemplaza solo los servicios por los del catálogo indicados (RF-18). */
+    @Transactional
+    public Publicacion actualizarServicios(Long publicacionId, Long usuarioId, boolean esAdministrador,
+            List<Long> servicioIds) {
+        Publicacion publicacion = buscarConAcceso(publicacionId, usuarioId, esAdministrador);
+        publicacion.cambiarServicios(serviciosDe(servicioIds), usuarioId);
+        Publicacion guardada = publicaciones.save(publicacion);
+        auditar(publicacionId, usuarioId, esAdministrador, "editar_servicios");
+        return guardada;
+    }
+
+    /** Reemplaza solo las imágenes; el orden enviado define la principal (RF-19). */
+    @Transactional
+    public Publicacion actualizarImagenes(Long publicacionId, Long usuarioId, boolean esAdministrador,
+            List<String> urls) {
+        Publicacion publicacion = buscarConAcceso(publicacionId, usuarioId, esAdministrador);
+        publicacion.cambiarImagenes(recortados(urls), usuarioId);
+        Publicacion guardada = publicaciones.save(publicacion);
+        auditar(publicacionId, usuarioId, esAdministrador, "editar_imagenes");
+        return guardada;
+    }
+
     /** Detalle para el dueño o un administrador: un borrador no es público. */
     @Transactional(readOnly = true)
     public Publicacion consultar(Long publicacionId, Long usuarioId, boolean esAdministrador) {

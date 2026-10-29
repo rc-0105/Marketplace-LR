@@ -13,7 +13,7 @@ import org.hibernate.validator.constraints.URL;
 /**
  * Datos del borrador. Solo el título es obligatorio; si llegan la capacidad o
  * el precio, deben ser positivos (RF-12). Los servicios son ids del catálogo
- * ({@code GET /api/v1/servicios}).
+ * ({@code GET /api/v1/catalogos/servicios}).
  */
 public record CrearPublicacionRequest(
         @NotBlank(message = "El título es obligatorio.")

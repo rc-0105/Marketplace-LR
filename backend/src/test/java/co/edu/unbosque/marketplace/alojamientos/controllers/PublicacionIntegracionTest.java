@@ -314,7 +314,7 @@ class PublicacionIntegracionTest {
     @Test
     @DisplayName("El catálogo de servicios se lista con sesión y en orden alfabético")
     void listaElCatalogoDeServicios() throws Exception {
-        mvc.perform(get("/api/v1/servicios")
+        mvc.perform(get("/api/v1/catalogos/servicios")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + iniciarSesion("ana@correo.com")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].nombre").value("Aire acondicionado"))
@@ -324,7 +324,7 @@ class PublicacionIntegracionTest {
     @Test
     @DisplayName("Sin token el catálogo de servicios responde 401")
     void catalogoSinTokenRecibe401() throws Exception {
-        mvc.perform(get("/api/v1/servicios")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/catalogos/servicios")).andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -500,6 +500,90 @@ class PublicacionIntegracionTest {
                 .andExpect(jsonPath("$.imagenes.length()").value(2))
                 .andExpect(jsonPath("$.imagenes[0]").value("https://imagenes.com/1.jpg"))
                 .andExpect(jsonPath("$.imagenes[1]").value("https://imagenes.com/2.jpg"));
+    }
+
+    @Test
+    @DisplayName("PUT de servicios cambia solo los servicios: el título y las imágenes quedan igual")
+    void putServiciosCambiaSoloLosServicios() throws Exception {
+        String token = iniciarSesion("luis@correo.com");
+        Long id = json.readTree(crear(token, """
+                {"titulo": "Casa en la playa", "servicios": [%d],
+                 "imagenes": ["https://imagenes.com/1.jpg"]}
+                """.formatted(idServicio("Wifi")))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString())
+                .get("id").asLong();
+        Long cocina = idServicio("Cocina");
+
+        mvc.perform(put(RUTA + "/" + id + "/servicios")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"servicios": [%d]}
+                                """.formatted(cocina)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.servicios.length()").value(1))
+                .andExpect(jsonPath("$.servicios[0].nombre").value("Cocina"))
+                .andExpect(jsonPath("$.titulo").value("Casa en la playa"))
+                .andExpect(jsonPath("$.imagenes[0]").value("https://imagenes.com/1.jpg"))
+                .andExpect(jsonPath("$.editadoPor").value(anfitrion.getId().intValue()));
+    }
+
+    @Test
+    @DisplayName("PUT de servicios de otro anfitrión responde 403 y sin lista responde 400")
+    void putServiciosRechazaAjenoYSinLista() throws Exception {
+        Long id = idCreado(iniciarSesion("luis@correo.com"));
+        usuarios.save(Usuario.nuevo("Marta Ruiz", "marta@correo.com", codificador.encode(CONTRASENA),
+                Rol.ANFITRION));
+
+        mvc.perform(put(RUTA + "/" + id + "/servicios")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + iniciarSesion("marta@correo.com"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"servicios\": []}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(put(RUTA + "/" + id + "/servicios")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + iniciarSesion("luis@correo.com"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errores.servicios").value("La lista de servicios es obligatoria."));
+    }
+
+    @Test
+    @DisplayName("PUT de imágenes reordena y quita sin tocar lo demás: la primera queda como principal")
+    void putImagenesReordenaSinTocarLoDemas() throws Exception {
+        String token = iniciarSesion("luis@correo.com");
+        Long id = json.readTree(crear(token, """
+                {"titulo": "Casa en la playa", "imagenes": ["https://imagenes.com/1.jpg",
+                 "https://imagenes.com/2.jpg", "https://imagenes.com/3.jpg"]}
+                """).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString())
+                .get("id").asLong();
+        List<Long> antes = idsDeImagenes(id);
+
+        mvc.perform(put(RUTA + "/" + id + "/imagenes")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"imagenes": ["https://imagenes.com/2.jpg", "https://imagenes.com/1.jpg"]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.imagenes.length()").value(2))
+                .andExpect(jsonPath("$.imagenes[0]").value("https://imagenes.com/2.jpg"))
+                .andExpect(jsonPath("$.titulo").value("Casa en la playa"));
+
+        assertThat(idsDeImagenes(id)).containsExactly(antes.get(1), antes.get(0));
+    }
+
+    @Test
+    @DisplayName("PUT de imágenes de un huésped responde 403 y con una URL inválida responde 400")
+    void putImagenesRechazaHuespedYUrlInvalida() throws Exception {
+        Long id = idCreado(iniciarSesion("luis@correo.com"));
+
+        mvc.perform(put(RUTA + "/" + id + "/imagenes")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + iniciarSesion("ana@correo.com"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"imagenes\": []}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(put(RUTA + "/" + id + "/imagenes")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + iniciarSesion("luis@correo.com"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"imagenes\": [\"ftp://imagen.jpg\"]}"))
+                .andExpect(status().isBadRequest());
     }
 
     private List<Long> idsDeServicios(Long publicacionId) {

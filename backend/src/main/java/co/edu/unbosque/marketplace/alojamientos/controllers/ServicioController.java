@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** Catálogo de servicios: de aquí salen los ids que se envían en una publicación. */
 @RestController
-@RequestMapping("/api/v1/servicios")
+@RequestMapping("/api/v1/catalogos/servicios")
 public class ServicioController {
 
     private final ServicioService servicioService;

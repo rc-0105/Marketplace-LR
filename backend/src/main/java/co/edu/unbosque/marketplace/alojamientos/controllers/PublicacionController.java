@@ -1,5 +1,7 @@
 package co.edu.unbosque.marketplace.alojamientos.controllers;
 
+import co.edu.unbosque.marketplace.alojamientos.controllers.dto.ActualizarImagenesRequest;
+import co.edu.unbosque.marketplace.alojamientos.controllers.dto.ActualizarServiciosRequest;
 import co.edu.unbosque.marketplace.alojamientos.controllers.dto.CrearPublicacionRequest;
 import co.edu.unbosque.marketplace.alojamientos.controllers.dto.PublicacionResponse;
 import co.edu.unbosque.marketplace.alojamientos.model.Publicacion;
@@ -64,6 +66,26 @@ public class PublicacionController {
 			@Valid @RequestBody CrearPublicacionRequest data) {
 		Publicacion editada = publicacionService.editar(id, usuarioDe(jwt), esAdministrador(jwt),
 				data.aSolicitud());
+		return PublicacionResponse.desde(editada);
+	}
+
+	/** Reemplaza solo los servicios por los ids del catálogo enviados (RF-18). */
+	@PutMapping("/{id}/servicios")
+	@PreAuthorize(ANFITRION_O_ADMINISTRADOR)
+	public PublicacionResponse actualizarServicios(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
+			@Valid @RequestBody ActualizarServiciosRequest data) {
+		Publicacion editada = publicacionService.actualizarServicios(id, usuarioDe(jwt), esAdministrador(jwt),
+				data.servicios());
+		return PublicacionResponse.desde(editada);
+	}
+
+	/** Reemplaza solo las imágenes, en el orden enviado: la primera es la principal (RF-19). */
+	@PutMapping("/{id}/imagenes")
+	@PreAuthorize(ANFITRION_O_ADMINISTRADOR)
+	public PublicacionResponse actualizarImagenes(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
+			@Valid @RequestBody ActualizarImagenesRequest data) {
+		Publicacion editada = publicacionService.actualizarImagenes(id, usuarioDe(jwt), esAdministrador(jwt),
+				data.imagenes());
 		return PublicacionResponse.desde(editada);
 	}
 

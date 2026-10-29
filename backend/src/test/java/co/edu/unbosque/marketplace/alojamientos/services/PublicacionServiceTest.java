@@ -366,6 +366,96 @@ class PublicacionServiceTest {
         verify(publicaciones, never()).delete(any(Publicacion.class));
     }
 
+    @Test
+    @DisplayName("El dueño cambia solo los servicios: el resto queda igual y se registra la edición")
+    void duenoCambiaSoloLosServicios() {
+        Publicacion existente = publicacionDe(ANFITRION_ID);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(existente));
+        when(catalogo.findAllById(Set.of(1L))).thenReturn(List.of(WIFI));
+
+        Publicacion editada = servicio.actualizarServicios(PUBLICACION_ID, ANFITRION_ID, false, List.of(1L));
+
+        assertThat(editada.getServicios()).containsExactly(WIFI);
+        assertThat(editada.getTitulo()).isEqualTo("Casa en la playa");
+        assertThat(editada.getImagenes()).containsExactly("https://imagenes.com/1.jpg");
+        assertThat(editada.getEditadoPor()).isEqualTo(ANFITRION_ID);
+        verify(publicaciones).save(existente);
+        EventoCritico evento = eventoPublicado();
+        assertThat(evento.accion()).isEqualTo(AccionCritica.PUBLICACION);
+        assertThat(evento.datos()).containsEntry("operacion", "editar_servicios");
+    }
+
+    @Test
+    @DisplayName("Otro anfitrión no puede cambiar los servicios: lanza 403 y no guarda nada")
+    void otroAnfitrionNoPuedeCambiarServicios() {
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(publicacionDe(ANFITRION_ID)));
+
+        assertThatThrownBy(() -> servicio.actualizarServicios(PUBLICACION_ID, OTRO_ANFITRION_ID, false,
+                List.of(1L)))
+                .isInstanceOf(AccesoDenegadoException.class);
+        verify(publicaciones, never()).save(any(Publicacion.class));
+    }
+
+    @Test
+    @DisplayName("Cambiar servicios con uno fuera del catálogo lanza la excepción y no guarda nada")
+    void cambiarServiciosRechazaFueraDelCatalogo() {
+        Publicacion existente = publicacionDe(ANFITRION_ID);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(existente));
+        when(catalogo.findAllById(Set.of(99L))).thenReturn(List.of());
+
+        assertThatThrownBy(() -> servicio.actualizarServicios(PUBLICACION_ID, ANFITRION_ID, false, List.of(99L)))
+                .isInstanceOf(ServicioNoValidoException.class);
+        assertThat(existente.getServicios()).containsExactly(PISCINA);
+        verify(publicaciones, never()).save(any(Publicacion.class));
+    }
+
+    @Test
+    @DisplayName("El administrador cambia los servicios de cualquier publicación como acción administrativa")
+    void administradorCambiaServicios() {
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(publicacionDe(ANFITRION_ID)));
+        when(catalogo.findAllById(Set.of(1L))).thenReturn(List.of(WIFI));
+
+        servicio.actualizarServicios(PUBLICACION_ID, ADMINISTRADOR_ID, true, List.of(1L));
+
+        assertThat(eventoPublicado().accion()).isEqualTo(AccionCritica.ACCION_ADMINISTRATIVA);
+    }
+
+    @Test
+    @DisplayName("El dueño cambia solo las imágenes en el orden enviado: el resto queda igual y se registra la edición")
+    void duenoCambiaSoloLasImagenes() {
+        Publicacion existente = publicacionDe(ANFITRION_ID);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(existente));
+
+        Publicacion editada = servicio.actualizarImagenes(PUBLICACION_ID, ANFITRION_ID, false,
+                List.of(" https://imagenes.com/2.jpg ", "https://imagenes.com/1.jpg"));
+
+        assertThat(editada.getImagenes()).containsExactly("https://imagenes.com/2.jpg", "https://imagenes.com/1.jpg");
+        assertThat(editada.getServicios()).containsExactly(PISCINA);
+        assertThat(editada.getEditadoPor()).isEqualTo(ANFITRION_ID);
+        verify(publicaciones).save(existente);
+        assertThat(eventoPublicado().datos()).containsEntry("operacion", "editar_imagenes");
+    }
+
+    @Test
+    @DisplayName("Otro anfitrión no puede cambiar las imágenes: lanza 403 y no guarda nada")
+    void otroAnfitrionNoPuedeCambiarImagenes() {
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(publicacionDe(ANFITRION_ID)));
+
+        assertThatThrownBy(() -> servicio.actualizarImagenes(PUBLICACION_ID, OTRO_ANFITRION_ID, false,
+                List.of("https://imagenes.com/2.jpg")))
+                .isInstanceOf(AccesoDenegadoException.class);
+        verify(publicaciones, never()).save(any(Publicacion.class));
+    }
+
+    @Test
+    @DisplayName("Cambiar las imágenes de una publicación que no existe lanza 404")
+    void cambiarImagenesInexistenteLanza404() {
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.actualizarImagenes(PUBLICACION_ID, ANFITRION_ID, false, List.of()))
+                .isInstanceOf(PublicacionNoEncontradaException.class);
+    }
+
     private static Publicacion publicacionDe(Long anfitrionId) {
         return Publicacion.borrador(anfitrionId, new DatosBorrador("Casa en la playa", null, "Santa Marta", null,
                 TipoAlojamiento.CASA, 4, null, Set.of(PISCINA), null, List.of("https://imagenes.com/1.jpg")));

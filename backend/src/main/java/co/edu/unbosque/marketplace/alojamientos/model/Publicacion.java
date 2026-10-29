@@ -110,6 +110,22 @@ public class Publicacion {
 	 */
 	public void editar(DatosBorrador datos, Long editorId) {
 		aplicar(datos);
+		registrarEdicion(editorId);
+	}
+
+	/** Reemplaza solo los servicios (RF-18); el resto de la publicación no cambia. */
+	public void cambiarServicios(Set<Servicio> nuevos, Long editorId) {
+		reemplazarServicios(nuevos);
+		registrarEdicion(editorId);
+	}
+
+	/** Reemplaza solo las imágenes, en el orden recibido (RF-19); el resto no cambia. */
+	public void cambiarImagenes(List<String> urls, Long editorId) {
+		reemplazarImagenes(urls);
+		registrarEdicion(editorId);
+	}
+
+	private void registrarEdicion(Long editorId) {
 		this.editadoPor = editorId;
 		this.editadoEn = Instant.now();
 	}
@@ -123,11 +139,15 @@ public class Publicacion {
 		this.capacidad = datos.capacidad();
 		this.precioNoche = datos.precioNoche();
 		this.reglas = datos.reglas();
-		// Sin clear(): Hibernate lo toma como vaciar la colección y reescribe todas
-		// las filas de la tabla intermedia. Así solo cambian las que de verdad cambian.
-		this.servicios.retainAll(datos.servicios());
-		this.servicios.addAll(datos.servicios());
+		reemplazarServicios(datos.servicios());
 		reemplazarImagenes(datos.imagenes());
+	}
+
+	// Sin clear(): Hibernate lo toma como vaciar la colección y reescribe todas
+	// las filas de la tabla intermedia. Así solo cambian las que de verdad cambian.
+	private void reemplazarServicios(Set<Servicio> nuevos) {
+		this.servicios.retainAll(nuevos);
+		this.servicios.addAll(nuevos);
 	}
 
 	/**
