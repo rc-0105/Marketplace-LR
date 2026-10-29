@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { get, post, put } from '../../../shared/services/http.js';
 import {
-  actualizarServicios, consultarPublicacion, crearPublicacion, editarPublicacion,
+  actualizarImagenes, actualizarServicios, consultarPublicacion, crearPublicacion, editarPublicacion,
   listarMisPublicaciones, listarServicios, listarTiposAlojamiento,
 } from './alojamientosService.js';
 
@@ -64,10 +64,13 @@ describe('alojamientosService', () => {
     expect(get).toHaveBeenCalledWith('/api/v1/catalogos/servicios');
   });
 
-  it('reemplaza solo los servicios de la publicación', async () => {
+  it('reemplaza por separado los servicios y las imágenes de la publicación', async () => {
     vi.mocked(put).mockResolvedValue({ id: 5, titulo: 'Casa', estado: 'BORRADOR' });
 
     await expect(actualizarServicios(5, [1, 2])).resolves.toMatchObject({ id: 5 });
+    await expect(actualizarImagenes(5, ['https://imagenes.com/1.jpg'])).resolves.toMatchObject({ id: 5 });
+
     expect(put).toHaveBeenCalledWith('/api/v1/publicaciones/5/servicios', { servicios: [1, 2] });
+    expect(put).toHaveBeenCalledWith('/api/v1/publicaciones/5/imagenes', { imagenes: ['https://imagenes.com/1.jpg'] });
   });
 });
