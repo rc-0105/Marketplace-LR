@@ -4,9 +4,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { guardarSesion, limpiarSesion } from '../services/sesion.js';
 import Encabezado from './Encabezado.jsx';
 
-function iniciar() {
+function iniciar(rol = 'HUESPED') {
   const expiraEn = new Date(Date.now() + 3600_000).toISOString();
-  guardarSesion({ token: 't', expiraEn, usuario: { id: 1, nombre: 'Ana', correo: 'a@b.co', rol: 'HUESPED', activa: true } });
+  guardarSesion({ token: 't', expiraEn, usuario: { id: 1, nombre: 'Ana', correo: 'a@b.co', rol, activa: true } });
 }
 
 function renderizar(alCerrarSesion) {
@@ -32,6 +32,20 @@ describe('Encabezado', () => {
     renderizar(vi.fn());
 
     expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeInTheDocument();
+  });
+
+  it('al anfitrión le ofrece el enlace a sus publicaciones', () => {
+    iniciar('ANFITRION');
+    renderizar(vi.fn());
+
+    expect(screen.getByRole('link', { name: 'Mis publicaciones' })).toHaveAttribute('href', '/anfitrion/publicaciones');
+  });
+
+  it('al huésped no le ofrece publicaciones', () => {
+    iniciar('HUESPED');
+    renderizar(vi.fn());
+
+    expect(screen.queryByRole('link', { name: 'Mis publicaciones' })).not.toBeInTheDocument();
   });
 
   it('sin sesión no muestra el botón de cerrar sesión', () => {
