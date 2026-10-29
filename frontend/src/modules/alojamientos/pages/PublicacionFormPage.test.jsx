@@ -3,12 +3,14 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi } from '../../../shared/services/http.js';
 import {
-  actualizarImagenes, actualizarServicios, consultarPublicacion, crearPublicacion, editarPublicacion, listarServicios,
-  listarTiposAlojamiento,
+  actualizarImagenes, actualizarServicios, consultarPublicacion, crearPublicacion, editarPublicacion,
+  listarPoliticasCancelacion, listarServicios, listarTiposAlojamiento,
 } from '../services/alojamientosService.js';
 import PublicacionFormPage from './PublicacionFormPage.jsx';
 
 vi.mock('../services/alojamientosService.js', () => ({
+  actualizarConfiguracion: vi.fn(),
+  listarPoliticasCancelacion: vi.fn(),
   actualizarImagenes: vi.fn(),
   actualizarServicios: vi.fn(),
   listarServicios: vi.fn(),
@@ -24,6 +26,7 @@ const EXISTENTE = {
   id: 5, titulo: 'Casa en la playa', descripcion: null, ciudad: 'Santa Marta', direccion: null,
   tipo: { id: 2, nombre: 'Casa' }, capacidad: 4, precioNoche: 250000, reglas: null,
   servicios: [{ id: 9, nombre: 'Wifi' }], imagenes: ['https://imagenes.com/1.jpg'],
+  tarifaLimpieza: null, modoReserva: 'INMEDIATA', politicaCancelacion: null, serviciosAdicionales: [],
   estado: 'BORRADOR', camposFaltantes: [],
 };
 
@@ -47,6 +50,23 @@ describe('PublicacionFormPage', () => {
     vi.resetAllMocks();
     vi.mocked(listarTiposAlojamiento).mockResolvedValue(TIPOS);
     vi.mocked(listarServicios).mockResolvedValue([{ id: 9, nombre: 'Wifi' }]);
+    vi.mocked(listarPoliticasCancelacion).mockResolvedValue([
+      { id: 1, nombre: 'Flexible', descripcion: 'Devolución total.', diasSinCosto: 1, porcentajeDevolucion: 50 },
+    ]);
+  });
+
+  it('al editar muestra el panel de condiciones de reserva', async () => {
+    vi.mocked(consultarPublicacion).mockResolvedValue(EXISTENTE);
+    renderizarEn('/anfitrion/publicaciones/5/editar');
+
+    expect(await screen.findByRole('heading', { name: 'Condiciones de reserva' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Reserva inmediata' })).toBeChecked();
+  });
+
+  it('al crear no muestra el panel de condiciones de reserva', () => {
+    renderizarEn('/anfitrion/publicaciones/nueva');
+
+    expect(screen.queryByRole('heading', { name: 'Condiciones de reserva' })).not.toBeInTheDocument();
   });
 
   it('crea el borrador con los datos escritos y lleva a editarlo', async () => {

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { get, post, put } from '../../../shared/services/http.js';
 import {
-  actualizarImagenes, actualizarServicios, consultarPublicacion, crearPublicacion, editarPublicacion,
-  listarMisPublicaciones, listarServicios, listarTiposAlojamiento,
+  actualizarConfiguracion, actualizarImagenes, actualizarServicios, consultarPublicacion, crearPublicacion,
+  editarPublicacion, listarMisPublicaciones, listarPoliticasCancelacion, listarServicios, listarTiposAlojamiento,
 } from './alojamientosService.js';
 
 vi.mock('../../../shared/services/http.js', async (importOriginal) => ({
@@ -72,5 +72,39 @@ describe('alojamientosService', () => {
 
     expect(put).toHaveBeenCalledWith('/api/v1/publicaciones/5/servicios', { servicios: [1, 2] });
     expect(put).toHaveBeenCalledWith('/api/v1/publicaciones/5/imagenes', { imagenes: ['https://imagenes.com/1.jpg'] });
+  });
+
+  it('lista el catálogo de políticas de cancelación', async () => {
+    const politicas = [{ id: 1, nombre: 'Flexible', descripcion: 'Devolución total.', diasSinCosto: 1, porcentajeDevolucion: 50 }];
+    vi.mocked(get).mockResolvedValue(politicas);
+
+    await expect(listarPoliticasCancelacion()).resolves.toEqual(politicas);
+    expect(get).toHaveBeenCalledWith('/api/v1/catalogos/politicas-cancelacion');
+  });
+
+  it('reemplaza la configuración de la publicación y la convierte al modelo con sus condiciones', async () => {
+    const solicitud = { tarifaLimpieza: 40000, modoReserva: 'APROBACION', politicaCancelacion: 2, serviciosAdicionales: [] };
+    vi.mocked(put).mockResolvedValue({
+      id: 5, titulo: 'Casa', estado: 'BORRADOR', tarifaLimpieza: 40000, modoReserva: 'APROBACION',
+      politicaCancelacion: { id: 2, nombre: 'Moderada' }, serviciosAdicionales: [{ id: 7, nombre: 'Desayuno', costo: 15000 }],
+    });
+
+    const publicacion = await actualizarConfiguracion(5, solicitud);
+
+    expect(put).toHaveBeenCalledWith('/api/v1/publicaciones/5/configuracion', solicitud);
+    expect(publicacion).toMatchObject({
+      tarifaLimpieza: 40000,
+      modoReserva: 'APROBACION',
+      politicaCancelacion: { id: 2, nombre: 'Moderada' },
+      serviciosAdicionales: [{ id: 7, nombre: 'Desayuno', costo: 15000 }],
+    });
+  });
+
+  it('una publicación sin configurar queda con reserva inmediata y sin condiciones', async () => {
+    vi.mocked(get).mockResolvedValue({ id: 5, titulo: 'Casa', estado: 'BORRADOR' });
+
+    await expect(consultarPublicacion(5)).resolves.toMatchObject({
+      tarifaLimpieza: null, modoReserva: 'INMEDIATA', politicaCancelacion: null, serviciosAdicionales: [],
+    });
   });
 });
