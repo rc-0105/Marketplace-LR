@@ -3,11 +3,13 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi } from '../../../shared/services/http.js';
 import {
-  actualizarServicios, consultarPublicacion, crearPublicacion, editarPublicacion, listarServicios, listarTiposAlojamiento,
+  actualizarImagenes, actualizarServicios, consultarPublicacion, crearPublicacion, editarPublicacion, listarServicios,
+  listarTiposAlojamiento,
 } from '../services/alojamientosService.js';
 import PublicacionFormPage from './PublicacionFormPage.jsx';
 
 vi.mock('../services/alojamientosService.js', () => ({
+  actualizarImagenes: vi.fn(),
   actualizarServicios: vi.fn(),
   listarServicios: vi.fn(),
   consultarPublicacion: vi.fn(),
@@ -136,6 +138,28 @@ describe('PublicacionFormPage', () => {
     await screen.findByText('Guardamos los cambios.');
     expect(actualizarServicios).toHaveBeenCalledWith('5', []);
     expect(editarPublicacion).toHaveBeenCalledWith('5', expect.objectContaining({ servicios: [] }));
+  });
+
+  it('al editar ofrece los servicios y las imágenes, y el PUT envía las imágenes recién guardadas', async () => {
+    const nueva = 'https://imagenes.com/2.jpg';
+    vi.mocked(consultarPublicacion).mockResolvedValue(EXISTENTE);
+    vi.mocked(actualizarImagenes).mockResolvedValue({ ...EXISTENTE, imagenes: [nueva, 'https://imagenes.com/1.jpg'] });
+    vi.mocked(editarPublicacion).mockResolvedValue(EXISTENTE);
+    renderizarEn('/anfitrion/publicaciones/5/editar');
+
+    expect(await screen.findByRole('checkbox', { name: 'Wifi' })).toBeChecked();
+    escribir('URL de la imagen', nueva);
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar imagen' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Subir la imagen 2' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar imágenes' }));
+    await screen.findByText('Guardamos las imágenes.');
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await screen.findByText('Guardamos los cambios.');
+    expect(actualizarImagenes).toHaveBeenCalledWith('5', [nueva, 'https://imagenes.com/1.jpg']);
+    expect(editarPublicacion).toHaveBeenCalledWith('5', expect.objectContaining({
+      imagenes: [nueva, 'https://imagenes.com/1.jpg'],
+    }));
   });
 
   it('avisa cuando la publicación no es del anfitrión', async () => {

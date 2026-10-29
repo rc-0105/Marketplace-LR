@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Campo from '../../../shared/components/Campo.jsx';
+import ImagenesPublicacion from '../components/ImagenesPublicacion.jsx';
 import ServiciosPublicacion from '../components/ServiciosPublicacion.jsx';
 import { FORMULARIO_VACIO, formularioDesde, solicitudDesde, validarFormulario } from '../models/publicacion.js';
 import {
@@ -126,9 +127,12 @@ export default function PublicacionFormPage() {
           </button>
         </form>
       )}
-      {/* El panel guarda por su lado; la publicación que devuelve mantiene al día lo que envía el PUT. */}
+      {/* Cada panel guarda por su lado; la publicación que devuelve mantiene al día lo que envía el PUT. */}
       {publicacion && (
-        <ServiciosPublicacion publicacionId={id} seleccionados={publicacion.servicios} alGuardar={setPublicacion} />
+        <>
+          <ServiciosPublicacion publicacionId={id} seleccionados={publicacion.servicios} alGuardar={setPublicacion} />
+          <ImagenesPublicacion publicacionId={id} imagenes={publicacion.imagenes} alGuardar={setPublicacion} />
+        </>
       )}
     </main>
   );
