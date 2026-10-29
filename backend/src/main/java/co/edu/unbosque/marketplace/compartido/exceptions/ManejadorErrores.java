@@ -18,7 +18,9 @@ public class ManejadorErrores {
 
     @ExceptionHandler(NegocioException.class)
     public ProblemDetail negocio(NegocioException error) {
-        return ProblemDetail.forStatusAndDetail(error.getEstado(), error.getMessage());
+        ProblemDetail problema = ProblemDetail.forStatusAndDetail(error.getEstado(), error.getMessage());
+        error.getPropiedades().forEach(problema::setProperty);
+        return problema;
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

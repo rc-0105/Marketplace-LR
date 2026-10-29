@@ -7,7 +7,10 @@ import java.time.Instant;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Denylist de sesiones: guarda los tokens cerrados y limpia los que ya no importan (RF-03). */
+/**
+ * Denylist de sesiones: guarda los tokens cerrados y limpia los que ya no importan (RF-03).
+ * También decide si una sesión sigue valiendo según el estado de la cuenta (RF-06).
+ */
 @Service
 public class SesionService {
 
@@ -28,8 +31,8 @@ public class SesionService {
     }
 
     @Transactional(readOnly = true)
-    public boolean estaInvalidada(String jti) {
-        return sesiones.existsById(jti);
+    public boolean estaInvalidada(String jti, Long usuarioId) {
+        return sesiones.estaRevocadaOInactiva(jti, usuarioId);
     }
 
     @Transactional

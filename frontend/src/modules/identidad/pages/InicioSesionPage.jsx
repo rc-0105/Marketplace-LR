@@ -3,15 +3,19 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Campo from '../../../shared/components/Campo.jsx';
 import { homeDe } from '../../../shared/sesion/rutasPorRol.js';
 import { validarInicioSesion } from '../models/usuario.js';
-import { iniciarSesion } from '../services/identidadService.js';
+import { iniciarSesion, reactivarCuenta } from '../services/identidadService.js';
 import estilos from './InicioSesionPage.module.css';
+
+function avisoDesde(error) {
+  return { mensaje: error.message, motivo: error.motivo, reactivable: error.codigo === 'CUENTA_DESACTIVADA' };
+}
 
 export default function InicioSesionPage() {
   const { state } = useLocation();
   const navegar = useNavigate();
   const [datos, setDatos] = useState({ correo: '', contrasena: '' });
   const [errores, setErrores] = useState({});
-  const [errorGeneral, setErrorGeneral] = useState('');
+  const [aviso, setAviso] = useState(null);
   const [enviando, setEnviando] = useState(false);
   // Los avisos que trae la navegación (registro, recuperación, sesión vencida) dejan de aplicar al primer intento.
   const [intento, setIntento] = useState(false);
@@ -24,7 +28,7 @@ export default function InicioSesionPage() {
   async function enviar(evento) {
     evento.preventDefault();
     setIntento(true);
-    setErrorGeneral('');
+    setAviso(null);
     const erroresFormato = validarInicioSesion(datos);
     setErrores(erroresFormato);
     if (Object.keys(erroresFormato).length > 0) {
@@ -37,7 +41,18 @@ export default function InicioSesionPage() {
       navegar(homeDe(usuario.rol), { replace: true });
     } catch (error) {
       setEnviando(false);
-      setErrorGeneral(error.message);
+      setAviso(avisoDesde(error));
+    }
+  }
+
+  async function reactivar() {
+    setEnviando(true);
+    try {
+      const usuario = await reactivarCuenta({ correo: datos.correo.trim(), contrasena: datos.contrasena });
+      navegar(homeDe(usuario.rol), { replace: true });
+    } catch (error) {
+      setEnviando(false);
+      setAviso(avisoDesde(error));
     }
   }
 
@@ -54,7 +69,17 @@ export default function InicioSesionPage() {
         <output className={estilos.vencida}>Tu sesión venció. Inicia sesión de nuevo para continuar.</output>
       )}
 
-      {errorGeneral && <p role="alert" className={estilos.aviso}>{errorGeneral}</p>}
+      {aviso && (
+        <p role="alert" className={estilos.aviso}>
+          {aviso.mensaje}
+          {aviso.motivo && <> Motivo: {aviso.motivo}</>}
+        </p>
+      )}
+      {aviso?.reactivable && (
+        <button type="button" className={estilos.botonSecundario} onClick={reactivar} disabled={enviando}>
+          Reactivar mi cuenta
+        </button>
+      )}
 
       <form className={estilos.formulario} onSubmit={enviar} noValidate>
         <Campo id="correo" etiqueta="Correo electrónico" type="email" autoComplete="email"

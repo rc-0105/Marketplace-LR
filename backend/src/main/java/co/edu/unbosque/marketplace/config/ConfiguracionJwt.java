@@ -60,7 +60,9 @@ public class ConfiguracionJwt {
                 new JwtTimestampValidator(DESFASE_RELOJ),
                 new JwtIssuerValidator(propiedades.emisor()),
                 new JwtClaimValidator<Object>("exp", Objects::nonNull),
-                new JwtClaimValidator<Object>("jti", Objects::nonNull));
+                new JwtClaimValidator<Object>("jti", Objects::nonNull),
+                // El sub se convierte a Long al consultar la cuenta: un claim malformado da 401, nunca 500.
+                new JwtClaimValidator<String>("sub", sub -> sub != null && sub.matches("\\d{1,18}")));
         // La denylist va después y solo si lo base pasó: un token vencido o manipulado
         // da 401 sin tocar la BD, incluso durante una caída (D4).
         decodificador.setJwtValidator(jwt -> {

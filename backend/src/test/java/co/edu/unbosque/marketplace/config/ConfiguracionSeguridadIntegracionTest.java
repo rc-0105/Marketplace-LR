@@ -9,11 +9,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import co.edu.unbosque.marketplace.compartido.infraestructura.web.FiltroCorrelacion;
+import co.edu.unbosque.marketplace.identidad.model.Rol;
+import co.edu.unbosque.marketplace.identidad.model.Usuario;
 import co.edu.unbosque.marketplace.identidad.repository.UsuarioRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -48,6 +51,15 @@ class ConfiguracionSeguridadIntegracionTest {
 
     @Autowired
     private UsuarioRepository usuarios;
+
+    private Long idUsuario;
+
+    // El validador consulta la cuenta del sub: el token se firma con un usuario que sí existe.
+    @BeforeEach
+    void guardarUsuario() {
+        usuarios.deleteAll();
+        idUsuario = usuarios.save(Usuario.nuevo("Hugo Ruiz", "hugo@correo.com", "hash", Rol.HUESPED)).getId();
+    }
 
     @AfterEach
     void limpiar() {
@@ -121,12 +133,25 @@ class ConfiguracionSeguridadIntegracionTest {
         assertThat(estadoLogin).isNotIn(401, 403);
     }
 
+    @Test
+    @DisplayName("La reactivación es pública pero el resto de /api/v1/perfil sigue negado por defecto")
+    void reactivarEsPublicaYElRestoDePerfilSeNiega() throws Exception {
+        int estadoReactivar = mvc.perform(post("/api/v1/perfil/reactivar").content("{}")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andReturn().getResponse().getStatus();
+        assertThat(estadoReactivar).isEqualTo(400);
+
+        mvc.perform(get("/api/v1/perfil/otra")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/perfil/otra").header(HttpHeaders.AUTHORIZATION, bearer(token(Duration.ofMinutes(5)))))
+                .andExpect(status().isForbidden());
+    }
+
     private String token(Duration vigencia) {
         Instant ahora = Instant.now();
         Instant expira = ahora.plus(vigencia);
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(propiedades.emisor())
-                .subject("1")
+                .subject(String.valueOf(idUsuario))
                 .id(UUID.randomUUID().toString())
                 .claim("rol", "HUESPED")
                 .issuedAt(ahora.minus(Duration.ofHours(2)))

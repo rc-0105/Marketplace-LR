@@ -36,6 +36,9 @@ public class Usuario {
     @Column(nullable = false, length = 20)
     private EstadoCuenta estado;
 
+    @Column(name = "motivo_restriccion", length = 500)
+    private String motivoRestriccion;
+
     @Column(name = "creado_en", nullable = false, updatable = false)
     private Instant creadoEn;
 
@@ -57,7 +60,7 @@ public class Usuario {
         return new Usuario(nombre, correo, contrasenaHash, rol);
     }
 
-    /** Gancho para SOF-15 y SOF-17: hoy toda cuenta activa puede entrar. */
+    /** Solo una cuenta activa puede entrar; la desactivada y la restringida no. */
     public boolean puedeIniciarSesion() {
         return estado == EstadoCuenta.ACTIVA;
     }
@@ -65,6 +68,35 @@ public class Usuario {
     /** Recibe el hash ya calculado: la entidad nunca ve la contraseña en claro. */
     public void cambiarContrasena(String nuevoHash) {
         this.contrasenaHash = nuevoHash;
+    }
+
+    /** ACTIVA a RESTRINGIDA. El motivo es obligatorio y se guarda sin espacios sobrantes. */
+    public void restringir(String motivo) {
+        if (estado != EstadoCuenta.ACTIVA) {
+            throw new IllegalStateException("Solo una cuenta activa se puede restringir");
+        }
+        if (motivo == null || motivo.isBlank()) {
+            throw new IllegalArgumentException("El motivo de la restricción es obligatorio");
+        }
+        this.estado = EstadoCuenta.RESTRINGIDA;
+        this.motivoRestriccion = motivo.strip();
+    }
+
+    /** RESTRINGIDA a ACTIVA; el motivo deja de existir. */
+    public void levantarRestriccion() {
+        if (estado != EstadoCuenta.RESTRINGIDA) {
+            throw new IllegalStateException("Solo una cuenta restringida se puede liberar");
+        }
+        this.estado = EstadoCuenta.ACTIVA;
+        this.motivoRestriccion = null;
+    }
+
+    /** DESACTIVADA a ACTIVA. Una cuenta restringida no se reactiva por su cuenta. */
+    public void reactivar() {
+        if (estado != EstadoCuenta.DESACTIVADA) {
+            throw new IllegalStateException("Solo una cuenta desactivada se puede reactivar");
+        }
+        this.estado = EstadoCuenta.ACTIVA;
     }
 
     public Long getId() {
@@ -89,6 +121,10 @@ public class Usuario {
 
     public EstadoCuenta getEstado() {
         return estado;
+    }
+
+    public String getMotivoRestriccion() {
+        return motivoRestriccion;
     }
 
     public Instant getCreadoEn() {
