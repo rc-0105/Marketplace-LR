@@ -93,6 +93,10 @@ complétenlo localmente.
 | `SPRING_DATASOURCE_PASSWORD` | Contraseña de la base de datos |
 | `JWT_SECRET` | Firma de los tokens de sesión. Obligatorio, mínimo 32 bytes; sin él la API no arranca. Genéralo con `openssl rand -base64 48` |
 | `JWT_EXPIRACION_MINUTOS` | Vigencia del token en minutos (por defecto 60) |
+| `CORREO_MODO` | `log` (por defecto) escribe el código de recuperación en la consola; `smtp` lo envía por correo |
+| `MAIL_HOST`, `MAIL_PORT` | Servidor SMTP. Por defecto `smtp.gmail.com` y `587` (STARTTLS) |
+| `MAIL_USERNAME`, `MAIL_PASSWORD` | Cuenta SMTP. Con Gmail, la contraseña es una [contraseña de aplicación](https://myaccount.google.com/apppasswords), no la de la cuenta |
+| `MAIL_FROM` | Remitente de los correos. Si se omite, se usa `MAIL_USERNAME` |
 | `STRIPE_CLAVE_PRUEBA` | Clave de la pasarela en modo prueba |
 
 ## Documentación

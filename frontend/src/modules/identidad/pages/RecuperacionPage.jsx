@@ -72,7 +72,7 @@ export default function RecuperacionPage() {
           <form className={estilos.formulario} onSubmit={confirmar} noValidate>
             <Campo id="codigo" etiqueta="Código de recuperación" inputMode="numeric" autoComplete="one-time-code"
               maxLength={6} value={datos.codigo} onChange={cambiar} error={errores.codigo}
-              ayuda="Mientras el envío de correos sea simulado, el código aparece en el log del servidor." />
+              ayuda="Revisa tu bandeja de entrada y la carpeta de spam. El código solo sirve una vez." />
             <div>
               <Campo id="contrasenaNueva" etiqueta="Contraseña nueva" type="password" autoComplete="new-password"
                 value={datos.contrasenaNueva} onChange={cambiar} error={errores.contrasenaNueva} />

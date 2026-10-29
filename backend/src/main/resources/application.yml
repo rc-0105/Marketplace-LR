@@ -24,6 +24,10 @@ springdoc:
     path: /swagger-ui.html
 
 management:
+  # Sin esto, /actuator/health intentaría conectarse al SMTP aunque el correo esté en modo log.
+  health:
+    mail:
+      enabled: false
   endpoints:
     web:
       exposure:
@@ -42,3 +46,25 @@ jwt:
   secreto: ${JWT_SECRET}
   expiracion-minutos: ${JWT_EXPIRACION_MINUTOS:60}
   emisor: ${spring.application.name}
+
+# Envío del código de recuperación (RF-05). Con "log" el código se escribe en la
+# consola; con "smtp" se envía por correo usando spring.mail. Las credenciales
+# llegan solo por entorno (RNF-17).
+correo:
+  modo: ${CORREO_MODO:log}
+  # Si MAIL_FROM falta o está vacío, se usa MAIL_USERNAME.
+  remitente: ${MAIL_FROM:}
+
+spring.mail:
+  host: ${MAIL_HOST:smtp.gmail.com}
+  port: ${MAIL_PORT:587}
+  username: ${MAIL_USERNAME:}
+  password: ${MAIL_PASSWORD:}
+  properties:
+    mail.smtp.auth: true
+    mail.smtp.starttls.enable: true
+    # Nunca enviar la contraseña sin cifrar si el servidor no ofrece STARTTLS.
+    mail.smtp.starttls.required: true
+    mail.smtp.connectiontimeout: 5000
+    mail.smtp.timeout: 5000
+    mail.smtp.writetimeout: 5000

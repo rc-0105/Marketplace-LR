@@ -4,6 +4,7 @@ import co.edu.unbosque.marketplace.identidad.services.EnvioCodigoRecuperacion;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Component;
  * su correo. Sale por su propio logger, separado de la auditoría (RF-45).
  */
 @Component
+@ConditionalOnProperty(name = "correo.modo", havingValue = "log", matchIfMissing = true)
 public class EnvioCodigoRecuperacionPorLog implements EnvioCodigoRecuperacion {
 
     private static final Logger CORREO_SIMULADO = LoggerFactory.getLogger("correo.simulado");
