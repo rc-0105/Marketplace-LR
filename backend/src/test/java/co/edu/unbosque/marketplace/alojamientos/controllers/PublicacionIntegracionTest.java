@@ -189,6 +189,34 @@ class PublicacionIntegracionTest {
     }
 
     @Test
+    @DisplayName("El anfitrión lista solo sus publicaciones, la más reciente primero")
+    void anfitrionListaSoloLasSuyas() throws Exception {
+        String token = iniciarSesion("luis@correo.com");
+        idCreado(token);
+        crear(token, """
+                {"titulo": "Apartamento en el centro"}
+                """).andExpect(status().isCreated());
+        usuarios.save(Usuario.nuevo("Marta Ruiz", "marta@correo.com", codificador.encode(CONTRASENA),
+                Rol.ANFITRION));
+        crear(iniciarSesion("marta@correo.com"), """
+                {"titulo": "Casa ajena"}
+                """).andExpect(status().isCreated());
+
+        mvc.perform(get(RUTA + "/mias").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].titulo").value("Apartamento en el centro"))
+                .andExpect(jsonPath("$[1].titulo").value("Casa en la playa"));
+    }
+
+    @Test
+    @DisplayName("Un huésped no tiene publicaciones que listar: responde 403")
+    void huespedNoListaPublicaciones() throws Exception {
+        mvc.perform(get(RUTA + "/mias").header(HttpHeaders.AUTHORIZATION, "Bearer " + iniciarSesion("ana@correo.com")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     @DisplayName("Otro anfitrión intenta editar la publicación: responde 403 y la publicación no cambia")
     void otroAnfitrionRecibe403() throws Exception {
         Long id = idCreado(iniciarSesion("luis@correo.com"));

@@ -65,6 +65,14 @@ async function solicitar(ruta, opciones) {
   return datos;
 }
 
+export function get(ruta) {
+  return solicitar(ruta, { method: 'GET' });
+}
+
 export function post(ruta, cuerpo) {
   return solicitar(ruta, { method: 'POST', body: JSON.stringify(cuerpo) });
+}
+
+export function put(ruta, cuerpo) {
+  return solicitar(ruta, { method: 'PUT', body: JSON.stringify(cuerpo) });
 }
