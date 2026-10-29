@@ -10,7 +10,6 @@ class ConfirmacionCuentaRequestTest {
     @Test
     @DisplayName("Al imprimir la solicitud no aparece la contraseña")
     void ocultaLaContrasenaAlImprimir() {
-        assertThat(new ConfirmacionCuentaRequest("Segura#2026").toString())
-                .isEqualTo("ConfirmacionCuentaRequest[]");
+        assertThat(new ConfirmacionCuentaRequest("Segura#2026")).hasToString("ConfirmacionCuentaRequest[]");
     }
 }

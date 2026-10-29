@@ -54,8 +54,8 @@ export default function MiCuentaPage() {
     try {
       await OPERACIONES[operacion].ejecutar(contrasena);
       navegar('/inicio-sesion', { replace: true });
-    } catch (fallo) {
-      setError(mensajeDe(fallo));
+    } catch (error_) {
+      setError(mensajeDe(error_));
       setEnviando(false);
     }
   }
