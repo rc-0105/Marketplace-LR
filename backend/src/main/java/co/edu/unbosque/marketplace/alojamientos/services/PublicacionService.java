@@ -66,6 +66,12 @@ public class PublicacionService {
         return buscarConAcceso(publicacionId, usuarioId, esAdministrador);
     }
 
+    /** Publicaciones del anfitrión, la más reciente primero: de aquí elige cuál editar. */
+    @Transactional(readOnly = true)
+    public List<Publicacion> listarDelAnfitrion(Long anfitrionId) {
+        return publicaciones.findByAnfitrionIdOrderByCreadoEnDesc(anfitrionId);
+    }
+
     /**
      * Borra la publicación con sus imágenes y servicios. Solo un BORRADOR: nunca
      * fue público, así que no tiene reservas ni reseñas que dependan de él.

@@ -1,6 +1,7 @@
 package co.edu.unbosque.marketplace.alojamientos.repository;
 
 import co.edu.unbosque.marketplace.alojamientos.model.Publicacion;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,4 +13,8 @@ public interface PublicacionRepository extends JpaRepository<Publicacion, Long> 
     @Override
     @EntityGraph(attributePaths = {"servicios", "imagenes"})
     Optional<Publicacion> findById(Long id);
+
+    // Mismo motivo: el listado reporta los campos faltantes, que miran servicios e imágenes.
+    @EntityGraph(attributePaths = {"servicios", "imagenes"})
+    List<Publicacion> findByAnfitrionIdOrderByCreadoEnDesc(Long anfitrionId);
 }
