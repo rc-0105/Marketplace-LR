@@ -9,11 +9,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import co.edu.unbosque.marketplace.alojamientos.model.Publicacion;
+import co.edu.unbosque.marketplace.alojamientos.model.Servicio;
 import co.edu.unbosque.marketplace.alojamientos.repository.PublicacionRepository;
+import co.edu.unbosque.marketplace.alojamientos.repository.ServicioRepository;
 import co.edu.unbosque.marketplace.identidad.model.Rol;
 import co.edu.unbosque.marketplace.identidad.model.Usuario;
 import co.edu.unbosque.marketplace.identidad.repository.UsuarioRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,6 +26,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -43,6 +47,12 @@ class PublicacionIntegracionTest {
 
     @Autowired
     private PublicacionRepository publicaciones;
+
+    @Autowired
+    private ServicioRepository catalogo;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     @Autowired
     private PasswordEncoder codificador;
@@ -256,6 +266,68 @@ class PublicacionIntegracionTest {
     }
 
     @Test
+    @DisplayName("Al editar se reemplazan los servicios del catálogo y las imágenes, en el orden enviado")
+    void editarReemplazaServiciosEImagenes() throws Exception {
+        String token = iniciarSesion("luis@correo.com");
+        Long wifi = idServicio("Wifi");
+        Long piscina = idServicio("Piscina");
+        Long cocina = idServicio("Cocina");
+        String creada = crear(token, """
+                {"titulo": "Casa en la playa", "servicios": [%d, %d],
+                 "imagenes": ["https://imagenes.com/1.jpg", "https://imagenes.com/2.jpg"]}
+                """.formatted(wifi, piscina))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.servicios[0].nombre").value("Piscina"))
+                .andExpect(jsonPath("$.servicios[1].nombre").value("Wifi"))
+                .andReturn().getResponse().getContentAsString();
+        Long id = json.readTree(creada).get("id").asLong();
+
+        editar(token, id, """
+                {"titulo": "Casa en la playa", "servicios": [%d],
+                 "imagenes": ["https://imagenes.com/3.jpg", "https://imagenes.com/1.jpg"]}
+                """.formatted(cocina))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.servicios.length()").value(1))
+                .andExpect(jsonPath("$.servicios[0].id").value(cocina.intValue()))
+                .andExpect(jsonPath("$.servicios[0].nombre").value("Cocina"))
+                .andExpect(jsonPath("$.imagenes[0]").value("https://imagenes.com/3.jpg"))
+                .andExpect(jsonPath("$.imagenes[1]").value("https://imagenes.com/1.jpg"));
+
+        Publicacion guardada = publicaciones.findById(id).orElseThrow();
+        assertThat(guardada.getServicios()).extracting(Servicio::getNombre).containsExactly("Cocina");
+        assertThat(guardada.getImagenes()).containsExactly("https://imagenes.com/3.jpg",
+                "https://imagenes.com/1.jpg");
+    }
+
+    @Test
+    @DisplayName("Con un servicio que no está en el catálogo responde 400 y no guarda nada")
+    void servicioFueraDelCatalogoRecibe400() throws Exception {
+        crear(iniciarSesion("luis@correo.com"), """
+                {"titulo": "Casa en la playa", "servicios": [999999]}
+                """)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("Uno de los servicios no existe en el catálogo."));
+
+        assertThat(publicaciones.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("El catálogo de servicios se lista con sesión y en orden alfabético")
+    void listaElCatalogoDeServicios() throws Exception {
+        mvc.perform(get("/api/v1/servicios")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + iniciarSesion("ana@correo.com")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].nombre").value("Aire acondicionado"))
+                .andExpect(jsonPath("$[?(@.nombre == 'Wifi')].id").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("Sin token el catálogo de servicios responde 401")
+    void catalogoSinTokenRecibe401() throws Exception {
+        mvc.perform(get("/api/v1/servicios")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
     @DisplayName("El dueño consulta su publicación: responde 200 con los datos guardados")
     void duenoConsultaSuPublicacion() throws Exception {
         String token = iniciarSesion("luis@correo.com");
@@ -302,9 +374,9 @@ class PublicacionIntegracionTest {
     void duenoEliminaSuBorrador() throws Exception {
         String token = iniciarSesion("luis@correo.com");
         String creada = crear(token, """
-                {"titulo": "Casa en la playa", "servicios": ["Wifi"],
+                {"titulo": "Casa en la playa", "servicios": [%d],
                  "imagenes": ["https://imagenes.com/1.jpg"]}
-                """)
+                """.formatted(idServicio("Wifi")))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         Long id = json.readTree(creada).get("id").asLong();
@@ -345,12 +417,119 @@ class PublicacionIntegracionTest {
         eliminar(iniciarSesion("luis@correo.com"), 999_999L).andExpect(status().isNotFound());
     }
 
+    @Test
+    @DisplayName("Editar sin cambiar las imágenes conserva sus filas: los ids no cambian")
+    void editarConLasMismasImagenesConservaSusIds() throws Exception {
+        String token = iniciarSesion("luis@correo.com");
+        String cuerpo = """
+                {"titulo": "Casa en la playa",
+                 "imagenes": ["https://imagenes.com/1.jpg", "https://imagenes.com/2.jpg"]}
+                """;
+        Long id = json.readTree(crear(token, cuerpo).andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString()).get("id").asLong();
+        List<Long> antes = idsDeImagenes(id);
+
+        editar(token, id, cuerpo).andExpect(status().isOk());
+
+        assertThat(idsDeImagenes(id)).isEqualTo(antes);
+    }
+
+    @Test
+    @DisplayName("Al reordenar y quitar imágenes, las que siguen conservan su id y la primera es la principal")
+    void reordenarYQuitarImagenesConservaLasQueSiguen() throws Exception {
+        String token = iniciarSesion("luis@correo.com");
+        Long id = json.readTree(crear(token, """
+                {"titulo": "Casa en la playa", "imagenes": ["https://imagenes.com/1.jpg",
+                 "https://imagenes.com/2.jpg", "https://imagenes.com/3.jpg"]}
+                """).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString())
+                .get("id").asLong();
+        List<Long> antes = idsDeImagenes(id);
+
+        editar(token, id, """
+                {"titulo": "Casa en la playa",
+                 "imagenes": ["https://imagenes.com/3.jpg", "https://imagenes.com/1.jpg"]}
+                """)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.imagenes[0]").value("https://imagenes.com/3.jpg"))
+                .andExpect(jsonPath("$.imagenes[1]").value("https://imagenes.com/1.jpg"))
+                .andExpect(jsonPath("$.imagenes.length()").value(2));
+
+        // antes: [1.jpg, 2.jpg, 3.jpg]; ahora 3.jpg va primero y 2.jpg ya no está.
+        assertThat(idsDeImagenes(id)).containsExactly(antes.get(2), antes.get(0));
+    }
+
+    @Test
+    @DisplayName("Editar con los mismos servicios conserva sus filas; quitar uno solo borra esa fila")
+    void editarServiciosConservaLasFilasQueSiguen() throws Exception {
+        String token = iniciarSesion("luis@correo.com");
+        Long wifi = idServicio("Wifi");
+        Long piscina = idServicio("Piscina");
+        String cuerpo = """
+                {"titulo": "Casa en la playa", "servicios": [%d, %d]}
+                """.formatted(wifi, piscina);
+        Long id = json.readTree(crear(token, cuerpo).andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString()).get("id").asLong();
+        Long filaWifi = idFilaServicio(id, wifi);
+        List<Long> antes = idsDeServicios(id);
+
+        editar(token, id, cuerpo).andExpect(status().isOk());
+        assertThat(idsDeServicios(id)).isEqualTo(antes);
+
+        editar(token, id, """
+                {"titulo": "Casa en la playa", "servicios": [%d]}
+                """.formatted(wifi))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.servicios.length()").value(1));
+        assertThat(idsDeServicios(id)).containsExactly(filaWifi);
+    }
+
+    @Test
+    @DisplayName("Con varios servicios y varias imágenes, el detalle no repite imágenes ni servicios")
+    void consultarConVariosServiciosEImagenesNoDuplica() throws Exception {
+        String token = iniciarSesion("luis@correo.com");
+        Long id = json.readTree(crear(token, """
+                {"titulo": "Casa en la playa", "servicios": [%d, %d],
+                 "imagenes": ["https://imagenes.com/1.jpg", "https://imagenes.com/2.jpg"]}
+                """.formatted(idServicio("Wifi"), idServicio("Piscina")))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString())
+                .get("id").asLong();
+
+        consultar(token, id)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.servicios.length()").value(2))
+                .andExpect(jsonPath("$.imagenes.length()").value(2))
+                .andExpect(jsonPath("$.imagenes[0]").value("https://imagenes.com/1.jpg"))
+                .andExpect(jsonPath("$.imagenes[1]").value("https://imagenes.com/2.jpg"));
+    }
+
+    private List<Long> idsDeServicios(Long publicacionId) {
+        return jdbc.queryForList("SELECT id FROM publicacion_servicio WHERE publicacion_id = ? ORDER BY id",
+                Long.class, publicacionId);
+    }
+
+    private Long idFilaServicio(Long publicacionId, Long servicioId) {
+        return jdbc.queryForObject(
+                "SELECT id FROM publicacion_servicio WHERE publicacion_id = ? AND servicio_id = ?",
+                Long.class, publicacionId, servicioId);
+    }
+
+    private List<Long> idsDeImagenes(Long publicacionId) {
+        return jdbc.queryForList("SELECT id FROM publicacion_imagen WHERE publicacion_id = ? ORDER BY posicion",
+                Long.class, publicacionId);
+    }
+
     private ResultActions consultar(String token, Long id) throws Exception {
         return mvc.perform(get(RUTA + "/" + id).header(HttpHeaders.AUTHORIZATION, "Bearer " + token));
     }
 
     private ResultActions eliminar(String token, Long id) throws Exception {
         return mvc.perform(delete(RUTA + "/" + id).header(HttpHeaders.AUTHORIZATION, "Bearer " + token));
+    }
+
+    private Long idServicio(String nombre) {
+        return catalogo.findAllByOrderByNombreAsc().stream()
+                .filter(servicio -> servicio.getNombre().equals(nombre))
+                .findFirst().orElseThrow().getId();
     }
 
     private Long idCreado(String token) throws Exception {

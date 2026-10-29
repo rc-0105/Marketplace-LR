@@ -3,6 +3,7 @@ package co.edu.unbosque.marketplace.alojamientos.controllers.dto;
 import co.edu.unbosque.marketplace.alojamientos.services.SolicitudBorrador;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
@@ -11,7 +12,8 @@ import org.hibernate.validator.constraints.URL;
 
 /**
  * Datos del borrador. Solo el título es obligatorio; si llegan la capacidad o
- * el precio, deben ser positivos (RF-12).
+ * el precio, deben ser positivos (RF-12). Los servicios son ids del catálogo
+ * ({@code GET /api/v1/servicios}).
  */
 public record CrearPublicacionRequest(
         @NotBlank(message = "El título es obligatorio.")
@@ -37,8 +39,7 @@ public record CrearPublicacionRequest(
         BigDecimal precioNoche,
 
         @Size(max = 30, message = "Se admiten máximo 30 servicios.")
-        List<@NotBlank(message = "Un servicio no puede estar vacío.")
-                @Size(max = 60, message = "Cada servicio admite máximo 60 caracteres.") String> servicios,
+        List<@NotNull(message = "Un servicio no puede estar vacío.") Long> servicios,
 
         @Size(max = 2000, message = "Las reglas admiten máximo 2000 caracteres.")
         String reglas,
