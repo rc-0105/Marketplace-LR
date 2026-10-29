@@ -4,9 +4,42 @@
   padding: var(--espacio-12) var(--espacio-4);
 }
 
+.cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espacio-4);
+  margin-bottom: var(--espacio-6);
+}
+
 .titulo {
-  margin: 0 0 var(--espacio-6);
+  margin: 0;
   font-size: var(--texto-encabezado);
+}
+
+.nueva {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 var(--espacio-4);
+  border-radius: var(--radio);
+  background: var(--color-terracota);
+  color: var(--color-sobre-terracota);
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color var(--transicion);
+}
+
+.nueva:hover {
+  background: var(--color-terracota-oscuro);
+}
+
+.editar {
+  display: inline-block;
+  margin-top: var(--espacio-3);
+  color: var(--color-terracota);
+  font-weight: 600;
 }
 
 .nota {
