@@ -13,29 +13,23 @@ import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.util.HtmlUtils;
 
 /**
- * Envía el código por SMTP cuando {@code correo.modo=smtp}. El envío sale en
+ * Envía el código por SMTP; lo registra {@code ConfiguracionCorreo} con {@code correo.modo=smtp}. El envío sale en
  * segundo plano y después del commit: así un correo registrado no tarda más ni
  * falla distinto que uno inexistente (anti-enumeración), y si la solicitud se
  * revierte no llega un código que no quedó guardado. El mensaje va en HTML con
  * la marca y en texto plano para los clientes que no muestran HTML; las
  * plantillas viven en {@code resources/correos}.
  */
-@Component
-@ConditionalOnProperty(name = "correo.modo", havingValue = "smtp")
 public class EnvioCodigoRecuperacionPorCorreo implements EnvioCodigoRecuperacion {
 
     private static final Logger LOG = LoggerFactory.getLogger(EnvioCodigoRecuperacionPorCorreo.class);
@@ -51,9 +45,8 @@ public class EnvioCodigoRecuperacionPorCorreo implements EnvioCodigoRecuperacion
     private final String plantillaHtml = leer("correos/recuperacion.html");
     private final String plantillaTexto = leer("correos/recuperacion.txt");
 
-    public EnvioCodigoRecuperacionPorCorreo(JavaMailSender correo,
-            @Qualifier("applicationTaskExecutor") TaskExecutor ejecutor,
-            @Value("${correo.remitente:}") String remitente, @Value("${spring.mail.username:}") String usuario) {
+    public EnvioCodigoRecuperacionPorCorreo(JavaMailSender correo, TaskExecutor ejecutor, String remitente,
+            String usuario) {
         String elegido = remitente == null || remitente.isBlank() ? usuario : remitente;
         if (elegido == null || elegido.isBlank()) {
             throw new IllegalStateException("Con correo.modo=smtp hay que definir MAIL_FROM o MAIL_USERNAME.");

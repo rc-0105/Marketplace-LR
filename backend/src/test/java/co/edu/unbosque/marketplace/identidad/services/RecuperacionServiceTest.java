@@ -66,7 +66,7 @@ class RecuperacionServiceTest {
         assertThat(guardado.getUsuarioId()).isEqualTo(7L);
         assertThat(guardado.getCodigoHash()).hasSize(64).isNotEqualTo(codigo);
         assertThat(guardado.getVenceEn()).isEqualTo(AHORA.plus(Duration.ofMinutes(15)));
-        verify(envio).enviar(eq(CORREO), eq(codigo), eq(AHORA.plus(Duration.ofMinutes(15))));
+        verify(envio).enviar(CORREO, codigo, AHORA.plus(Duration.ofMinutes(15)));
         EventoCritico evento = eventoPublicado();
         assertThat(evento.accion()).isEqualTo(AccionCritica.AUTENTICACION);
         assertThat(evento.resultado()).isEqualTo(ResultadoEvento.EXITO);

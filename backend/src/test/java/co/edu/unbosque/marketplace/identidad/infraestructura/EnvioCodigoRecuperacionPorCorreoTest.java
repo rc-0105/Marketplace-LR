@@ -10,7 +10,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import co.edu.unbosque.marketplace.identidad.services.EnvioCodigoRecuperacion;
 import jakarta.mail.BodyPart;
 import jakarta.mail.Multipart;
 import jakarta.mail.Part;
@@ -23,9 +22,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.boot.autoconfigure.AutoConfigurations;
-import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration;
-import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.mail.MailSendException;
@@ -128,22 +124,6 @@ class EnvioCodigoRecuperacionPorCorreoTest {
         assertThatThrownBy(() -> new EnvioCodigoRecuperacionPorCorreo(correo, ejecutor, " ", ""))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("MAIL_FROM");
-    }
-
-    @Test
-    @DisplayName("correo.modo elige el canal: log por defecto y smtp cuando se pide")
-    void eligeElCanalSegunLaPropiedad() {
-        ApplicationContextRunner contexto = new ApplicationContextRunner()
-                .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class))
-                .withBean(JavaMailSender.class, () -> correo)
-                .withBean("applicationTaskExecutor", TaskExecutor.class, SyncTaskExecutor::new)
-                .withPropertyValues("correo.remitente=plataforma@gmail.com")
-                .withUserConfiguration(EnvioCodigoRecuperacionPorLog.class, EnvioCodigoRecuperacionPorCorreo.class);
-
-        contexto.run(sinModo -> assertThat(sinModo.getBean(EnvioCodigoRecuperacion.class))
-                .isInstanceOf(EnvioCodigoRecuperacionPorLog.class));
-        contexto.withPropertyValues("correo.modo=smtp").run(smtp -> assertThat(
-                smtp.getBean(EnvioCodigoRecuperacion.class)).isInstanceOf(EnvioCodigoRecuperacionPorCorreo.class));
     }
 
     private MimeMessage mensajeEnviado() {
