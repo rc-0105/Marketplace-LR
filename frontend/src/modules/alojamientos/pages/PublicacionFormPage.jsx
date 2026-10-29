@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Campo from '../../../shared/components/Campo.jsx';
+import ServiciosPublicacion from '../components/ServiciosPublicacion.jsx';
 import { FORMULARIO_VACIO, formularioDesde, solicitudDesde, validarFormulario } from '../models/publicacion.js';
 import {
   consultarPublicacion, crearPublicacion, editarPublicacion, listarTiposAlojamiento,
@@ -124,6 +125,10 @@ export default function PublicacionFormPage() {
             {editando ? 'Guardar cambios' : 'Guardar borrador'}
           </button>
         </form>
+      )}
+      {/* El panel guarda por su lado; la publicación que devuelve mantiene al día lo que envía el PUT. */}
+      {publicacion && (
+        <ServiciosPublicacion publicacionId={id} seleccionados={publicacion.servicios} alGuardar={setPublicacion} />
       )}
     </main>
   );

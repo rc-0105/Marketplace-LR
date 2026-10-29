@@ -45,3 +45,20 @@ export async function editarPublicacion(id, solicitud) {
 export function listarTiposAlojamiento() {
   return get('/api/v1/catalogos/tipos-alojamiento');
 }
+
+/**
+ * @returns {Promise<import('../models/publicacion.js').OpcionCatalogo[]>} servicios en orden alfabético
+ */
+export function listarServicios() {
+  return get('/api/v1/catalogos/servicios');
+}
+
+/**
+ * Reemplaza solo los servicios de la publicación por los ids enviados (RF-18).
+ * @param {number | string} id
+ * @param {number[]} servicioIds
+ * @returns {Promise<import('../models/publicacion.js').Publicacion>}
+ */
+export async function actualizarServicios(id, servicioIds) {
+  return publicacionDesdeApi(await put(`${RUTA}/${id}/servicios`, { servicios: servicioIds }));
+}
