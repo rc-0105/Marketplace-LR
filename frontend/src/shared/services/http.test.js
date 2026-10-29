@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ErrorApi, post } from './http.js';
+import { ErrorApi, get, post, put } from './http.js';
 import { guardarSesion, limpiarSesion, obtenerSesion, suscribirExpiracion } from './sesion.js';
 
 function respuesta(estado, cuerpo) {
@@ -24,6 +24,27 @@ describe('http', () => {
       method: 'POST',
       body: '{"a":1}',
       headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
+    }));
+  });
+
+  it('consulta con GET sin cuerpo y devuelve la respuesta', async () => {
+    const fetchFalso = vi.fn(() => respuesta(200, [{ id: 1 }]));
+    vi.stubGlobal('fetch', fetchFalso);
+
+    await expect(get('/api/v1/recurso')).resolves.toEqual([{ id: 1 }]);
+    const [, opciones] = fetchFalso.mock.calls[0];
+    expect(opciones.method).toBe('GET');
+    expect(opciones.body).toBeUndefined();
+  });
+
+  it('reemplaza con PUT enviando el cuerpo como JSON', async () => {
+    const fetchFalso = vi.fn(() => respuesta(200, { id: 1 }));
+    vi.stubGlobal('fetch', fetchFalso);
+
+    await expect(put('/api/v1/recurso/1', { a: 2 })).resolves.toEqual({ id: 1 });
+    expect(fetchFalso).toHaveBeenCalledWith('/api/v1/recurso/1', expect.objectContaining({
+      method: 'PUT',
+      body: '{"a":2}',
     }));
   });
 

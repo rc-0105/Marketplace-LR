@@ -4,6 +4,7 @@ import InicioSesionPage from '../modules/identidad/pages/InicioSesionPage.jsx';
 import RecuperacionPage from '../modules/identidad/pages/RecuperacionPage.jsx';
 import MiCuentaPage from '../modules/identidad/pages/MiCuentaPage.jsx';
 import RegistroPage from '../modules/identidad/pages/RegistroPage.jsx';
+import MisPublicacionesPage from '../modules/alojamientos/pages/MisPublicacionesPage.jsx';
 import PanelRolPage from './pages/PanelRolPage.jsx';
 import Encabezado from '../shared/components/Encabezado.jsx';
 import ProveedorSesion from '../shared/sesion/ProveedorSesion.jsx';
@@ -43,6 +44,8 @@ export default function App() {
         <Route path="/inicio-sesion" element={<SoloInvitados><InicioSesionPage /></SoloInvitados>} />
         <Route path="/recuperar-contrasena" element={<SoloInvitados><RecuperacionPage /></SoloInvitados>} />
         <Route path="/mi-cuenta" element={<RutaProtegida><MiCuentaPage /></RutaProtegida>} />
+        <Route path="/anfitrion/publicaciones"
+          element={<RutaProtegida rol="ANFITRION"><MisPublicacionesPage /></RutaProtegida>} />
         {ROLES_CON_PANEL.map(({ rol, ruta }) => (
           <Route key={ruta} path={ruta} element={<RutaProtegida rol={rol}><PanelRolPage /></RutaProtegida>} />
         ))}
