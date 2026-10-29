@@ -15,6 +15,8 @@ import java.time.Instant;
 @Table(name = "usuario")
 public class Usuario {
 
+    public static final String NOMBRE_ELIMINADO = "Usuario eliminado";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -97,6 +99,35 @@ public class Usuario {
             throw new IllegalStateException("Solo una cuenta desactivada se puede reactivar");
         }
         this.estado = EstadoCuenta.ACTIVA;
+    }
+
+    /** ACTIVA a DESACTIVADA, por decisión de su dueño. */
+    public void desactivar() {
+        if (estado != EstadoCuenta.ACTIVA) {
+            throw new IllegalStateException("Solo una cuenta activa se puede desactivar");
+        }
+        this.estado = EstadoCuenta.DESACTIVADA;
+    }
+
+    /**
+     * ACTIVA a ELIMINADA (terminal): anonimiza la fila en lugar de borrarla. El hash inservible lo
+     * genera quien llama, para que el modelo no dependa de la infraestructura de contraseñas.
+     */
+    public void eliminar(String hashInservible) {
+        if (estado != EstadoCuenta.ACTIVA) {
+            throw new IllegalStateException("Solo una cuenta activa se puede eliminar");
+        }
+        if (id == null) {
+            throw new IllegalStateException("Una cuenta sin id no se puede anonimizar");
+        }
+        if (hashInservible == null || hashInservible.isBlank()) {
+            throw new IllegalArgumentException("El hash inservible es obligatorio");
+        }
+        this.nombre = NOMBRE_ELIMINADO;
+        this.correo = "eliminada-" + id + "@eliminada.invalid";
+        this.contrasenaHash = hashInservible;
+        this.motivoRestriccion = null;
+        this.estado = EstadoCuenta.ELIMINADA;
     }
 
     public Long getId() {

@@ -9,7 +9,6 @@ import co.edu.unbosque.marketplace.identidad.exceptions.CredencialesInvalidasExc
 import co.edu.unbosque.marketplace.identidad.exceptions.CuentaDesactivadaException;
 import co.edu.unbosque.marketplace.identidad.exceptions.CuentaRestringidaException;
 import co.edu.unbosque.marketplace.identidad.exceptions.CuentaYaActivaException;
-import co.edu.unbosque.marketplace.identidad.model.EstadoCuenta;
 import co.edu.unbosque.marketplace.identidad.model.Usuario;
 import co.edu.unbosque.marketplace.identidad.repository.UsuarioRepository;
 import java.time.Instant;
@@ -77,12 +76,27 @@ public class AutenticacionService {
         return encontrado.get();
     }
 
+    // Exhaustivo a propósito: un estado nuevo no compila hasta que se decida qué responderle.
     private NegocioException rechazarPorEstado(Usuario usuario, String operacion) {
-        boolean restringida = usuario.getEstado() == EstadoCuenta.RESTRINGIDA;
-        auditarFallo(usuario, operacion, restringida ? "cuenta_restringida" : "cuenta_desactivada");
-        return restringida
-                ? new CuentaRestringidaException(usuario.getMotivoRestriccion())
-                : new CuentaDesactivadaException();
+        return switch (usuario.getEstado()) {
+            case RESTRINGIDA -> {
+                auditarFallo(usuario, operacion, "cuenta_restringida");
+                yield new CuentaRestringidaException(usuario.getMotivoRestriccion());
+            }
+            case DESACTIVADA -> {
+                auditarFallo(usuario, operacion, "cuenta_desactivada");
+                yield new CuentaDesactivadaException();
+            }
+            // Al cliente le responde igual que un correo inexistente; solo la auditoría sabe quién fue.
+            case ELIMINADA -> {
+                auditarFallo(usuario, operacion, "cuenta_eliminada");
+                yield new CredencialesInvalidasException();
+            }
+            case ACTIVA -> {
+                auditarFallo(usuario, operacion, "cuenta_activa");
+                yield new CuentaYaActivaException();
+            }
+        };
     }
 
     private void auditarFallo(Usuario usuario, String operacion, String motivo) {
@@ -98,13 +112,8 @@ public class AutenticacionService {
     @Transactional
     public SesionIniciada reactivarCuenta(String correo, String contrasena) {
         Usuario usuario = verificarCredenciales(correo, contrasena, REACTIVAR);
-        // Sin default: un estado nuevo no compila hasta que se decida qué hacer con él.
         Usuario reactivada = switch (usuario.getEstado()) {
-            case RESTRINGIDA -> throw rechazarPorEstado(usuario, REACTIVAR);
-            case ACTIVA -> {
-                auditarFallo(usuario, REACTIVAR, "cuenta_activa");
-                throw new CuentaYaActivaException();
-            }
+            case RESTRINGIDA, ACTIVA, ELIMINADA -> throw rechazarPorEstado(usuario, REACTIVAR);
             case DESACTIVADA -> {
                 usuario.reactivar();
                 usuarios.save(usuario);

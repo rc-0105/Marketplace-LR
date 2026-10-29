@@ -55,4 +55,17 @@ describe('Encabezado', () => {
     terminar();
     await waitFor(() => expect(boton).toBeEnabled());
   });
+
+  it('con sesión ofrece el enlace a Mi cuenta', () => {
+    iniciar();
+    renderizar(vi.fn());
+
+    expect(screen.getByRole('link', { name: 'Mi cuenta' })).toHaveAttribute('href', '/mi-cuenta');
+  });
+
+  it('sin sesión no ofrece el enlace a Mi cuenta', () => {
+    renderizar(vi.fn());
+
+    expect(screen.queryByRole('link', { name: 'Mi cuenta' })).not.toBeInTheDocument();
+  });
 });

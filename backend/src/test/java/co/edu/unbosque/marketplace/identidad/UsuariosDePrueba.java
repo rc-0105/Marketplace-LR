@@ -19,6 +19,10 @@ public final class UsuariosDePrueba {
         return conEstado(id, EstadoCuenta.DESACTIVADA, null);
     }
 
+    public static Usuario eliminada(Long id) {
+        return conEstado(id, EstadoCuenta.ELIMINADA, null);
+    }
+
     public static Usuario restringida(Long id, String motivo) {
         return conEstado(id, EstadoCuenta.RESTRINGIDA, motivo);
     }
