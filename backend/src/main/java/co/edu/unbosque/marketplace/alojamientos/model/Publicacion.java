@@ -76,12 +76,39 @@ public class Publicacion {
 	@Column(name = "creado_en", nullable = false, updatable = false)
 	private Instant creadoEn;
 
+	@Column(name = "editado_por")
+	private Long editadoPor;
+
+	@Column(name = "editado_en")
+	private Instant editadoEn;
+
 	protected Publicacion() {
 		// Requerido por JPA.
 	}
 
 	private Publicacion(Long anfitrionId, DatosBorrador datos) {
 		this.anfitrionId = anfitrionId;
+		aplicar(datos);
+		this.estado = EstadoPublicacion.BORRADOR;
+		this.creadoEn = Instant.now();
+	}
+
+	/** Toda publicación nueva nace en BORRADOR, sin importar qué datos traiga. */
+	public static Publicacion borrador(Long anfitrionId, DatosBorrador datos) {
+		return new Publicacion(anfitrionId, datos);
+	}
+
+	/**
+	 * Reemplaza todos los datos editables (RF-13) y registra quién editó y cuándo.
+	 * El dueño, el estado y la fecha de creación no cambian.
+	 */
+	public void editar(DatosBorrador datos, Long editorId) {
+		aplicar(datos);
+		this.editadoPor = editorId;
+		this.editadoEn = Instant.now();
+	}
+
+	private void aplicar(DatosBorrador datos) {
 		this.titulo = datos.titulo();
 		this.descripcion = datos.descripcion();
 		this.ciudad = datos.ciudad();
@@ -90,15 +117,10 @@ public class Publicacion {
 		this.capacidad = datos.capacidad();
 		this.precioNoche = datos.precioNoche();
 		this.reglas = datos.reglas();
+		this.servicios.clear();
 		this.servicios.addAll(datos.servicios());
+		this.imagenes.clear();
 		this.imagenes.addAll(datos.imagenes());
-		this.estado = EstadoPublicacion.BORRADOR;
-		this.creadoEn = Instant.now();
-	}
-
-	/** Toda publicación nueva nace en BORRADOR, sin importar qué datos traiga. */
-	public static Publicacion borrador(Long anfitrionId, DatosBorrador datos) {
-		return new Publicacion(anfitrionId, datos);
 	}
 
 	/**
@@ -183,5 +205,13 @@ public class Publicacion {
 
 	public Instant getCreadoEn() {
 		return creadoEn;
+	}
+
+	public Long getEditadoPor() {
+		return editadoPor;
+	}
+
+	public Instant getEditadoEn() {
+		return editadoEn;
 	}
 }
