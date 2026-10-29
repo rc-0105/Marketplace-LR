@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { get, post, put } from '../../../shared/services/http.js';
 import {
-  consultarPublicacion, crearPublicacion, editarPublicacion, listarMisPublicaciones, listarTiposAlojamiento,
+  actualizarImagenes, actualizarServicios, consultarPublicacion, crearPublicacion, editarPublicacion,
+  listarMisPublicaciones, listarServicios, listarTiposAlojamiento,
 } from './alojamientosService.js';
 
 vi.mock('../../../shared/services/http.js', async (importOriginal) => ({
@@ -54,5 +55,22 @@ describe('alojamientosService', () => {
 
     await expect(listarTiposAlojamiento()).resolves.toEqual([{ id: 1, nombre: 'Casa' }]);
     expect(get).toHaveBeenCalledWith('/api/v1/catalogos/tipos-alojamiento');
+  });
+
+  it('lista el catálogo de servicios', async () => {
+    vi.mocked(get).mockResolvedValue([{ id: 1, nombre: 'Wifi' }]);
+
+    await expect(listarServicios()).resolves.toEqual([{ id: 1, nombre: 'Wifi' }]);
+    expect(get).toHaveBeenCalledWith('/api/v1/catalogos/servicios');
+  });
+
+  it('reemplaza por separado los servicios y las imágenes de la publicación', async () => {
+    vi.mocked(put).mockResolvedValue({ id: 5, titulo: 'Casa', estado: 'BORRADOR' });
+
+    await expect(actualizarServicios(5, [1, 2])).resolves.toMatchObject({ id: 5 });
+    await expect(actualizarImagenes(5, ['https://imagenes.com/1.jpg'])).resolves.toMatchObject({ id: 5 });
+
+    expect(put).toHaveBeenCalledWith('/api/v1/publicaciones/5/servicios', { servicios: [1, 2] });
+    expect(put).toHaveBeenCalledWith('/api/v1/publicaciones/5/imagenes', { imagenes: ['https://imagenes.com/1.jpg'] });
   });
 });

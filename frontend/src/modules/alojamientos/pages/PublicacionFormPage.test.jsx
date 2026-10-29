@@ -3,11 +3,15 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi } from '../../../shared/services/http.js';
 import {
-  consultarPublicacion, crearPublicacion, editarPublicacion, listarTiposAlojamiento,
+  actualizarImagenes, actualizarServicios, consultarPublicacion, crearPublicacion, editarPublicacion, listarServicios,
+  listarTiposAlojamiento,
 } from '../services/alojamientosService.js';
 import PublicacionFormPage from './PublicacionFormPage.jsx';
 
 vi.mock('../services/alojamientosService.js', () => ({
+  actualizarImagenes: vi.fn(),
+  actualizarServicios: vi.fn(),
+  listarServicios: vi.fn(),
   consultarPublicacion: vi.fn(),
   crearPublicacion: vi.fn(),
   editarPublicacion: vi.fn(),
@@ -42,6 +46,7 @@ describe('PublicacionFormPage', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(listarTiposAlojamiento).mockResolvedValue(TIPOS);
+    vi.mocked(listarServicios).mockResolvedValue([{ id: 9, nombre: 'Wifi' }]);
   });
 
   it('crea el borrador con los datos escritos y lleva a editarlo', async () => {
@@ -116,6 +121,44 @@ describe('PublicacionFormPage', () => {
     expect(editarPublicacion).toHaveBeenCalledWith('5', expect.objectContaining({
       titulo: 'Casa en la playa', ciudad: 'Santa Marta', tipo: 2, precioNoche: 300000,
       servicios: [9], imagenes: ['https://imagenes.com/1.jpg'],
+    }));
+  });
+
+  it('al editar ofrece los servicios, y el PUT envía los recién guardados', async () => {
+    vi.mocked(consultarPublicacion).mockResolvedValue(EXISTENTE);
+    vi.mocked(actualizarServicios).mockResolvedValue({ ...EXISTENTE, servicios: [] });
+    vi.mocked(editarPublicacion).mockResolvedValue(EXISTENTE);
+    renderizarEn('/anfitrion/publicaciones/5/editar');
+
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Wifi' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar servicios' }));
+    await screen.findByText('Guardamos los servicios.');
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await screen.findByText('Guardamos los cambios.');
+    expect(actualizarServicios).toHaveBeenCalledWith('5', []);
+    expect(editarPublicacion).toHaveBeenCalledWith('5', expect.objectContaining({ servicios: [] }));
+  });
+
+  it('al editar ofrece los servicios y las imágenes, y el PUT envía las imágenes recién guardadas', async () => {
+    const nueva = 'https://imagenes.com/2.jpg';
+    vi.mocked(consultarPublicacion).mockResolvedValue(EXISTENTE);
+    vi.mocked(actualizarImagenes).mockResolvedValue({ ...EXISTENTE, imagenes: [nueva, 'https://imagenes.com/1.jpg'] });
+    vi.mocked(editarPublicacion).mockResolvedValue(EXISTENTE);
+    renderizarEn('/anfitrion/publicaciones/5/editar');
+
+    expect(await screen.findByRole('checkbox', { name: 'Wifi' })).toBeChecked();
+    escribir('URL de la imagen', nueva);
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar imagen' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Subir la imagen 2' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar imágenes' }));
+    await screen.findByText('Guardamos las imágenes.');
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await screen.findByText('Guardamos los cambios.');
+    expect(actualizarImagenes).toHaveBeenCalledWith('5', [nueva, 'https://imagenes.com/1.jpg']);
+    expect(editarPublicacion).toHaveBeenCalledWith('5', expect.objectContaining({
+      imagenes: [nueva, 'https://imagenes.com/1.jpg'],
     }));
   });
 
