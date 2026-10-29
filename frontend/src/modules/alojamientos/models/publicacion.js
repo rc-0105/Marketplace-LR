@@ -16,7 +16,7 @@
  */
 
 /**
- * Datos del formulario tal como los escribe el anfitrión: todo es texto.
+ * Datos del formulario tal como los escribe el anfitrión: cada campo es texto.
  * @typedef {Object} FormularioPublicacion
  * @property {string} titulo
  * @property {string} descripcion
@@ -87,13 +87,15 @@ export function formularioDesde(publicacion) {
   };
 }
 
+const SIN_SERVICIOS_NI_IMAGENES = Object.freeze({ servicios: [], imagenes: [] });
+
 /**
  * Arma el cuerpo que espera la API. Los servicios y las imágenes se envían tal
- * como están, porque el PUT reemplaza todo y lo que no llegue se borra.
+ * como están, porque el PUT reemplaza la publicación completa y lo que no llegue se borra.
  * @param {FormularioPublicacion} formulario
  * @param {{servicios: string[], imagenes: string[]}} [actuales]
  */
-export function solicitudDesde(formulario, actuales = { servicios: [], imagenes: [] }) {
+export function solicitudDesde(formulario, actuales = SIN_SERVICIOS_NI_IMAGENES) {
   const opcional = (valor) => valor.trim() || null;
   const numero = (valor) => (valor.trim() ? Number(valor.trim()) : null);
   return {

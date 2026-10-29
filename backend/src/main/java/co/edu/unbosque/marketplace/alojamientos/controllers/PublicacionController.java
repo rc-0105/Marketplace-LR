@@ -56,7 +56,7 @@ public class PublicacionController {
 				.map(PublicacionResponse::desde).toList();
 	}
 
-	/** Detalle para editarla: el PUT reemplaza todo, así que primero se cargan los datos actuales. */
+	/** Detalle para editarla: el PUT reemplaza la publicación completa, así que primero se cargan los datos actuales. */
 	@GetMapping("/{id}")
 	@PreAuthorize(Permisos.ANFITRION_O_ADMINISTRADOR)
 	public PublicacionResponse consultar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
