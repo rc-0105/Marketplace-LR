@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { nombreDeEstado } from '../models/publicacion.js';
 import { listarMisPublicaciones } from '../services/alojamientosService.js';
 import estilos from './MisPublicacionesPage.module.css';
@@ -30,7 +31,10 @@ export default function MisPublicacionesPage() {
 
   return (
     <main className={estilos.pagina}>
-      <h1 className={estilos.titulo}>Mis publicaciones</h1>
+      <div className={estilos.cabecera}>
+        <h1 className={estilos.titulo}>Mis publicaciones</h1>
+        <Link to="/anfitrion/publicaciones/nueva" className={estilos.nueva}>Nueva publicación</Link>
+      </div>
       {error && <p role="alert" className={estilos.error}>{error}</p>}
       {!error && publicaciones === null && <p className={estilos.nota}>Cargando tus publicaciones…</p>}
       {publicaciones?.length === 0 && (
@@ -46,6 +50,10 @@ export default function MisPublicacionesPage() {
                 {publicacion.ciudad && ` · ${publicacion.ciudad}`}
               </p>
               <p className={estilos.detalle}>{resumenDe(publicacion)}</p>
+              <Link to={`/anfitrion/publicaciones/${publicacion.id}/editar`} className={estilos.editar}
+                aria-label={`Editar ${publicacion.titulo}`}>
+                Editar
+              </Link>
             </li>
           ))}
         </ul>
