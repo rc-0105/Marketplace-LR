@@ -36,6 +36,16 @@ describe('MisPublicacionesPage', () => {
     expect(screen.getByText('Le faltan 2 datos para activarse.')).toBeInTheDocument();
     expect(screen.getByText('Le falta 1 dato para activarse.')).toBeInTheDocument();
     expect(screen.getByText('Tiene todos los datos para activarse.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Editar Casa en la playa' }))
+      .toHaveAttribute('href', '/anfitrion/publicaciones/1/editar');
+  });
+
+  it('ofrece crear una publicación nueva', () => {
+    vi.mocked(listarMisPublicaciones).mockReturnValue(new Promise(() => {}));
+
+    renderizar();
+
+    expect(screen.getByRole('link', { name: 'Nueva publicación' })).toHaveAttribute('href', '/anfitrion/publicaciones/nueva');
   });
 
   it('avisa mientras carga', () => {
