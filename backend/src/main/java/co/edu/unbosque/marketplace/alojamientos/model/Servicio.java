@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.util.Objects;
 
 /**
  * Servicio del catálogo (wifi, piscina...). Las publicaciones lo eligen del
@@ -36,5 +37,22 @@ public class Servicio {
 
 	public String getNombre() {
 		return nombre;
+	}
+
+	// Igualdad por nombre, que es único: Publicacion compara sus servicios con
+	// retainAll, y así funciona también con instancias que no salen del mismo
+	// contexto de persistencia. Se usan los getters porque el otro puede ser un
+	// proxy de Hibernate, cuyos campos están vacíos.
+	@Override
+	public boolean equals(Object otro) {
+		if (this == otro) {
+			return true;
+		}
+		return otro instanceof Servicio servicio && Objects.equals(getNombre(), servicio.getNombre());
+	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hashCode(getNombre());
 	}
 }

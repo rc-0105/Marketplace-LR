@@ -10,21 +10,36 @@ CREATE TABLE servicio (
     nombre VARCHAR(60) NOT NULL UNIQUE
 );
 
+-- "Wifi" y "wifi" son el mismo servicio: el catálogo no admite dos que solo
+-- cambien en mayúsculas.
+CREATE UNIQUE INDEX uq_servicio_nombre_sin_mayusculas ON servicio (lower(nombre));
+
 INSERT INTO servicio (nombre) VALUES
     ('Wifi'), ('Cocina'), ('Parqueadero'), ('Piscina'), ('Aire acondicionado'),
     ('Calefacción'), ('Lavadora'), ('Televisión'), ('Zona de trabajo'), ('Se admiten mascotas');
 
--- Los servicios que ya se escribieron como texto entran al catálogo para no perderlos.
+-- Los servicios que ya se escribieron como texto entran al catálogo para no
+-- perderlos, uno por nombre sin importar mayúsculas ni espacios.
 INSERT INTO servicio (nombre)
-SELECT DISTINCT servicio FROM publicacion_servicio
-ON CONFLICT (nombre) DO NOTHING;
+SELECT DISTINCT ON (lower(trim(ps.servicio))) trim(ps.servicio)
+FROM publicacion_servicio ps
+WHERE NOT EXISTS (SELECT 1 FROM servicio s WHERE lower(s.nombre) = lower(trim(ps.servicio)))
+ORDER BY lower(trim(ps.servicio)), ps.servicio;
 
 ALTER TABLE publicacion_servicio ADD COLUMN servicio_id BIGINT REFERENCES servicio (id);
 
 UPDATE publicacion_servicio ps
 SET servicio_id = s.id
 FROM servicio s
-WHERE s.nombre = ps.servicio;
+WHERE lower(s.nombre) = lower(trim(ps.servicio));
+
+-- Si una publicación tenía "wifi" y "Wifi", ahora apuntan al mismo servicio:
+-- queda una sola fila.
+DELETE FROM publicacion_servicio a
+USING publicacion_servicio b
+WHERE a.publicacion_id = b.publicacion_id
+  AND a.servicio_id = b.servicio_id
+  AND a.ctid > b.ctid;
 
 ALTER TABLE publicacion_servicio DROP CONSTRAINT publicacion_servicio_pkey;
 ALTER TABLE publicacion_servicio DROP COLUMN servicio;

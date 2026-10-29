@@ -72,7 +72,7 @@ public class PublicacionController {
 
 	/** Reemplaza solo los servicios por los ids del catálogo enviados (RF-18). */
 	@PutMapping("/{id}/servicios")
-	@PreAuthorize(ANFITRION_O_ADMINISTRADOR)
+	@PreAuthorize(Permisos.ANFITRION_O_ADMINISTRADOR)
 	public PublicacionResponse actualizarServicios(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
 			@Valid @RequestBody ActualizarServiciosRequest data) {
 		Publicacion editada = publicacionService.actualizarServicios(id, usuarioDe(jwt), esAdministrador(jwt),
@@ -82,7 +82,7 @@ public class PublicacionController {
 
 	/** Reemplaza solo las imágenes, en el orden enviado: la primera es la principal (RF-19). */
 	@PutMapping("/{id}/imagenes")
-	@PreAuthorize(ANFITRION_O_ADMINISTRADOR)
+	@PreAuthorize(Permisos.ANFITRION_O_ADMINISTRADOR)
 	public PublicacionResponse actualizarImagenes(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
 			@Valid @RequestBody ActualizarImagenesRequest data) {
 		Publicacion editada = publicacionService.actualizarImagenes(id, usuarioDe(jwt), esAdministrador(jwt),
