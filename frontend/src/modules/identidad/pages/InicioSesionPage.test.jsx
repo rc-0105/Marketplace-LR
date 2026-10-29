@@ -45,6 +45,16 @@ describe('InicioSesionPage', () => {
     expect(screen.queryByText('Tu cuenta quedó creada. Ya puedes iniciar sesión.')).not.toBeInTheDocument();
   });
 
+  it('confirma la contraseña restablecida cuando viene de la recuperación', () => {
+    renderizar({ contrasenaRestablecida: true });
+    expect(screen.getByRole('status')).toHaveTextContent('Tu contraseña quedó actualizada. Inicia sesión con la nueva.');
+  });
+
+  it('ofrece recuperar la contraseña', () => {
+    renderizar(undefined);
+    expect(screen.getByRole('link', { name: '¿Olvidaste tu contraseña?' })).toHaveAttribute('href', '/recuperar-contrasena');
+  });
+
   it('no muestra la confirmación si se entra directo', () => {
     renderizar(undefined);
     expect(screen.getByRole('heading', { name: 'Inicia sesión' })).toBeInTheDocument();

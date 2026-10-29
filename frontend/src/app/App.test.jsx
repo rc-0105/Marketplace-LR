@@ -83,7 +83,7 @@ describe('App', () => {
     expect(screen.getByText('Ingresaste como Huésped.')).toBeInTheDocument();
   });
 
-  it.each(['/inicio-sesion', '/registro'])('con sesión %s lleva al panel del rol', (ruta) => {
+  it.each(['/inicio-sesion', '/registro', '/recuperar-contrasena'])('con sesión %s lleva al panel del rol', (ruta) => {
     iniciar('ANFITRION');
     renderizarEn(ruta);
     expect(screen.getByText('Ingresaste como Anfitrión.')).toBeInTheDocument();

@@ -29,7 +29,11 @@ public class ConfiguracionSeguridad {
     private static final String RUTA_REGISTRO = "/api/v1/auth/registro";
     private static final String RUTA_LOGIN = "/api/v1/auth/login";
     private static final String RUTA_REACTIVAR = "/api/v1/perfil/reactivar";
-    private static final Set<String> RUTAS_DE_ACCESO = Set.of(RUTA_LOGIN, RUTA_REGISTRO, RUTA_REACTIVAR);
+    private static final String RUTA_RECUPERACION = "/api/v1/auth/recuperacion";
+    private static final String RUTA_CONFIRMAR_RECUPERACION = "/api/v1/auth/recuperacion/confirmar";
+    // Rutas de quien aún no tiene sesión: públicas y sin leer el Bearer.
+    private static final Set<String> RUTAS_DE_ACCESO = Set.of(RUTA_LOGIN, RUTA_REGISTRO, RUTA_REACTIVAR,
+            RUTA_RECUPERACION, RUTA_CONFIRMAR_RECUPERACION);
 
     @Bean
     public SecurityFilterChain cadena(HttpSecurity http, ManejadorFallosSeguridad fallos,
@@ -48,7 +52,7 @@ public class ConfiguracionSeguridad {
                 .authorizeHttpRequests(rutas -> rutas
                         // Los errores internos que Boot reenvía a /error no se bloquean.
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                        .requestMatchers(HttpMethod.POST, RUTA_REGISTRO, RUTA_LOGIN, RUTA_REACTIVAR).permitAll()
+                        .requestMatchers(HttpMethod.POST, RUTAS_DE_ACCESO.toArray(String[]::new)).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/estado", "/actuator/health",
                                 "/actuator/health/**", "/actuator/info", "/v3/api-docs/**",
                                 "/swagger-ui/**", "/swagger-ui.html").permitAll()
@@ -77,7 +81,7 @@ public class ConfiguracionSeguridad {
     }
 
     /**
-     * Registro, login y reactivación ignoran el Bearer: un token vencido que el cliente aún
+     * Registro, login, reactivación y recuperación ignoran el Bearer: un token vencido que el cliente aún
      * guarda no debe impedirle volver a entrar (D7).
      */
     @Bean

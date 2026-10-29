@@ -1,0 +1,15 @@
+Inversiones LR · Marketplace de alojamientos
+
+RESTABLECE TU CONTRASEÑA
+
+Recibimos una solicitud para restablecer la contraseña de tu cuenta. Escribe este código en la pantalla de recuperación para definir una contraseña nueva.
+
+    Tu código de verificación: {{codigo}}
+
+El código vence hoy a las {{hora}} (hora de Colombia) y solo sirve una vez.
+
+¿No fuiste tú? Ignora este correo: tu contraseña sigue igual. Nunca compartas este código; nadie de Inversiones LR te lo va a pedir.
+
+--
+Este es un mensaje automático; las respuestas a este correo no se leen.
+© {{anio}} Inversiones LR

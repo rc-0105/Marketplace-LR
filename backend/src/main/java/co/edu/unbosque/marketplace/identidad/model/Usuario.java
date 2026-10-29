@@ -67,6 +67,11 @@ public class Usuario {
         return estado == EstadoCuenta.ACTIVA;
     }
 
+    /** Recibe el hash ya calculado: la entidad nunca ve la contraseña en claro. */
+    public void cambiarContrasena(String nuevoHash) {
+        this.contrasenaHash = nuevoHash;
+    }
+
     /** ACTIVA a RESTRINGIDA. El motivo es obligatorio y se guarda sin espacios sobrantes. */
     public void restringir(String motivo) {
         if (estado != EstadoCuenta.ACTIVA) {
