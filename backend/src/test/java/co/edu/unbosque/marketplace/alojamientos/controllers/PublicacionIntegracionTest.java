@@ -638,6 +638,179 @@ class PublicacionIntegracionTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    @DisplayName("El catálogo de políticas de cancelación lista las tres, de la más flexible a la más estricta")
+    void catalogoDePoliticasDeCancelacion() throws Exception {
+        mvc.perform(get("/api/v1/catalogos/politicas-cancelacion")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + iniciarSesion("ana@correo.com")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[0].nombre").value("Flexible"))
+                .andExpect(jsonPath("$[0].diasSinCosto").value(1))
+                .andExpect(jsonPath("$[0].porcentajeDevolucion").value(50))
+                .andExpect(jsonPath("$[1].nombre").value("Moderada"))
+                .andExpect(jsonPath("$[1].diasSinCosto").value(5))
+                .andExpect(jsonPath("$[1].porcentajeDevolucion").value(50))
+                .andExpect(jsonPath("$[2].nombre").value("Estricta"))
+                .andExpect(jsonPath("$[2].diasSinCosto").value(14))
+                .andExpect(jsonPath("$[2].porcentajeDevolucion").value(0));
+    }
+
+    @Test
+    @DisplayName("Una publicación nueva acepta reserva inmediata y no tiene tarifa, política ni servicios adicionales")
+    void publicacionNuevaAceptaReservaInmediata() throws Exception {
+        String token = iniciarSesion("luis@correo.com");
+
+        consultar(token, idCreado(token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modoReserva").value("INMEDIATA"))
+                .andExpect(jsonPath("$.tarifaLimpieza").doesNotExist())
+                .andExpect(jsonPath("$.politicaCancelacion").doesNotExist())
+                .andExpect(jsonPath("$.serviciosAdicionales.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("PUT de configuración guarda tarifa, modo, política y servicios adicionales, y se ven en el detalle")
+    void putConfiguracionQuedaEnElDetalle() throws Exception {
+        String token = iniciarSesion("luis@correo.com");
+        Long id = idCreado(token);
+
+        configurar(token, id, """
+                {"tarifaLimpieza": 40000, "modoReserva": "APROBACION", "politicaCancelacion": %d,
+                 "serviciosAdicionales": [{"nombre": "Desayuno", "costo": 15000},
+                                          {"nombre": "Traslado", "costo": 60000}]}
+                """.formatted(idPolitica("Moderada")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.editadoPor").value(anfitrion.getId().intValue()));
+
+        consultar(token, id)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tarifaLimpieza").value(40000))
+                .andExpect(jsonPath("$.modoReserva").value("APROBACION"))
+                .andExpect(jsonPath("$.politicaCancelacion.nombre").value("Moderada"))
+                .andExpect(jsonPath("$.politicaCancelacion.diasSinCosto").value(5))
+                .andExpect(jsonPath("$.politicaCancelacion.porcentajeDevolucion").value(50))
+                .andExpect(jsonPath("$.serviciosAdicionales.length()").value(2))
+                .andExpect(jsonPath("$.serviciosAdicionales[0].nombre").value("Desayuno"))
+                .andExpect(jsonPath("$.serviciosAdicionales[0].costo").value(15000))
+                .andExpect(jsonPath("$.serviciosAdicionales[0].id").isNumber())
+                .andExpect(jsonPath("$.serviciosAdicionales[1].nombre").value("Traslado"))
+                .andExpect(jsonPath("$.titulo").value("Casa en la playa"))
+                .andExpect(jsonPath("$.tipo.nombre").value("Casa"));
+        assertThat(jdbc.queryForObject("SELECT modo_reserva FROM publicacion WHERE id = ?", String.class, id))
+                .isEqualTo("APROBACION");
+    }
+
+    @Test
+    @DisplayName("Al reconfigurar, el servicio adicional que sigue conserva su id y el que no viene se borra")
+    void reconfigurarConservaElIdDelServicioAdicional() throws Exception {
+        String token = iniciarSesion("luis@correo.com");
+        Long id = idCreado(token);
+        configurar(token, id, """
+                {"serviciosAdicionales": [{"nombre": "Desayuno", "costo": 15000},
+                                          {"nombre": "Traslado", "costo": 60000}]}
+                """).andExpect(status().isOk());
+        Long desayuno = idServicioAdicional(id, "Desayuno");
+
+        configurar(token, id, """
+                {"serviciosAdicionales": [{"nombre": "Desayuno", "costo": 18000}]}
+                """)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.serviciosAdicionales.length()").value(1))
+                .andExpect(jsonPath("$.serviciosAdicionales[0].id").value(desayuno.intValue()))
+                .andExpect(jsonPath("$.serviciosAdicionales[0].costo").value(18000))
+                .andExpect(jsonPath("$.modoReserva").value("INMEDIATA"));
+        assertThat(jdbc.queryForList("SELECT id FROM servicio_adicional WHERE publicacion_id = ?", Long.class, id))
+                .containsExactly(desayuno);
+    }
+
+    @Test
+    @DisplayName("Editar la publicación completa no cambia su configuración")
+    void editarNoCambiaLaConfiguracion() throws Exception {
+        String token = iniciarSesion("luis@correo.com");
+        Long id = idCreado(token);
+        configurar(token, id, """
+                {"tarifaLimpieza": 40000, "modoReserva": "APROBACION", "politicaCancelacion": %d,
+                 "serviciosAdicionales": [{"nombre": "Desayuno", "costo": 15000}]}
+                """.formatted(idPolitica("Estricta"))).andExpect(status().isOk());
+
+        editar(token, id, """
+                {"titulo": "Casa renovada"}
+                """)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.titulo").value("Casa renovada"))
+                .andExpect(jsonPath("$.tarifaLimpieza").value(40000))
+                .andExpect(jsonPath("$.modoReserva").value("APROBACION"))
+                .andExpect(jsonPath("$.politicaCancelacion.nombre").value("Estricta"))
+                .andExpect(jsonPath("$.serviciosAdicionales[0].nombre").value("Desayuno"));
+    }
+
+    @Test
+    @DisplayName("PUT de configuración de otro anfitrión o de un huésped responde 403 y no cambia nada")
+    void putConfiguracionRechazaAjenoYHuesped() throws Exception {
+        Long id = idCreado(iniciarSesion("luis@correo.com"));
+        usuarios.save(Usuario.nuevo("Marta Ruiz", "marta@correo.com", codificador.encode(CONTRASENA),
+                Rol.ANFITRION));
+        String cuerpo = """
+                {"modoReserva": "APROBACION"}
+                """;
+
+        configurar(iniciarSesion("marta@correo.com"), id, cuerpo).andExpect(status().isForbidden());
+        configurar(iniciarSesion("ana@correo.com"), id, cuerpo).andExpect(status().isForbidden());
+
+        assertThat(jdbc.queryForObject("SELECT modo_reserva FROM publicacion WHERE id = ?", String.class, id))
+                .isEqualTo("INMEDIATA");
+    }
+
+    @Test
+    @DisplayName("PUT de configuración rechaza con 400 datos inválidos y una política fuera del catálogo")
+    void putConfiguracionRechazaDatosInvalidos() throws Exception {
+        String token = iniciarSesion("luis@correo.com");
+        Long id = idCreado(token);
+
+        configurar(token, id, "{\"tarifaLimpieza\": -1}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errores.tarifaLimpieza").value("La tarifa de limpieza no puede ser negativa."));
+        configurar(token, id, "{\"modoReserva\": \"MANUAL\"}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errores.modoReserva").value("El modo de reserva debe ser INMEDIATA o APROBACION."));
+        configurar(token, id, "{\"serviciosAdicionales\": [{\"nombre\": \"Desayuno\", \"costo\": 0}]}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errores['serviciosAdicionales[0].costo']")
+                        .value("El costo del servicio adicional debe ser mayor que cero."));
+        configurar(token, id, "{\"serviciosAdicionales\": [{\"nombre\": \" \", \"costo\": 1000}]}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errores['serviciosAdicionales[0].nombre']")
+                        .value("El nombre del servicio adicional es obligatorio."));
+        configurar(token, id, "{\"politicaCancelacion\": 999999}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("La política de cancelación no existe en el catálogo."));
+        configurar(token, id, """
+                {"serviciosAdicionales": [{"nombre": "Desayuno", "costo": 1000}, {"nombre": "desayuno", "costo": 2000}]}
+                """)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("Hay servicios adicionales con el mismo nombre."));
+
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM servicio_adicional WHERE publicacion_id = ?",
+                Long.class, id)).isZero();
+    }
+
+    private ResultActions configurar(String token, Long id, String cuerpo) throws Exception {
+        return mvc.perform(put(RUTA + "/" + id + "/configuracion")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(cuerpo));
+    }
+
+    private Long idPolitica(String nombre) {
+        return jdbc.queryForObject("SELECT id FROM politica_cancelacion WHERE nombre = ?", Long.class, nombre);
+    }
+
+    private Long idServicioAdicional(Long publicacionId, String nombre) {
+        return jdbc.queryForObject("SELECT id FROM servicio_adicional WHERE publicacion_id = ? AND nombre = ?",
+                Long.class, publicacionId, nombre);
+    }
+
     private List<Long> idsDeServicios(Long publicacionId) {
         return jdbc.queryForList("SELECT id FROM publicacion_servicio WHERE publicacion_id = ? ORDER BY id",
                 Long.class, publicacionId);

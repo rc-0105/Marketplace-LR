@@ -5,6 +5,24 @@
  */
 
 /**
+ * Política de cancelación del catálogo: con al menos `diasSinCosto` días de
+ * anticipación se devuelve el 100 %; después, `porcentajeDevolucion`.
+ * @typedef {Object} PoliticaCancelacion
+ * @property {number} id
+ * @property {string} nombre
+ * @property {string} descripcion
+ * @property {number} diasSinCosto
+ * @property {number} porcentajeDevolucion
+ */
+
+/**
+ * @typedef {Object} ServicioAdicional
+ * @property {number} [id] lo asigna la API al guardarlo
+ * @property {string} nombre
+ * @property {number} costo
+ */
+
+/**
  * @typedef {Object} Publicacion
  * @property {number} id
  * @property {string} titulo
@@ -17,6 +35,10 @@
  * @property {OpcionCatalogo[]} servicios
  * @property {string | null} reglas
  * @property {string[]} imagenes en orden; la primera es la principal
+ * @property {number | null} tarifaLimpieza
+ * @property {'INMEDIATA' | 'APROBACION'} modoReserva
+ * @property {PoliticaCancelacion | null} politicaCancelacion
+ * @property {ServicioAdicional[]} serviciosAdicionales
  * @property {string} estado
  * @property {string[]} camposFaltantes lo que la API dice que falta para activarla
  */
@@ -135,6 +157,78 @@ export function errorDeImagen(url, actuales) {
   }
 }
 
+/**
+ * Condiciones de reserva tal como las edita el anfitrión: la tarifa y la
+ * política son texto, y los servicios adicionales ya pasaron la validación.
+ * @typedef {Object} FormularioConfiguracion
+ * @property {string} tarifaLimpieza
+ * @property {'INMEDIATA' | 'APROBACION'} modoReserva
+ * @property {string} politica id del catálogo, o vacío
+ * @property {ServicioAdicional[]} serviciosAdicionales
+ */
+
+/**
+ * @param {Publicacion} publicacion
+ * @returns {FormularioConfiguracion}
+ */
+export function configuracionDesde(publicacion) {
+  return {
+    tarifaLimpieza: publicacion.tarifaLimpieza === null ? '' : String(publicacion.tarifaLimpieza),
+    modoReserva: publicacion.modoReserva,
+    politica: publicacion.politicaCancelacion === null ? '' : String(publicacion.politicaCancelacion.id),
+    serviciosAdicionales: publicacion.serviciosAdicionales.map(({ nombre, costo }) => ({ nombre, costo })),
+  };
+}
+
+/**
+ * Mismo formato que exige la API: cero o más, con máximo 2 decimales. Vacía es válida.
+ * @param {string} tarifa
+ * @returns {string | undefined} mensaje de error, o nada si sirve
+ */
+export function errorDeTarifa(tarifa) {
+  const limpia = tarifa.trim();
+  return limpia && !PRECIO_VALIDO.test(limpia)
+    ? 'La tarifa de limpieza debe ser cero o más, con máximo 2 decimales.'
+    : undefined;
+}
+
+/**
+ * Valida el formato de un servicio adicional antes de agregarlo a la lista.
+ * Si el nombre ya existe lo decide la API.
+ * @param {string} nombre
+ * @param {string} costo
+ * @returns {{nombre?: string, costo?: string}} errores por campo; vacío si se puede agregar
+ */
+export function erroresDeServicioAdicional(nombre, costo) {
+  const errores = {};
+  const nombreLimpio = nombre.trim();
+  if (!nombreLimpio) {
+    errores.nombre = 'Escribe el nombre del servicio adicional.';
+  } else if (nombreLimpio.length > 80) {
+    errores.nombre = 'El nombre admite máximo 80 caracteres.';
+  }
+  const costoLimpio = costo.trim();
+  if (!PRECIO_VALIDO.test(costoLimpio) || Number(costoLimpio) <= 0) {
+    errores.costo = 'El costo debe ser mayor que cero, con máximo 2 decimales.';
+  }
+  return errores;
+}
+
+/**
+ * Arma el cuerpo que espera la API. El PUT reemplaza todas las condiciones, así
+ * que lo vacío se envía como nulo.
+ * @param {FormularioConfiguracion} configuracion
+ */
+export function solicitudConfiguracionDesde(configuracion) {
+  const tarifa = configuracion.tarifaLimpieza.trim();
+  return {
+    tarifaLimpieza: tarifa ? Number(tarifa) : null,
+    modoReserva: configuracion.modoReserva,
+    politicaCancelacion: configuracion.politica ? Number(configuracion.politica) : null,
+    serviciosAdicionales: configuracion.serviciosAdicionales,
+  };
+}
+
 const NOMBRE_ESTADO = {
   BORRADOR: 'Borrador',
 };
@@ -164,6 +258,10 @@ export function publicacionDesdeApi(respuesta) {
     servicios: respuesta.servicios ?? [],
     reglas: respuesta.reglas ?? null,
     imagenes: respuesta.imagenes ?? [],
+    tarifaLimpieza: respuesta.tarifaLimpieza ?? null,
+    modoReserva: respuesta.modoReserva ?? 'INMEDIATA',
+    politicaCancelacion: respuesta.politicaCancelacion ?? null,
+    serviciosAdicionales: respuesta.serviciosAdicionales ?? [],
     estado: respuesta.estado,
     camposFaltantes: respuesta.camposFaltantes ?? [],
   };

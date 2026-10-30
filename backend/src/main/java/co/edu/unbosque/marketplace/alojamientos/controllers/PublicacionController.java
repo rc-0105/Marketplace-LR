@@ -1,5 +1,6 @@
 package co.edu.unbosque.marketplace.alojamientos.controllers;
 
+import co.edu.unbosque.marketplace.alojamientos.controllers.dto.ActualizarConfiguracionRequest;
 import co.edu.unbosque.marketplace.alojamientos.controllers.dto.ActualizarImagenesRequest;
 import co.edu.unbosque.marketplace.alojamientos.controllers.dto.ActualizarServiciosRequest;
 import co.edu.unbosque.marketplace.alojamientos.controllers.dto.CrearPublicacionRequest;
@@ -96,6 +97,19 @@ public class PublicacionController {
 			@Valid @RequestBody ActualizarImagenesRequest data) {
 		Publicacion editada = publicacionService.actualizarImagenes(id, usuarioDe(jwt), esAdministrador(jwt),
 				data.imagenes());
+		return PublicacionResponse.desde(editada);
+	}
+
+	/**
+	 * Reemplaza solo las condiciones comerciales: tarifa de limpieza, modo de
+	 * reserva, política de cancelación y servicios adicionales (RF-20, RF-21, RF-22).
+	 */
+	@PutMapping("/{id}/configuracion")
+	@PreAuthorize(Permisos.ANFITRION_O_ADMINISTRADOR)
+	public PublicacionResponse actualizarConfiguracion(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
+			@Valid @RequestBody ActualizarConfiguracionRequest data) {
+		Publicacion editada = publicacionService.actualizarConfiguracion(id, usuarioDe(jwt), esAdministrador(jwt),
+				data.aSolicitud());
 		return PublicacionResponse.desde(editada);
 	}
 

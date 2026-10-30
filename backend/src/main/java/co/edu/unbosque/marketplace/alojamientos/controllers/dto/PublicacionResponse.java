@@ -23,6 +23,10 @@ public record PublicacionResponse(
         List<ServicioResponse> servicios,
         String reglas,
         List<String> imagenes,
+        BigDecimal tarifaLimpieza,
+        String modoReserva,
+        PoliticaCancelacionResponse politicaCancelacion,
+        List<ServicioAdicionalResponse> serviciosAdicionales,
         String estado,
         Instant creadoEn,
         Long editadoPor,
@@ -43,6 +47,12 @@ public record PublicacionResponse(
                 publicacion.getServicios().stream().map(ServicioResponse::desde).toList(),
                 publicacion.getReglas(),
                 publicacion.getImagenes(),
+                publicacion.getTarifaLimpieza(),
+                publicacion.getModoReserva().name(),
+                publicacion.getPoliticaCancelacion() == null
+                        ? null
+                        : PoliticaCancelacionResponse.desde(publicacion.getPoliticaCancelacion()),
+                publicacion.getServiciosAdicionales().stream().map(ServicioAdicionalResponse::desde).toList(),
                 publicacion.getEstado().name(),
                 publicacion.getCreadoEn(),
                 publicacion.getEditadoPor(),

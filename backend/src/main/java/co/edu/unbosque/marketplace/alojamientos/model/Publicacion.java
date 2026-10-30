@@ -22,6 +22,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -77,6 +78,21 @@ public class Publicacion {
 	@OrderBy("posicion")
 	private Set<ImagenPublicacion> imagenes = new LinkedHashSet<>();
 
+	@Column(name = "tarifa_limpieza", precision = 12, scale = 2)
+	private BigDecimal tarifaLimpieza;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "modo_reserva", nullable = false, length = 20)
+	private ModoReserva modoReserva = ModoReserva.INMEDIATA;
+
+	@ManyToOne
+	@JoinColumn(name = "politica_id")
+	private PoliticaCancelacion politica;
+
+	@OneToMany(mappedBy = "publicacion", cascade = CascadeType.ALL, orphanRemoval = true)
+	@OrderBy("nombre")
+	private Set<ServicioAdicional> serviciosAdicionales = new LinkedHashSet<>();
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
 	private EstadoPublicacion estado;
@@ -125,6 +141,37 @@ public class Publicacion {
 	public void cambiarImagenes(List<String> urls, Long editorId) {
 		reemplazarImagenes(urls);
 		registrarEdicion(editorId);
+	}
+
+	public void configurar(CondicionesReserva condiciones, Long editorId) {
+		this.tarifaLimpieza = condiciones.tarifaLimpieza();
+		this.modoReserva = condiciones.modoReserva();
+		this.politica = condiciones.politica();
+		reemplazarServiciosAdicionales(condiciones.serviciosAdicionales());
+		registrarEdicion(editorId);
+	}
+
+	private void reemplazarServiciosAdicionales(List<CondicionesReserva.Adicional> nuevos) {
+		Map<String, ServicioAdicional> actuales = new HashMap<>();
+		for (ServicioAdicional adicional : serviciosAdicionales) {
+			actuales.put(clave(adicional.getNombre()), adicional);
+		}
+		List<ServicioAdicional> resultado = new ArrayList<>();
+		for (CondicionesReserva.Adicional nuevo : nuevos) {
+			ServicioAdicional adicional = actuales.remove(clave(nuevo.nombre()));
+			if (adicional == null) {
+				adicional = new ServicioAdicional(this, nuevo.nombre(), nuevo.costo());
+			} else {
+				adicional.actualizar(nuevo.nombre(), nuevo.costo());
+			}
+			resultado.add(adicional);
+		}
+		serviciosAdicionales.clear();
+		serviciosAdicionales.addAll(resultado);
+	}
+
+	private static String clave(String nombre) {
+		return nombre.toLowerCase(Locale.ROOT);
 	}
 
 	private void registrarEdicion(Long editorId) {
@@ -255,6 +302,27 @@ public class Publicacion {
 	public List<String> getImagenes() {
 		return imagenes.stream().sorted(Comparator.comparingInt(ImagenPublicacion::getPosicion))
 				.map(ImagenPublicacion::getUrl).toList();
+	}
+
+	public BigDecimal getTarifaLimpieza() {
+		return tarifaLimpieza;
+	}
+
+	public ModoReserva getModoReserva() {
+		return modoReserva;
+	}
+
+	public PoliticaCancelacion getPoliticaCancelacion() {
+		return politica;
+	}
+
+	/**
+	 * Servicios adicionales en orden alfabético, igual que los aplica @OrderBy al
+	 * leer.
+	 */
+	public List<ServicioAdicional> getServiciosAdicionales() {
+		return serviciosAdicionales.stream()
+				.sorted(Comparator.comparing(ServicioAdicional::getNombre, String.CASE_INSENSITIVE_ORDER)).toList();
 	}
 
 	public EstadoPublicacion getEstado() {

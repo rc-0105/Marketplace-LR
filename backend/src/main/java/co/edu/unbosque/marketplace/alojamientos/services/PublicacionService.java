@@ -1,14 +1,20 @@
 package co.edu.unbosque.marketplace.alojamientos.services;
 
+import co.edu.unbosque.marketplace.alojamientos.exceptions.PoliticaCancelacionNoValidaException;
 import co.edu.unbosque.marketplace.alojamientos.exceptions.PublicacionNoEliminableException;
 import co.edu.unbosque.marketplace.alojamientos.exceptions.PublicacionNoEncontradaException;
+import co.edu.unbosque.marketplace.alojamientos.exceptions.ServicioAdicionalRepetidoException;
 import co.edu.unbosque.marketplace.alojamientos.exceptions.ServicioNoValidoException;
 import co.edu.unbosque.marketplace.alojamientos.exceptions.TipoAlojamientoNoValidoException;
+import co.edu.unbosque.marketplace.alojamientos.model.CondicionesReserva;
 import co.edu.unbosque.marketplace.alojamientos.model.DatosBorrador;
 import co.edu.unbosque.marketplace.alojamientos.model.EstadoPublicacion;
+import co.edu.unbosque.marketplace.alojamientos.model.ModoReserva;
+import co.edu.unbosque.marketplace.alojamientos.model.PoliticaCancelacion;
 import co.edu.unbosque.marketplace.alojamientos.model.Publicacion;
 import co.edu.unbosque.marketplace.alojamientos.model.Servicio;
 import co.edu.unbosque.marketplace.alojamientos.model.TipoAlojamiento;
+import co.edu.unbosque.marketplace.alojamientos.repository.PoliticaCancelacionRepository;
 import co.edu.unbosque.marketplace.alojamientos.repository.PublicacionRepository;
 import co.edu.unbosque.marketplace.alojamientos.repository.ServicioRepository;
 import co.edu.unbosque.marketplace.alojamientos.repository.TipoAlojamientoRepository;
@@ -19,14 +25,19 @@ import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
 import co.edu.unbosque.marketplace.compartido.seguridad.Propiedad;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Creación, consulta, edición y eliminación de publicaciones (RF-11, RF-12, RF-13). */
+/**
+ * Creación, consulta, edición y eliminación de publicaciones (RF-11, RF-12, RF-13),
+ * y sus condiciones comerciales (RF-20, RF-21, RF-22).
+ */
 @Service
 public class PublicacionService {
 
@@ -35,13 +46,15 @@ public class PublicacionService {
     private final PublicacionRepository publicaciones;
     private final ServicioRepository catalogo;
     private final TipoAlojamientoRepository tipos;
+    private final PoliticaCancelacionRepository politicas;
     private final PublicadorEventos publicador;
 
     public PublicacionService(PublicacionRepository publicaciones, ServicioRepository catalogo,
-            TipoAlojamientoRepository tipos, PublicadorEventos publicador) {
+            TipoAlojamientoRepository tipos, PoliticaCancelacionRepository politicas, PublicadorEventos publicador) {
         this.publicaciones = publicaciones;
         this.catalogo = catalogo;
         this.tipos = tipos;
+        this.politicas = politicas;
         this.publicador = publicador;
     }
 
@@ -89,6 +102,20 @@ public class PublicacionService {
         publicacion.cambiarImagenes(recortados(urls), usuarioId);
         Publicacion guardada = publicaciones.save(publicacion);
         auditar(publicacionId, usuarioId, esAdministrador, "editar_imagenes");
+        return guardada;
+    }
+
+    /**
+     * Reemplaza solo las condiciones comerciales: tarifa de limpieza, modo de
+     * reserva, política de cancelación y servicios adicionales (RF-20, RF-21, RF-22).
+     */
+    @Transactional
+    public Publicacion actualizarConfiguracion(Long publicacionId, Long usuarioId, boolean esAdministrador,
+            SolicitudConfiguracion solicitud) {
+        Publicacion publicacion = buscarConAcceso(publicacionId, usuarioId, esAdministrador);
+        publicacion.configurar(condicionesDe(solicitud), usuarioId);
+        Publicacion guardada = publicaciones.save(publicacion);
+        auditar(publicacionId, usuarioId, esAdministrador, "editar_configuracion");
         return guardada;
     }
 
@@ -166,6 +193,36 @@ public class PublicacionService {
             return null;
         }
         return tipos.findById(tipoId).orElseThrow(TipoAlojamientoNoValidoException::new);
+    }
+
+    // Todo se valida antes de tocar la publicación: si algo falla, queda como estaba.
+    private CondicionesReserva condicionesDe(SolicitudConfiguracion solicitud) {
+        ModoReserva modo = solicitud.modoReserva() == null
+                ? ModoReserva.INMEDIATA
+                : ModoReserva.valueOf(solicitud.modoReserva());
+        PoliticaCancelacion politica = solicitud.politicaCancelacion() == null
+                ? null
+                : politicas.findById(solicitud.politicaCancelacion())
+                        .orElseThrow(PoliticaCancelacionNoValidaException::new);
+        return new CondicionesReserva(solicitud.tarifaLimpieza(), modo, politica,
+                adicionalesDe(solicitud.serviciosAdicionales()));
+    }
+
+    private static List<CondicionesReserva.Adicional> adicionalesDe(
+            List<SolicitudConfiguracion.ServicioAdicional> solicitados) {
+        if (solicitados == null) {
+            return List.of();
+        }
+        Set<String> nombres = new HashSet<>();
+        List<CondicionesReserva.Adicional> resultado = new ArrayList<>();
+        for (SolicitudConfiguracion.ServicioAdicional solicitado : solicitados) {
+            String nombre = solicitado.nombre().trim();
+            if (!nombres.add(nombre.toLowerCase(Locale.ROOT))) {
+                throw new ServicioAdicionalRepetidoException();
+            }
+            resultado.add(new CondicionesReserva.Adicional(nombre, solicitado.costo()));
+        }
+        return List.copyOf(resultado);
     }
 
     private static String textoOpcional(String valor) {

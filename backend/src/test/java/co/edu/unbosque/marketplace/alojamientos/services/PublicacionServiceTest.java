@@ -8,14 +8,20 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import co.edu.unbosque.marketplace.alojamientos.exceptions.PoliticaCancelacionNoValidaException;
 import co.edu.unbosque.marketplace.alojamientos.exceptions.PublicacionNoEncontradaException;
+import co.edu.unbosque.marketplace.alojamientos.exceptions.ServicioAdicionalRepetidoException;
 import co.edu.unbosque.marketplace.alojamientos.exceptions.ServicioNoValidoException;
 import co.edu.unbosque.marketplace.alojamientos.exceptions.TipoAlojamientoNoValidoException;
 import co.edu.unbosque.marketplace.alojamientos.model.DatosBorrador;
 import co.edu.unbosque.marketplace.alojamientos.model.EstadoPublicacion;
+import co.edu.unbosque.marketplace.alojamientos.model.ModoReserva;
+import co.edu.unbosque.marketplace.alojamientos.model.PoliticaCancelacion;
 import co.edu.unbosque.marketplace.alojamientos.model.Publicacion;
+import co.edu.unbosque.marketplace.alojamientos.model.ServicioAdicional;
 import co.edu.unbosque.marketplace.alojamientos.model.Servicio;
 import co.edu.unbosque.marketplace.alojamientos.model.TipoAlojamiento;
+import co.edu.unbosque.marketplace.alojamientos.repository.PoliticaCancelacionRepository;
 import co.edu.unbosque.marketplace.alojamientos.repository.PublicacionRepository;
 import co.edu.unbosque.marketplace.alojamientos.repository.ServicioRepository;
 import co.edu.unbosque.marketplace.alojamientos.repository.TipoAlojamientoRepository;
@@ -45,7 +51,14 @@ class PublicacionServiceTest {
     private final PublicadorEventos publicador = mock(PublicadorEventos.class);
     private final ServicioRepository catalogo = mock(ServicioRepository.class);
     private final TipoAlojamientoRepository tipos = mock(TipoAlojamientoRepository.class);
-    private final PublicacionService servicio = new PublicacionService(publicaciones, catalogo, tipos, publicador);
+    private final PoliticaCancelacionRepository politicas = mock(PoliticaCancelacionRepository.class);
+    private final PublicacionService servicio = new PublicacionService(publicaciones, catalogo, tipos, politicas,
+            publicador);
+
+    private static final Long MODERADA_ID = 2L;
+    private static final Long POLITICA_INEXISTENTE_ID = 99L;
+    private static final PoliticaCancelacion MODERADA = new PoliticaCancelacion("Moderada",
+            "Devolución total hasta 5 días antes de la llegada; después, del 50 %.", 5, 50);
 
     private static final Servicio WIFI = new Servicio("Wifi");
     private static final Servicio PISCINA = new Servicio("Piscina");
@@ -63,6 +76,8 @@ class PublicacionServiceTest {
         when(tipos.findById(CASA_ID)).thenReturn(Optional.of(CASA));
         when(tipos.findById(APARTAMENTO_ID)).thenReturn(Optional.of(APARTAMENTO));
         when(tipos.findById(TIPO_INEXISTENTE_ID)).thenReturn(Optional.empty());
+        when(politicas.findById(MODERADA_ID)).thenReturn(Optional.of(MODERADA));
+        when(politicas.findById(POLITICA_INEXISTENTE_ID)).thenReturn(Optional.empty());
     }
 
     @Test
@@ -467,6 +482,163 @@ class PublicacionServiceTest {
 
         assertThatThrownBy(() -> servicio.actualizarImagenes(PUBLICACION_ID, ANFITRION_ID, false, List.of()))
                 .isInstanceOf(PublicacionNoEncontradaException.class);
+    }
+
+    @Test
+    @DisplayName("Una publicación nueva acepta reserva inmediata y no tiene política, tarifa ni servicios adicionales")
+    void publicacionNuevaAceptaReservaInmediata() {
+        Publicacion publicacion = publicacionDe(ANFITRION_ID);
+
+        assertThat(publicacion.getModoReserva()).isEqualTo(ModoReserva.INMEDIATA);
+        assertThat(publicacion.getPoliticaCancelacion()).isNull();
+        assertThat(publicacion.getTarifaLimpieza()).isNull();
+        assertThat(publicacion.getServiciosAdicionales()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("El dueño configura tarifa, modo, política y servicios adicionales: el resto queda igual y se audita")
+    void duenoConfiguraLasCondiciones() {
+        Publicacion existente = publicacionDe(ANFITRION_ID);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(existente));
+
+        Publicacion configurada = servicio.actualizarConfiguracion(PUBLICACION_ID, ANFITRION_ID, false,
+                new SolicitudConfiguracion(new BigDecimal("40000"), "APROBACION", MODERADA_ID,
+                        List.of(adicional(" Desayuno ", "15000"), adicional("Traslado", "60000"))));
+
+        assertThat(configurada.getTarifaLimpieza()).isEqualByComparingTo("40000");
+        assertThat(configurada.getModoReserva()).isEqualTo(ModoReserva.APROBACION);
+        assertThat(configurada.getPoliticaCancelacion()).isEqualTo(MODERADA);
+        assertThat(configurada.getServiciosAdicionales()).extracting(ServicioAdicional::getNombre)
+                .containsExactly("Desayuno", "Traslado");
+        assertThat(configurada.getServiciosAdicionales()).extracting(ServicioAdicional::getCosto)
+                .usingElementComparator(BigDecimal::compareTo)
+                .containsExactly(new BigDecimal("15000"), new BigDecimal("60000"));
+        assertThat(configurada.getTitulo()).isEqualTo("Casa en la playa");
+        assertThat(configurada.getServicios()).containsExactly(PISCINA);
+        assertThat(configurada.getImagenes()).containsExactly("https://imagenes.com/1.jpg");
+        assertThat(configurada.getEditadoPor()).isEqualTo(ANFITRION_ID);
+        verify(publicaciones).save(existente);
+        EventoCritico evento = eventoPublicado();
+        assertThat(evento.accion()).isEqualTo(AccionCritica.PUBLICACION);
+        assertThat(evento.datos()).containsEntry("operacion", "editar_configuracion");
+    }
+
+    @Test
+    @DisplayName("Si no se indica el modo de reserva, la publicación acepta reserva inmediata")
+    void sinModoAceptaReservaInmediata() {
+        Publicacion existente = publicacionDe(ANFITRION_ID);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(existente));
+        servicio.actualizarConfiguracion(PUBLICACION_ID, ANFITRION_ID, false,
+                new SolicitudConfiguracion(null, "APROBACION", null, List.of()));
+
+        Publicacion configurada = servicio.actualizarConfiguracion(PUBLICACION_ID, ANFITRION_ID, false,
+                new SolicitudConfiguracion(null, null, null, null));
+
+        assertThat(configurada.getModoReserva()).isEqualTo(ModoReserva.INMEDIATA);
+        assertThat(configurada.getServiciosAdicionales()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Al reconfigurar, el servicio adicional que conserva el nombre es el mismo y solo cambia su costo")
+    void reconfigurarConservaElServicioAdicional() {
+        Publicacion existente = publicacionDe(ANFITRION_ID);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(existente));
+        servicio.actualizarConfiguracion(PUBLICACION_ID, ANFITRION_ID, false, new SolicitudConfiguracion(null, null,
+                null, List.of(adicional("Desayuno", "15000"), adicional("Traslado", "60000"))));
+        ServicioAdicional desayuno = existente.getServiciosAdicionales().get(0);
+
+        servicio.actualizarConfiguracion(PUBLICACION_ID, ANFITRION_ID, false,
+                new SolicitudConfiguracion(null, null, null, List.of(adicional("desayuno", "18000"))));
+
+        assertThat(existente.getServiciosAdicionales()).containsExactly(desayuno);
+        assertThat(desayuno.getNombre()).isEqualTo("desayuno");
+        assertThat(desayuno.getCosto()).isEqualByComparingTo("18000");
+    }
+
+    @Test
+    @DisplayName("Con una política fuera del catálogo lanza la excepción y no guarda nada")
+    void configurarRechazaPoliticaInexistente() {
+        Publicacion existente = publicacionDe(ANFITRION_ID);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(existente));
+
+        assertThatThrownBy(() -> servicio.actualizarConfiguracion(PUBLICACION_ID, ANFITRION_ID, false,
+                new SolicitudConfiguracion(new BigDecimal("40000"), null, POLITICA_INEXISTENTE_ID, List.of())))
+                .isInstanceOf(PoliticaCancelacionNoValidaException.class)
+                .hasMessage("La política de cancelación no existe en el catálogo.");
+        assertThat(existente.getTarifaLimpieza()).isNull();
+        verify(publicaciones, never()).save(any(Publicacion.class));
+    }
+
+    @Test
+    @DisplayName("Dos servicios adicionales con el mismo nombre se rechazan y no se guarda nada")
+    void configurarRechazaServiciosAdicionalesRepetidos() {
+        Publicacion existente = publicacionDe(ANFITRION_ID);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(existente));
+        SolicitudConfiguracion repetidos = new SolicitudConfiguracion(null, null, null,
+                List.of(adicional("Desayuno", "15000"), adicional(" desayuno", "20000")));
+
+        assertThatThrownBy(() -> servicio.actualizarConfiguracion(PUBLICACION_ID, ANFITRION_ID, false, repetidos))
+                .isInstanceOf(ServicioAdicionalRepetidoException.class)
+                .hasMessage("Hay servicios adicionales con el mismo nombre.");
+        assertThat(existente.getServiciosAdicionales()).isEmpty();
+        verify(publicaciones, never()).save(any(Publicacion.class));
+    }
+
+    @Test
+    @DisplayName("Otro anfitrión no puede configurar la publicación: lanza 403 y no guarda nada")
+    void otroAnfitrionNoPuedeConfigurar() {
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(publicacionDe(ANFITRION_ID)));
+        SolicitudConfiguracion configuracion = new SolicitudConfiguracion(null, "APROBACION", null, List.of());
+
+        assertThatThrownBy(() -> servicio.actualizarConfiguracion(PUBLICACION_ID, OTRO_ANFITRION_ID, false,
+                configuracion))
+                .isInstanceOf(AccesoDenegadoException.class);
+        verify(publicaciones, never()).save(any(Publicacion.class));
+    }
+
+    @Test
+    @DisplayName("El administrador configura cualquier publicación como acción administrativa")
+    void administradorConfiguraCualquierPublicacion() {
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(publicacionDe(ANFITRION_ID)));
+
+        servicio.actualizarConfiguracion(PUBLICACION_ID, ADMINISTRADOR_ID, true,
+                new SolicitudConfiguracion(null, "APROBACION", null, List.of()));
+
+        assertThat(eventoPublicado().accion()).isEqualTo(AccionCritica.ACCION_ADMINISTRATIVA);
+    }
+
+    @Test
+    @DisplayName("Configurar una publicación que no existe lanza 404")
+    void configurarInexistenteLanza404() {
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.empty());
+        SolicitudConfiguracion configuracion = new SolicitudConfiguracion(null, null, null, List.of());
+
+        assertThatThrownBy(() -> servicio.actualizarConfiguracion(PUBLICACION_ID, ANFITRION_ID, false,
+                configuracion))
+                .isInstanceOf(PublicacionNoEncontradaException.class);
+    }
+
+    @Test
+    @DisplayName("Editar la publicación completa no toca su configuración")
+    void editarNoTocaLaConfiguracion() {
+        Publicacion existente = publicacionDe(ANFITRION_ID);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(existente));
+        servicio.actualizarConfiguracion(PUBLICACION_ID, ANFITRION_ID, false,
+                new SolicitudConfiguracion(new BigDecimal("40000"), "APROBACION", MODERADA_ID,
+                        List.of(adicional("Desayuno", "15000"))));
+
+        servicio.editar(PUBLICACION_ID, ANFITRION_ID, false, soloTitulo("Casa renovada"));
+
+        assertThat(existente.getTitulo()).isEqualTo("Casa renovada");
+        assertThat(existente.getTarifaLimpieza()).isEqualByComparingTo("40000");
+        assertThat(existente.getModoReserva()).isEqualTo(ModoReserva.APROBACION);
+        assertThat(existente.getPoliticaCancelacion()).isEqualTo(MODERADA);
+        assertThat(existente.getServiciosAdicionales()).extracting(ServicioAdicional::getNombre)
+                .containsExactly("Desayuno");
+    }
+
+    private static SolicitudConfiguracion.ServicioAdicional adicional(String nombre, String costo) {
+        return new SolicitudConfiguracion.ServicioAdicional(nombre, new BigDecimal(costo));
     }
 
     private static Publicacion publicacionDe(Long anfitrionId) {
