@@ -113,6 +113,23 @@ public class PublicacionController {
 		return PublicacionResponse.desde(editada);
 	}
 
+	/**
+	 * Pide activar la publicación: un borrador completo queda esperando revisión
+	 * (RF-14) y una pausada vuelve a estar activa (RF-17).
+	 */
+	@PostMapping("/{id}/activar")
+	@PreAuthorize(Permisos.ANFITRION)
+	public PublicacionResponse activar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+		return PublicacionResponse.desde(publicacionService.activar(id, usuarioDe(jwt)));
+	}
+
+	/** Saca de las búsquedas una publicación activa (RF-17). */
+	@PostMapping("/{id}/pausar")
+	@PreAuthorize(Permisos.ANFITRION)
+	public PublicacionResponse pausar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+		return PublicacionResponse.desde(publicacionService.pausar(id, usuarioDe(jwt)));
+	}
+
 	/** Elimina un borrador con sus imágenes y servicios. */
 	@DeleteMapping("/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
