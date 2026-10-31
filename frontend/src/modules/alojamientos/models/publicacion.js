@@ -231,7 +231,30 @@ export function solicitudConfiguracionDesde(configuracion) {
 
 const NOMBRE_ESTADO = {
   BORRADOR: 'Borrador',
+  PENDIENTE_REVISION: 'En revisión',
+  ACTIVA: 'Activa',
+  PAUSADA: 'Pausada',
 };
+
+const NOMBRE_CAMPO = {
+  descripcion: 'descripción',
+  ciudad: 'ciudad',
+  direccion: 'dirección',
+  tipo: 'tipo de alojamiento',
+  capacidad: 'capacidad',
+  precioNoche: 'precio por noche',
+  servicios: 'servicios',
+  reglas: 'reglas',
+  imagenes: 'imágenes',
+};
+
+/**
+ * @param {string} campo nombre del campo como lo reporta la API en camposFaltantes
+ * @returns {string} el campo como se le muestra al anfitrión
+ */
+export function nombreDeCampo(campo) {
+  return NOMBRE_CAMPO[campo] ?? campo;
+}
 
 /**
  * @param {string} estado

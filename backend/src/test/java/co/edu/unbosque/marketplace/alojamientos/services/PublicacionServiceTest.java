@@ -8,7 +8,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import co.edu.unbosque.marketplace.alojamientos.exceptions.CambioEstadoNoPermitidoException;
 import co.edu.unbosque.marketplace.alojamientos.exceptions.PoliticaCancelacionNoValidaException;
+import co.edu.unbosque.marketplace.alojamientos.exceptions.PublicacionIncompletaException;
 import co.edu.unbosque.marketplace.alojamientos.exceptions.PublicacionNoEncontradaException;
 import co.edu.unbosque.marketplace.alojamientos.exceptions.ServicioAdicionalRepetidoException;
 import co.edu.unbosque.marketplace.alojamientos.exceptions.ServicioNoValidoException;
@@ -39,6 +41,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.AdditionalAnswers;
 import org.mockito.ArgumentCaptor;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class PublicacionServiceTest {
 
@@ -637,6 +640,112 @@ class PublicacionServiceTest {
                 .containsExactly("Desayuno");
     }
 
+    @Test
+    @DisplayName("Activar un borrador completo lo deja en PENDIENTE_REVISION, lo guarda y lo audita")
+    void activarBorradorCompletoLoEnviaARevision() {
+        Publicacion completa = publicacionCompletaDe(ANFITRION_ID);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(completa));
+
+        Publicacion activada = servicio.activar(PUBLICACION_ID, ANFITRION_ID);
+
+        assertThat(activada.getEstado()).isEqualTo(EstadoPublicacion.PENDIENTE_REVISION);
+        verify(publicaciones).save(completa);
+        EventoCritico evento = eventoPublicado();
+        assertThat(evento.accion()).isEqualTo(AccionCritica.PUBLICACION);
+        assertThat(evento.datos()).containsEntry("operacion", "enviar_a_revision");
+    }
+
+    @Test
+    @DisplayName("Activar un borrador incompleto se rechaza con la lista exacta de lo que falta y no guarda nada")
+    void activarBorradorIncompletoListaLoQueFalta() {
+        Publicacion incompleta = publicacionDe(ANFITRION_ID);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(incompleta));
+
+        assertThatThrownBy(() -> servicio.activar(PUBLICACION_ID, ANFITRION_ID))
+                .isInstanceOfSatisfying(PublicacionIncompletaException.class, error -> assertThat(
+                        error.getPropiedades())
+                        .containsEntry("camposFaltantes", List.of("descripcion", "direccion", "precioNoche", "reglas")));
+        assertThat(incompleta.getEstado()).isEqualTo(EstadoPublicacion.BORRADOR);
+        verify(publicaciones, never()).save(any(Publicacion.class));
+        verify(publicador, never()).publicar(any(EventoCritico.class));
+    }
+
+    @Test
+    @DisplayName("Activar una publicación pausada la devuelve a ACTIVA sin pasar por revisión")
+    void activarPausadaLaReactiva() {
+        Publicacion pausada = publicacionEn(EstadoPublicacion.PAUSADA);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(pausada));
+
+        Publicacion reactivada = servicio.activar(PUBLICACION_ID, ANFITRION_ID);
+
+        assertThat(reactivada.getEstado()).isEqualTo(EstadoPublicacion.ACTIVA);
+        verify(publicaciones).save(pausada);
+        assertThat(eventoPublicado().datos()).containsEntry("operacion", "reactivar");
+    }
+
+    @Test
+    @DisplayName("Activar una publicación que ya espera revisión o ya está activa responde 409 y no guarda nada")
+    void activarEnRevisionOActivaSeRechaza() {
+        when(publicaciones.findById(PUBLICACION_ID))
+                .thenReturn(Optional.of(publicacionEn(EstadoPublicacion.PENDIENTE_REVISION)))
+                .thenReturn(Optional.of(publicacionEn(EstadoPublicacion.ACTIVA)));
+
+        assertThatThrownBy(() -> servicio.activar(PUBLICACION_ID, ANFITRION_ID))
+                .isInstanceOf(CambioEstadoNoPermitidoException.class)
+                .hasMessage("La publicación ya está esperando revisión.");
+        assertThatThrownBy(() -> servicio.activar(PUBLICACION_ID, ANFITRION_ID))
+                .isInstanceOf(CambioEstadoNoPermitidoException.class)
+                .hasMessage("La publicación ya está activa.");
+        verify(publicaciones, never()).save(any(Publicacion.class));
+    }
+
+    @Test
+    @DisplayName("Pausar una publicación activa la deja en PAUSADA, la guarda y lo audita")
+    void pausarActivaLaDejaPausada() {
+        Publicacion activa = publicacionEn(EstadoPublicacion.ACTIVA);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(activa));
+
+        Publicacion pausada = servicio.pausar(PUBLICACION_ID, ANFITRION_ID);
+
+        assertThat(pausada.getEstado()).isEqualTo(EstadoPublicacion.PAUSADA);
+        verify(publicaciones).save(activa);
+        assertThat(eventoPublicado().datos()).containsEntry("operacion", "pausar");
+    }
+
+    @Test
+    @DisplayName("Pausar una publicación que no está activa responde 409 y no guarda nada")
+    void pausarNoActivaSeRechaza() {
+        Publicacion borrador = publicacionCompletaDe(ANFITRION_ID);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(borrador));
+
+        assertThatThrownBy(() -> servicio.pausar(PUBLICACION_ID, ANFITRION_ID))
+                .isInstanceOf(CambioEstadoNoPermitidoException.class)
+                .hasMessage("Solo se puede pausar una publicación activa.");
+        assertThat(borrador.getEstado()).isEqualTo(EstadoPublicacion.BORRADOR);
+        verify(publicaciones, never()).save(any(Publicacion.class));
+    }
+
+    @Test
+    @DisplayName("Otro anfitrión no puede activar ni pausar la publicación: lanza 403 y no guarda nada")
+    void otroAnfitrionNoCambiaElEstado() {
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(publicacionCompletaDe(ANFITRION_ID)));
+
+        assertThatThrownBy(() -> servicio.activar(PUBLICACION_ID, OTRO_ANFITRION_ID))
+                .isInstanceOf(AccesoDenegadoException.class);
+        assertThatThrownBy(() -> servicio.pausar(PUBLICACION_ID, OTRO_ANFITRION_ID))
+                .isInstanceOf(AccesoDenegadoException.class);
+        verify(publicaciones, never()).save(any(Publicacion.class));
+    }
+
+    @Test
+    @DisplayName("Activar una publicación que no existe lanza 404")
+    void activarInexistenteLanza404() {
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.activar(PUBLICACION_ID, ANFITRION_ID))
+                .isInstanceOf(PublicacionNoEncontradaException.class);
+    }
+
     private static SolicitudConfiguracion.ServicioAdicional adicional(String nombre, String costo) {
         return new SolicitudConfiguracion.ServicioAdicional(nombre, new BigDecimal(costo));
     }
@@ -644,6 +753,19 @@ class PublicacionServiceTest {
     private static Publicacion publicacionDe(Long anfitrionId) {
         return Publicacion.borrador(anfitrionId, new DatosBorrador("Casa en la playa", null, "Santa Marta", null,
                 CASA, 4, null, Set.of(PISCINA), null, List.of("https://imagenes.com/1.jpg")));
+    }
+
+    private static Publicacion publicacionCompletaDe(Long anfitrionId) {
+        return Publicacion.borrador(anfitrionId, new DatosBorrador("Casa en la playa", "Frente al mar",
+                "Santa Marta", "Calle 1 # 2-3", CASA, 4, new BigDecimal("250000"), Set.of(PISCINA),
+                "No se admiten fiestas", List.of("https://imagenes.com/1.jpg")));
+    }
+
+    // ACTIVA solo se alcanza con la aprobación del administrador (SOF-23); aquí se fija directo.
+    private static Publicacion publicacionEn(EstadoPublicacion estado) {
+        Publicacion publicacion = publicacionCompletaDe(ANFITRION_ID);
+        ReflectionTestUtils.setField(publicacion, "estado", estado);
+        return publicacion;
     }
 
     private static SolicitudBorrador soloTitulo(String titulo) {
