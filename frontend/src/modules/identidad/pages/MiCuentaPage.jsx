@@ -30,6 +30,13 @@ const OPERACIONES = {
   },
 };
 
+// Una sección a la vez para que la página no necesite scroll.
+const PESTANAS = [
+  { clave: 'datos', titulo: 'Mis datos' },
+  { clave: 'contrasena', titulo: 'Contraseña' },
+  { clave: 'baja', titulo: 'Desactivar o eliminar' },
+];
+
 // Solo se ramifica por el código de negocio; el texto del detalle nunca decide nada.
 function mensajeDe(error) {
   if (error.codigo === 'CONFIRMACION_INVALIDA') {
@@ -48,6 +55,7 @@ export default function MiCuentaPage() {
   const [error, setError] = useState(null);
   const [perfil, setPerfil] = useState(null);
   const [errorPerfil, setErrorPerfil] = useState('');
+  const [pestana, setPestana] = useState(PESTANAS[0].clave);
 
   useEffect(() => {
     let vigente = true;
@@ -76,6 +84,22 @@ export default function MiCuentaPage() {
     }
   }
 
+  function elegirPestana(clave) {
+    setPestana(clave);
+    abrir(null);
+  }
+
+  // Patrón de pestañas WAI-ARIA: las flechas mueven la selección y el foco.
+  function moverConTeclado(evento, indice) {
+    const paso = { ArrowRight: 1, ArrowLeft: -1 }[evento.key];
+    if (!paso) {
+      return;
+    }
+    const siguiente = PESTANAS[(indice + paso + PESTANAS.length) % PESTANAS.length].clave;
+    elegirPestana(siguiente);
+    document.getElementById(`pestana-${siguiente}`)?.focus();
+  }
+
   async function guardarPerfil(datos) {
     const actualizado = await actualizarPerfil(datos);
     setPerfil(actualizado);
@@ -85,31 +109,40 @@ export default function MiCuentaPage() {
   return (
     <main className={estilos.pagina}>
       <h1 className={estilos.titulo}>Mi cuenta</h1>
-      <section className={estilos.seccion} aria-labelledby="seccion-datos">
-        <h2 id="seccion-datos" className={estilos.subtitulo}>Mis datos</h2>
-        {perfil?.fotoUrl && <img className={estilos.foto} src={perfil.fotoUrl} alt="Tu foto de perfil" />}
-        {errorPerfil && <p role="alert" className={estilos.aviso}>{errorPerfil}</p>}
-        {!perfil && !errorPerfil && <p className={estilos.resumen}>Cargando tus datos…</p>}
-        {perfil && <DatosPerfil perfil={perfil} alGuardar={guardarPerfil} />}
-      </section>
-      <section className={estilos.seccion} aria-labelledby="seccion-contrasena">
-        <h2 id="seccion-contrasena" className={estilos.subtitulo}>Cambiar contraseña</h2>
-        <CambioContrasena alCambiar={cambiarContrasena} />
-      </section>
-      {Object.entries(OPERACIONES).map(([clave, datos]) => (
-        <section key={clave} className={estilos.seccion} aria-labelledby={`seccion-${clave}`}>
-          <h2 id={`seccion-${clave}`} className={estilos.subtitulo}>{datos.titulo}</h2>
-          <p className={estilos.resumen}>{datos.resumen}</p>
-          <button type="button" className={estilos.boton} disabled={enviando} onClick={() => abrir(clave)}>
-            {datos.titulo}
+      <div role="tablist" aria-label="Secciones de mi cuenta" className={estilos.pestanas}>
+        {PESTANAS.map(({ clave, titulo }, indice) => (
+          <button key={clave} id={`pestana-${clave}`} type="button" role="tab" className={estilos.pestana}
+            aria-selected={pestana === clave} aria-controls={`panel-${clave}`} tabIndex={pestana === clave ? 0 : -1}
+            onClick={() => elegirPestana(clave)} onKeyDown={(evento) => moverConTeclado(evento, indice)}>
+            {titulo}
           </button>
-          {operacion === clave && (
-            <ConfirmacionCuenta titulo={datos.tituloConfirmacion} advertencia={datos.advertencia}
-              textoConfirmar={datos.textoConfirmar} enviando={enviando} error={error ?? undefined}
-              alConfirmar={confirmar} alCancelar={() => abrir(null)} />
-          )}
-        </section>
-      ))}
+        ))}
+      </div>
+      <div id={`panel-${pestana}`} role="tabpanel" aria-labelledby={`pestana-${pestana}`} className={estilos.panel}>
+        {pestana === 'datos' && (
+          <>
+            {perfil?.fotoUrl && <img className={estilos.foto} src={perfil.fotoUrl} alt="Tu foto de perfil" />}
+            {errorPerfil && <p role="alert" className={estilos.aviso}>{errorPerfil}</p>}
+            {!perfil && !errorPerfil && <p className={estilos.resumen}>Cargando tus datos…</p>}
+            {perfil && <DatosPerfil perfil={perfil} alGuardar={guardarPerfil} />}
+          </>
+        )}
+        {pestana === 'contrasena' && <CambioContrasena alCambiar={cambiarContrasena} />}
+        {pestana === 'baja' && Object.entries(OPERACIONES).map(([clave, datos]) => (
+          <section key={clave} className={estilos.seccion} aria-labelledby={`seccion-${clave}`}>
+            <h2 id={`seccion-${clave}`} className={estilos.subtitulo}>{datos.titulo}</h2>
+            <p className={estilos.resumen}>{datos.resumen}</p>
+            <button type="button" className={estilos.boton} disabled={enviando} onClick={() => abrir(clave)}>
+              {datos.titulo}
+            </button>
+            {operacion === clave && (
+              <ConfirmacionCuenta titulo={datos.tituloConfirmacion} advertencia={datos.advertencia}
+                textoConfirmar={datos.textoConfirmar} enviando={enviando} error={error ?? undefined}
+                alConfirmar={confirmar} alCancelar={() => abrir(null)} />
+            )}
+          </section>
+        ))}
+      </div>
     </main>
   );
 }
