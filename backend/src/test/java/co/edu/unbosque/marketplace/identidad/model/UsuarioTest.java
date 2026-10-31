@@ -15,6 +15,8 @@ class UsuarioTest {
 
     private static final String CORREO = "ana@correo.com";
     private static final String HASH_INSERVIBLE = "$2a$10$inservible";
+    private static final String TELEFONO = "+573001234567";
+    private static final String FOTO = "https://fotos.ejemplo.com/ana.jpg";
 
     @Test
     @DisplayName("Una cuenta activa puede iniciar sesión")
@@ -153,9 +155,10 @@ class UsuarioTest {
     }
 
     @Test
-    @DisplayName("Eliminar una cuenta activa anonimiza nombre, correo, hash y motivo, y la deja eliminada")
+    @DisplayName("Eliminar una cuenta activa anonimiza nombre, correo, hash, motivo, teléfono y foto, y la deja eliminada")
     void eliminaCuentaActivaAnonimizandola() {
         Usuario usuario = UsuariosDePrueba.activa(7L);
+        usuario.actualizarDatos("Ana Gómez", TELEFONO, FOTO);
 
         usuario.eliminar(HASH_INSERVIBLE);
 
@@ -164,6 +167,8 @@ class UsuarioTest {
         assertThat(usuario.getCorreo()).isEqualTo("eliminada-7@eliminada.invalid");
         assertThat(usuario.getContrasenaHash()).isEqualTo(HASH_INSERVIBLE);
         assertThat(usuario.getMotivoRestriccion()).isNull();
+        assertThat(usuario.getTelefono()).isNull();
+        assertThat(usuario.getFotoUrl()).isNull();
     }
 
     @ParameterizedTest
@@ -200,5 +205,46 @@ class UsuarioTest {
 
         assertThat(usuario.getEstado()).isEqualTo(EstadoCuenta.ACTIVA);
         assertThat(usuario.getCorreo()).isEqualTo(CORREO);
+    }
+
+    @Test
+    @DisplayName("Actualizar los datos guarda nombre, teléfono y foto sin espacios sobrantes y no toca el correo")
+    void actualizaDatosNormalizados() {
+        Usuario usuario = UsuariosDePrueba.activa(7L);
+
+        usuario.actualizarDatos("  Ana María  ", " " + TELEFONO + " ", " " + FOTO + " ");
+
+        assertThat(usuario.getNombre()).isEqualTo("Ana María");
+        assertThat(usuario.getTelefono()).isEqualTo(TELEFONO);
+        assertThat(usuario.getFotoUrl()).isEqualTo(FOTO);
+        assertThat(usuario.getCorreo()).isEqualTo(CORREO);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = "   ")
+    @DisplayName("Un teléfono o una foto vacíos se guardan como nulos")
+    void opcionalesVaciosQuedanNulos(String vacio) {
+        Usuario usuario = UsuariosDePrueba.activa(7L);
+        usuario.actualizarDatos("Ana Gómez", TELEFONO, FOTO);
+
+        usuario.actualizarDatos("Ana Gómez", vacio, vacio);
+
+        assertThat(usuario.getTelefono()).isNull();
+        assertThat(usuario.getFotoUrl()).isNull();
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = "   ")
+    @DisplayName("Actualizar exige un nombre con texto y no muta si falta")
+    void actualizarExigeNombre(String nombre) {
+        Usuario usuario = UsuariosDePrueba.activa(7L);
+
+        assertThatThrownBy(() -> usuario.actualizarDatos(nombre, TELEFONO, FOTO))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(usuario.getNombre()).isEqualTo("Ana Gómez");
+        assertThat(usuario.getTelefono()).isNull();
     }
 }

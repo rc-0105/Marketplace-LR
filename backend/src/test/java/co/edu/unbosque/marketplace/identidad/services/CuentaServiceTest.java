@@ -360,6 +360,58 @@ class CuentaServiceTest {
     }
 
     // Ni la contraseña (correcta o intentada), ni el correo, el nombre o el hash llegan a la auditoría.
+    @Test
+    @DisplayName("Con la contraseña actual correcta, cambiarla guarda el hash nuevo y audita el éxito sin datos")
+    void cambiaContrasenaConLaActualCorrecta() {
+        Usuario ana = UsuariosDePrueba.activa(AFECTADO);
+        when(usuarios.findById(AFECTADO)).thenReturn(Optional.of(ana));
+        when(codificador.matches(CONTRASENA, "hash-real")).thenReturn(true);
+        when(codificador.encode(INTENTO)).thenReturn(HASH_NUEVO);
+
+        servicio.cambiarContrasena(AFECTADO, CONTRASENA, INTENTO);
+
+        assertThat(ana.getContrasenaHash()).isEqualTo(HASH_NUEVO);
+        verify(usuarios).save(ana);
+        EventoCritico evento = eventoPublicado();
+        assertThat(evento.accion()).isEqualTo(AccionCritica.AUTENTICACION);
+        assertThat(evento.resultado()).isEqualTo(ResultadoEvento.EXITO);
+        assertThat(evento.usuario()).isEqualTo("7");
+        assertThat(evento.datos()).containsOnly(Map.entry(OPERACION, "cambiar_contrasena"));
+        sinDatosPersonales(evento);
+        assertThat(evento.toString()).doesNotContain(HASH_NUEVO);
+    }
+
+    @Test
+    @DisplayName("Con la contraseña actual incorrecta, cambiarla falla, conserva el hash y audita el fallo")
+    void rechazaCambioConLaActualIncorrecta() {
+        Usuario ana = UsuariosDePrueba.activa(AFECTADO);
+        when(usuarios.findById(AFECTADO)).thenReturn(Optional.of(ana));
+        when(codificador.matches(INTENTO, "hash-real")).thenReturn(false);
+
+        assertThatThrownBy(() -> servicio.cambiarContrasena(AFECTADO, INTENTO, CONTRASENA))
+                .isInstanceOf(ConfirmacionInvalidaException.class);
+
+        assertThat(ana.getContrasenaHash()).isEqualTo("hash-real");
+        verify(usuarios, never()).save(ana);
+        verify(codificador, never()).encode(anyString());
+        EventoCritico evento = eventoPublicado();
+        assertThat(evento.resultado()).isEqualTo(ResultadoEvento.FALLO);
+        assertThat(evento.datos()).containsOnly(Map.entry(OPERACION, "cambiar_contrasena"),
+                Map.entry(MOTIVO_FALLO, "credenciales_invalidas"));
+        sinDatosPersonales(evento);
+    }
+
+    @Test
+    @DisplayName("Cambiar la contraseña de un usuario que no existe da UsuarioNoEncontrado")
+    void cambiarContrasenaDeUsuarioInexistente() {
+        when(usuarios.findById(AFECTADO)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.cambiarContrasena(AFECTADO, CONTRASENA, INTENTO))
+                .isInstanceOf(UsuarioNoEncontradoException.class);
+
+        verifyNoInteractions(publicador);
+    }
+
     private void sinDatosPersonales(EventoCritico evento) {
         assertThat(evento.toString()).doesNotContain(CONTRASENA, INTENTO, "ana@correo.com", "Ana Gómez", "hash-real");
     }

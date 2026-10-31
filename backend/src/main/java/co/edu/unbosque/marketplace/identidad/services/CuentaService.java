@@ -20,7 +20,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Estado de las cuentas: la administración (RF-06) restringe y levanta; el dueño desactiva la suya (RF-09). */
+/**
+ * Estado y credenciales de las cuentas: la administración (RF-06) restringe y levanta; el dueño desactiva
+ * la suya (RF-09) y cambia su contraseña (RF-08).
+ */
 @Service
 @Transactional
 public class CuentaService {
@@ -31,6 +34,7 @@ public class CuentaService {
     private static final String LEVANTAR = "levantar_restriccion";
     private static final String DESACTIVAR = "desactivar_cuenta";
     private static final String ELIMINAR = "eliminar_cuenta";
+    private static final String CAMBIAR_CONTRASENA = "cambiar_contrasena";
     private static final String MOTIVO = "motivo";
 
     private final UsuarioRepository usuarios;
@@ -90,6 +94,14 @@ public class CuentaService {
         usuario.eliminar(codificador.encode(UUID.randomUUID().toString()));
         usuarios.save(usuario);
         auditarDueno(usuarioId, ELIMINAR, ResultadoEvento.EXITO, Map.of());
+    }
+
+    /** El dueño cambia su contraseña (RF-08) confirmando la actual; la nueva ya cumple la regla de formato. */
+    public void cambiarContrasena(Long usuarioId, String contrasenaActual, String contrasenaNueva) {
+        Usuario usuario = confirmarDueno(usuarioId, contrasenaActual, CAMBIAR_CONTRASENA);
+        usuario.cambiarContrasena(codificador.encode(contrasenaNueva));
+        usuarios.save(usuario);
+        auditarDueno(usuarioId, CAMBIAR_CONTRASENA, ResultadoEvento.EXITO, Map.of());
     }
 
     // Antes de ir a la base: un administrador nunca se encierra ni se libera a sí mismo.

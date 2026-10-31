@@ -41,6 +41,12 @@ public class Usuario {
     @Column(name = "motivo_restriccion", length = 500)
     private String motivoRestriccion;
 
+    @Column(length = 20)
+    private String telefono;
+
+    @Column(name = "foto_url", length = 500)
+    private String fotoUrl;
+
     @Column(name = "creado_en", nullable = false, updatable = false)
     private Instant creadoEn;
 
@@ -65,6 +71,23 @@ public class Usuario {
     /** Solo una cuenta activa puede entrar; la desactivada y la restringida no. */
     public boolean puedeIniciarSesion() {
         return estado == EstadoCuenta.ACTIVA;
+    }
+
+    /**
+     * Datos básicos que el dueño puede editar (RF-08). El correo nunca cambia por aquí. Los opcionales
+     * en blanco se guardan como nulos; el formato ya lo validó quien llama.
+     */
+    public void actualizarDatos(String nombre, String telefono, String fotoUrl) {
+        if (nombre == null || nombre.isBlank()) {
+            throw new IllegalArgumentException("El nombre es obligatorio");
+        }
+        this.nombre = nombre.strip();
+        this.telefono = opcional(telefono);
+        this.fotoUrl = opcional(fotoUrl);
+    }
+
+    private static String opcional(String valor) {
+        return valor == null || valor.isBlank() ? null : valor.strip();
     }
 
     /** Recibe el hash ya calculado: la entidad nunca ve la contraseña en claro. */
@@ -127,6 +150,8 @@ public class Usuario {
         this.correo = "eliminada-" + id + "@eliminada.invalid";
         this.contrasenaHash = hashInservible;
         this.motivoRestriccion = null;
+        this.telefono = null;
+        this.fotoUrl = null;
         this.estado = EstadoCuenta.ELIMINADA;
     }
 
@@ -156,6 +181,14 @@ public class Usuario {
 
     public String getMotivoRestriccion() {
         return motivoRestriccion;
+    }
+
+    public String getTelefono() {
+        return telefono;
+    }
+
+    public String getFotoUrl() {
+        return fotoUrl;
     }
 
     public Instant getCreadoEn() {
