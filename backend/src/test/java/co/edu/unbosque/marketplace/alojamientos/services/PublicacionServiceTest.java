@@ -663,8 +663,8 @@ class PublicacionServiceTest {
 
         assertThatThrownBy(() -> servicio.activar(PUBLICACION_ID, ANFITRION_ID))
                 .isInstanceOfSatisfying(PublicacionIncompletaException.class, error -> assertThat(
-                        error.getPropiedades().get("camposFaltantes"))
-                        .isEqualTo(List.of("descripcion", "direccion", "precioNoche", "reglas")));
+                        error.getPropiedades())
+                        .containsEntry("camposFaltantes", List.of("descripcion", "direccion", "precioNoche", "reglas")));
         assertThat(incompleta.getEstado()).isEqualTo(EstadoPublicacion.BORRADOR);
         verify(publicaciones, never()).save(any(Publicacion.class));
         verify(publicador, never()).publicar(any(EventoCritico.class));

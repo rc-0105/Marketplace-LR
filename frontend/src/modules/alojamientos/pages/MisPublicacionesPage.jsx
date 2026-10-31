@@ -32,16 +32,16 @@ function resumenDe(publicacion) {
 }
 
 // En un 422 los campos que faltan son los mismos que la API ya reportó en camposFaltantes.
-function mensajeDe(fallo, publicacion) {
-  if (fallo.estado === 422 && publicacion.camposFaltantes.length > 0) {
-    return `${fallo.message} Completa: ${publicacion.camposFaltantes.map(nombreDeCampo).join(', ')}.`;
+function mensajeDe(error, publicacion) {
+  if (error.estado === 422 && publicacion.camposFaltantes.length > 0) {
+    return `${error.message} Completa: ${publicacion.camposFaltantes.map(nombreDeCampo).join(', ')}.`;
   }
-  return fallo.estado ? fallo.message : MENSAJE_CAMBIO_FALLIDO;
+  return error.estado ? error.message : MENSAJE_CAMBIO_FALLIDO;
 }
 
 export default function MisPublicacionesPage() {
   const [publicaciones, setPublicaciones] = useState(null);
-  const [error, setError] = useState(null);
+  const [errorCarga, setErrorCarga] = useState(null);
   const [errores, setErrores] = useState({});
   const [enCurso, setEnCurso] = useState(null);
 
@@ -49,7 +49,7 @@ export default function MisPublicacionesPage() {
     let vigente = true;
     listarMisPublicaciones()
       .then((lista) => vigente && setPublicaciones(lista))
-      .catch(() => vigente && setError(MENSAJE_ERROR));
+      .catch(() => vigente && setErrorCarga(MENSAJE_ERROR));
     // Si la página se desmonta antes de la respuesta, no se toca el estado.
     return () => {
       vigente = false;
@@ -62,8 +62,8 @@ export default function MisPublicacionesPage() {
     try {
       const actualizada = await accion.ejecutar(publicacion.id);
       setPublicaciones((lista) => lista.map((otra) => (otra.id === actualizada.id ? actualizada : otra)));
-    } catch (fallo) {
-      setErrores((actuales) => ({ ...actuales, [publicacion.id]: mensajeDe(fallo, publicacion) }));
+    } catch (error) {
+      setErrores((actuales) => ({ ...actuales, [publicacion.id]: mensajeDe(error, publicacion) }));
     } finally {
       setEnCurso(null);
     }
@@ -75,8 +75,8 @@ export default function MisPublicacionesPage() {
         <h1 className={estilos.titulo}>Mis publicaciones</h1>
         <Link to="/anfitrion/publicaciones/nueva" className={estilos.nueva}>Nueva publicación</Link>
       </div>
-      {error && <p role="alert" className={estilos.error}>{error}</p>}
-      {!error && publicaciones === null && <p className={estilos.nota}>Cargando tus publicaciones…</p>}
+      {errorCarga && <p role="alert" className={estilos.error}>{errorCarga}</p>}
+      {!errorCarga && publicaciones === null && <p className={estilos.nota}>Cargando tus publicaciones…</p>}
       {publicaciones?.length === 0 && (
         <p className={estilos.nota}>Todavía no tienes publicaciones.</p>
       )}
