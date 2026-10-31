@@ -1,7 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import CambioContrasena from '../components/CambioContrasena.jsx';
 import ConfirmacionCuenta from '../components/ConfirmacionCuenta.jsx';
-import { desactivarCuenta, eliminarCuenta } from '../services/identidadService.js';
+import DatosPerfil from '../components/DatosPerfil.jsx';
+import {
+  actualizarPerfil, cambiarContrasena, desactivarCuenta, eliminarCuenta, obtenerPerfil,
+} from '../services/identidadService.js';
 import estilos from './MiCuentaPage.module.css';
 
 const MENSAJE_CONTRASENA = 'La contraseña no es correcta';
@@ -42,6 +46,18 @@ export default function MiCuentaPage() {
   const [operacion, setOperacion] = useState(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState(null);
+  const [perfil, setPerfil] = useState(null);
+  const [errorPerfil, setErrorPerfil] = useState('');
+
+  useEffect(() => {
+    let vigente = true;
+    obtenerPerfil()
+      .then((datos) => vigente && setPerfil(datos))
+      .catch((error_) => vigente && setErrorPerfil(error_.message));
+    return () => {
+      vigente = false;
+    };
+  }, []);
 
   function abrir(clave) {
     setOperacion(clave);
@@ -60,9 +76,26 @@ export default function MiCuentaPage() {
     }
   }
 
+  async function guardarPerfil(datos) {
+    const actualizado = await actualizarPerfil(datos);
+    setPerfil(actualizado);
+    return actualizado;
+  }
+
   return (
     <main className={estilos.pagina}>
       <h1 className={estilos.titulo}>Mi cuenta</h1>
+      <section className={estilos.seccion} aria-labelledby="seccion-datos">
+        <h2 id="seccion-datos" className={estilos.subtitulo}>Mis datos</h2>
+        {perfil?.fotoUrl && <img className={estilos.foto} src={perfil.fotoUrl} alt="Tu foto de perfil" />}
+        {errorPerfil && <p role="alert" className={estilos.aviso}>{errorPerfil}</p>}
+        {!perfil && !errorPerfil && <p className={estilos.resumen}>Cargando tus datos…</p>}
+        {perfil && <DatosPerfil perfil={perfil} alGuardar={guardarPerfil} />}
+      </section>
+      <section className={estilos.seccion} aria-labelledby="seccion-contrasena">
+        <h2 id="seccion-contrasena" className={estilos.subtitulo}>Cambiar contraseña</h2>
+        <CambioContrasena alCambiar={cambiarContrasena} />
+      </section>
       {Object.entries(OPERACIONES).map(([clave, datos]) => (
         <section key={clave} className={estilos.seccion} aria-labelledby={`seccion-${clave}`}>
           <h2 id={`seccion-${clave}`} className={estilos.subtitulo}>{datos.titulo}</h2>

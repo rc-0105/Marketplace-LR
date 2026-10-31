@@ -39,3 +39,20 @@
   cursor: progress;
   opacity: 0.7;
 }
+
+.foto {
+  display: block;
+  width: 6rem;
+  height: 6rem;
+  margin-bottom: var(--espacio-4);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.aviso {
+  margin: 0;
+  padding: var(--espacio-3) var(--espacio-4);
+  border-radius: var(--radio);
+  background: var(--color-error-fondo);
+  color: var(--color-error);
+}
