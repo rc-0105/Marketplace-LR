@@ -1,6 +1,6 @@
-import { post } from '../../../shared/services/http.js';
-import { guardarSesion, limpiarSesion } from '../../../shared/services/sesion.js';
-import { usuarioDesdeApi } from '../models/usuario.js';
+import { get, post, put } from '../../../shared/services/http.js';
+import { guardarSesion, limpiarSesion, obtenerSesion } from '../../../shared/services/sesion.js';
+import { perfilDesdeApi, usuarioDesdeApi } from '../models/usuario.js';
 
 /**
  * @param {import('../models/usuario.js').DatosRegistro} datos
@@ -75,6 +75,37 @@ export function eliminarCuenta(contrasena) {
 async function darDeBaja(ruta, contrasena) {
   await post(ruta, { contrasena });
   limpiarSesion();
+}
+
+/** @returns {Promise<import('../models/usuario.js').Perfil>} */
+export async function obtenerPerfil() {
+  return perfilDesdeApi(await get('/api/v1/perfil'));
+}
+
+/**
+ * Guarda nombre, teléfono y foto; el correo no se envía porque la API no permite cambiarlo.
+ * La sesión local se queda con el nombre nuevo. Si la API responde 400 el ErrorApi se propaga.
+ * @param {import('../models/usuario.js').DatosPerfil} datos
+ * @returns {Promise<import('../models/usuario.js').Perfil>}
+ */
+export async function actualizarPerfil(datos) {
+  const perfil = perfilDesdeApi(await put('/api/v1/perfil', {
+    nombre: datos.nombre, telefono: datos.telefono, fotoUrl: datos.fotoUrl,
+  }));
+  const sesion = obtenerSesion();
+  if (sesion) {
+    guardarSesion({ ...sesion, usuario: { ...sesion.usuario, nombre: perfil.nombre } });
+  }
+  return perfil;
+}
+
+/**
+ * Si la actual es incorrecta (403) o la nueva no cumple la regla (400) el ErrorApi se propaga.
+ * @param {{contrasenaActual: string, contrasenaNueva: string}} datos
+ * @returns {Promise<void>}
+ */
+export async function cambiarContrasena(datos) {
+  await put('/api/v1/perfil/contrasena', datos);
 }
 
 /** Siempre deja al usuario sin sesión local, falle o no el logout del servidor. */

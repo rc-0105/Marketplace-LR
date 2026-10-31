@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ErrorApi, post } from '../../../shared/services/http.js';
+import { ErrorApi, get, post, put } from '../../../shared/services/http.js';
 import { guardarSesion, obtenerSesion } from '../../../shared/services/sesion.js';
 import {
-  cerrarSesion, confirmarRecuperacion, desactivarCuenta, eliminarCuenta, iniciarSesion, reactivarCuenta,
-  registrarUsuario, solicitarRecuperacion,
+  actualizarPerfil, cambiarContrasena, cerrarSesion, confirmarRecuperacion, desactivarCuenta, eliminarCuenta,
+  iniciarSesion, obtenerPerfil, reactivarCuenta, registrarUsuario, solicitarRecuperacion,
 } from './identidadService.js';
 
 vi.mock('../../../shared/services/http.js', async (importOriginal) => ({
   ...(await importOriginal()),
+  get: vi.fn(),
   post: vi.fn(),
+  put: vi.fn(),
 }));
 
 const respuestaLogin = {
@@ -163,5 +165,53 @@ describe('identidadService', () => {
 
     await expect(operacion('x')).rejects.toBe(error);
     expect(obtenerSesion()).toEqual(previa);
+  });
+
+  it('obtiene el perfil y convierte teléfono y foto ausentes en texto vacío', async () => {
+    vi.mocked(get).mockResolvedValue({
+      id: 7, nombre: 'Ana', correo: 'ana@correo.com', telefono: null, fotoUrl: null, rol: 'HUESPED',
+    });
+
+    const perfil = await obtenerPerfil();
+
+    expect(get).toHaveBeenCalledWith('/api/v1/perfil');
+    expect(perfil).toEqual({ id: 7, nombre: 'Ana', correo: 'ana@correo.com', telefono: '', fotoUrl: '', rol: 'HUESPED' });
+  });
+
+  it('actualiza el perfil sin enviar el correo y deja el nombre nuevo en la sesión', async () => {
+    guardarSesion({ token: 'jwt-abc', expiraEn: '2999-01-01T00:00:00Z', usuario: { id: 7, nombre: 'Ana', rol: 'HUESPED' } });
+    vi.mocked(put).mockResolvedValue({
+      id: 7, nombre: 'Ana María', correo: 'ana@correo.com', telefono: '+573001234567', fotoUrl: null, rol: 'HUESPED',
+    });
+
+    const perfil = await actualizarPerfil({ nombre: 'Ana María', telefono: '+573001234567', fotoUrl: '' });
+
+    expect(put).toHaveBeenCalledWith('/api/v1/perfil', { nombre: 'Ana María', telefono: '+573001234567', fotoUrl: '' });
+    expect(perfil.nombre).toBe('Ana María');
+    expect(obtenerSesion()).toEqual({
+      token: 'jwt-abc', expiraEn: '2999-01-01T00:00:00Z', usuario: { id: 7, nombre: 'Ana María', rol: 'HUESPED' },
+    });
+  });
+
+  it('si la API rechaza el perfil propaga el error y la sesión no cambia', async () => {
+    const previa = { token: 'jwt-abc', expiraEn: '2999-01-01T00:00:00Z', usuario: { id: 7, nombre: 'Ana' } };
+    guardarSesion(previa);
+    const error = new ErrorApi(400, 'Datos inválidos.', { correo: 'El correo no se puede modificar.' });
+    vi.mocked(put).mockRejectedValue(error);
+
+    await expect(actualizarPerfil({ nombre: 'Ana', telefono: '', fotoUrl: '' })).rejects.toBe(error);
+    expect(obtenerSesion()).toEqual(previa);
+  });
+
+  it('cambia la contraseña enviando la actual y la nueva, y propaga el 403 si la actual no es correcta', async () => {
+    const datos = { contrasenaActual: 'Segura#2026', contrasenaNueva: 'Nueva#Clave7' };
+    vi.mocked(put).mockResolvedValueOnce(null);
+
+    await cambiarContrasena(datos);
+
+    expect(put).toHaveBeenCalledWith('/api/v1/perfil/contrasena', datos);
+    const error = new ErrorApi(403, 'La contraseña no es correcta.', {}, { codigo: 'CONFIRMACION_INVALIDA' });
+    vi.mocked(put).mockRejectedValueOnce(error);
+    await expect(cambiarContrasena(datos)).rejects.toBe(error);
   });
 });

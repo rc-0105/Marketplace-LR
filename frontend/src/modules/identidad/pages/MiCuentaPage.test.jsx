@@ -1,11 +1,28 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi } from '../../../shared/services/http.js';
-import { desactivarCuenta, eliminarCuenta } from '../services/identidadService.js';
+import {
+  actualizarPerfil, cambiarContrasena, desactivarCuenta, eliminarCuenta, obtenerPerfil,
+} from '../services/identidadService.js';
 import MiCuentaPage from './MiCuentaPage.jsx';
 
-vi.mock('../services/identidadService.js', () => ({ desactivarCuenta: vi.fn(), eliminarCuenta: vi.fn() }));
+vi.mock('../services/identidadService.js', () => ({
+  actualizarPerfil: vi.fn(), cambiarContrasena: vi.fn(), desactivarCuenta: vi.fn(), eliminarCuenta: vi.fn(),
+  obtenerPerfil: vi.fn(),
+}));
+
+const PERFIL = {
+  id: 7, nombre: 'Ana Gómez', correo: 'ana@correo.com', telefono: '', fotoUrl: '', rol: 'HUESPED',
+};
+const SECCIONES_BAJA = ['Desactivar mi cuenta', 'Eliminar mi cuenta'];
+
+// La confirmación de la baja vive en la sección de cada operación.
+function campoConfirmacion() {
+  return SECCIONES_BAJA
+    .map((nombre) => within(screen.getByRole('region', { name: nombre })).queryByLabelText('Contraseña actual'))
+    .find(Boolean) ?? null;
+}
 
 function renderizar() {
   render(
@@ -18,12 +35,21 @@ function renderizar() {
   );
 }
 
+function irAPestana(nombre) {
+  fireEvent.click(screen.getByRole('tab', { name: nombre }));
+}
+
+function renderizarBaja() {
+  renderizar();
+  irAPestana('Desactivar o eliminar');
+}
+
 function abrir(nombre) {
   fireEvent.click(screen.getByRole('button', { name: nombre }));
 }
 
 function confirmar(textoBoton, contrasena = 'Segura#2026') {
-  fireEvent.change(screen.getByLabelText('Contraseña actual'), { target: { value: contrasena } });
+  fireEvent.change(campoConfirmacion(), { target: { value: contrasena } });
   fireEvent.click(screen.getByRole('button', { name: textoBoton }));
 }
 
@@ -33,28 +59,136 @@ const OPERACIONES = [
 ];
 
 describe('MiCuentaPage', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    // Por defecto la carga queda pendiente: las pruebas de la baja no dependen del perfil.
+    vi.mocked(obtenerPerfil).mockReturnValue(new Promise(() => {}));
+  });
+
+  it('mientras carga el perfil avisa que está cargando', () => {
+    renderizar();
+
+    expect(screen.getByText('Cargando tus datos…')).toBeInTheDocument();
+  });
+
+  it('carga los datos del perfil con el correo como solo lectura', async () => {
+    vi.mocked(obtenerPerfil).mockResolvedValue(PERFIL);
+    renderizar();
+
+    expect(await screen.findByLabelText('Nombre')).toHaveValue('Ana Gómez');
+    expect(screen.getByText('ana@correo.com')).toBeInTheDocument();
+    expect(screen.getByText('El correo no se puede cambiar.')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: /correo/i })).not.toBeInTheDocument();
+  });
+
+  it('muestra la foto de perfil cuando la cuenta tiene una', async () => {
+    vi.mocked(obtenerPerfil).mockResolvedValue({ ...PERFIL, fotoUrl: 'https://fotos.ejemplo.com/ana.jpg' });
+    renderizar();
+
+    expect(await screen.findByRole('img', { name: 'Tu foto de perfil' }))
+      .toHaveAttribute('src', 'https://fotos.ejemplo.com/ana.jpg');
+  });
+
+  it('si no puede cargar el perfil muestra el mensaje de la API', async () => {
+    vi.mocked(obtenerPerfil).mockRejectedValue(new ErrorApi(0, 'No pudimos conectar con el servidor.'));
+    renderizar();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos conectar con el servidor.');
+    expect(screen.queryByLabelText('Nombre')).not.toBeInTheDocument();
+  });
+
+  it('al guardar los datos los envía a la API y muestra la foto nueva', async () => {
+    const foto = 'https://fotos.ejemplo.com/nueva.jpg';
+    vi.mocked(obtenerPerfil).mockResolvedValue(PERFIL);
+    vi.mocked(actualizarPerfil).mockResolvedValue({ ...PERFIL, nombre: 'Ana María', fotoUrl: foto });
+    renderizar();
+
+    fireEvent.change(await screen.findByLabelText('Nombre'), { target: { value: 'Ana María' } });
+    fireEvent.change(screen.getByLabelText('Foto de perfil (dirección web)'), { target: { value: foto } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    expect(await screen.findByText('Tus datos quedaron guardados.')).toBeInTheDocument();
+    expect(actualizarPerfil).toHaveBeenCalledWith({ nombre: 'Ana María', telefono: '', fotoUrl: foto });
+    expect(screen.getByRole('img', { name: 'Tu foto de perfil' })).toHaveAttribute('src', foto);
+  });
+
+  it('el cambio de contraseña usa el servicio de la API', async () => {
+    vi.mocked(cambiarContrasena).mockResolvedValue();
+    renderizar();
+    irAPestana('Contraseña');
+
+    fireEvent.change(screen.getByLabelText('Contraseña actual'), { target: { value: 'Segura#2026' } });
+    fireEvent.change(screen.getByLabelText('Contraseña nueva'), { target: { value: 'Nueva#Clave7' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Cambiar contraseña' }));
+
+    expect(await screen.findByText('Tu contraseña cambió.')).toBeInTheDocument();
+    expect(cambiarContrasena).toHaveBeenCalledWith({ contrasenaActual: 'Segura#2026', contrasenaNueva: 'Nueva#Clave7' });
+  });
+
+  it('muestra una sección a la vez: empieza en Mis datos y cada pestaña cambia el panel', async () => {
+    vi.mocked(obtenerPerfil).mockResolvedValue(PERFIL);
+    renderizar();
+
+    expect(screen.getByRole('tab', { name: 'Mis datos' })).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByLabelText('Nombre')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Contraseña nueva')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Desactivar mi cuenta' })).not.toBeInTheDocument();
+
+    irAPestana('Contraseña');
+    expect(screen.getByRole('tabpanel', { name: 'Contraseña' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Contraseña nueva')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Nombre')).not.toBeInTheDocument();
+
+    irAPestana('Desactivar o eliminar');
+    expect(screen.getByRole('button', { name: 'Desactivar mi cuenta' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Contraseña nueva')).not.toBeInTheDocument();
+  });
+
+  it('las flechas del teclado recorren las pestañas en círculo y mueven el foco', () => {
+    renderizar();
+    const datos = screen.getByRole('tab', { name: 'Mis datos' });
+
+    fireEvent.keyDown(datos, { key: 'ArrowLeft' });
+
+    const baja = screen.getByRole('tab', { name: 'Desactivar o eliminar' });
+    expect(baja).toHaveAttribute('aria-selected', 'true');
+    expect(baja).toHaveFocus();
+    fireEvent.keyDown(baja, { key: 'ArrowRight' });
+    expect(datos).toHaveAttribute('aria-selected', 'true');
+    expect(datos).toHaveFocus();
+  });
+
+  it('al cambiar de pestaña se cierra la confirmación de baja abierta', () => {
+    renderizarBaja();
+    abrir('Desactivar mi cuenta');
+    expect(campoConfirmacion()).toBeInTheDocument();
+
+    irAPestana('Mis datos');
+    irAPestana('Desactivar o eliminar');
+
+    expect(campoConfirmacion()).not.toBeInTheDocument();
+  });
 
   it('ofrece desactivar y eliminar la cuenta sin pedir contraseña todavía', () => {
-    renderizar();
+    renderizarBaja();
 
     expect(screen.getByRole('heading', { name: 'Mi cuenta' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Desactivar mi cuenta' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Eliminar mi cuenta' })).toBeInTheDocument();
-    expect(screen.queryByLabelText('Contraseña actual')).not.toBeInTheDocument();
+    expect(campoConfirmacion()).not.toBeInTheDocument();
   });
 
   it.each(OPERACIONES)('al elegir %s pide la contraseña sin llamar al servicio', (_op, abrirNombre, _c, servicio) => {
-    renderizar();
+    renderizarBaja();
 
     abrir(abrirNombre);
 
-    expect(screen.getByLabelText('Contraseña actual')).toBeInTheDocument();
+    expect(campoConfirmacion()).toBeInTheDocument();
     expect(servicio).not.toHaveBeenCalled();
   });
 
   it('eliminar avisa que no se puede deshacer y desactivar no', () => {
-    renderizar();
+    renderizarBaja();
 
     abrir('Desactivar mi cuenta');
     expect(screen.queryByText(/no se puede deshacer/i)).not.toBeInTheDocument();
@@ -65,7 +199,7 @@ describe('MiCuentaPage', () => {
 
   it.each(OPERACIONES)('al confirmar %s llama al servicio y lleva al inicio de sesión', async (_op, abrirNombre, confirmarNombre, servicio) => {
     servicio.mockResolvedValue(undefined);
-    renderizar();
+    renderizarBaja();
 
     abrir(abrirNombre);
     confirmar(confirmarNombre);
@@ -77,7 +211,7 @@ describe('MiCuentaPage', () => {
   it('mientras la petición está en curso no deja confirmar de nuevo', async () => {
     let terminar;
     desactivarCuenta.mockReturnValue(new Promise((resolver) => { terminar = resolver; }));
-    renderizar();
+    renderizarBaja();
 
     abrir('Desactivar mi cuenta');
     confirmar('Sí, desactivar mi cuenta');
@@ -90,7 +224,7 @@ describe('MiCuentaPage', () => {
   it.each(OPERACIONES)('con contraseña incorrecta en %s avisa y permite reintentar', async (_op, abrirNombre, confirmarNombre, servicio) => {
     servicio.mockRejectedValueOnce(new ErrorApi(403, 'La contraseña no es correcta.', {}, { codigo: 'CONFIRMACION_INVALIDA' }));
     servicio.mockResolvedValueOnce(undefined);
-    renderizar();
+    renderizarBaja();
 
     abrir(abrirNombre);
     confirmar(confirmarNombre, 'mala');
@@ -107,7 +241,7 @@ describe('MiCuentaPage', () => {
   it('con reservas futuras muestra el mensaje de la API y se queda en la página', async () => {
     const detalle = 'Tienes reservas confirmadas pendientes (2). Cancélalas o espera a que terminen antes de continuar.';
     desactivarCuenta.mockRejectedValue(new ErrorApi(409, detalle, {}, { codigo: 'RESERVAS_FUTURAS_ACTIVAS' }));
-    renderizar();
+    renderizarBaja();
 
     abrir('Desactivar mi cuenta');
     confirmar('Sí, desactivar mi cuenta');
@@ -124,7 +258,7 @@ describe('MiCuentaPage', () => {
     ['503', new ErrorApi(503, 'No disponible.')],
   ])('ante un %s muestra un mensaje genérico sin usar el detalle', async (_caso, error) => {
     eliminarCuenta.mockRejectedValue(error);
-    renderizar();
+    renderizarBaja();
 
     abrir('Eliminar mi cuenta');
     confirmar('Sí, eliminar mi cuenta');
@@ -135,15 +269,15 @@ describe('MiCuentaPage', () => {
   });
 
   it('cancelar cierra la confirmación, descarta la contraseña y no llama al servicio', () => {
-    renderizar();
+    renderizarBaja();
 
     abrir('Desactivar mi cuenta');
-    fireEvent.change(screen.getByLabelText('Contraseña actual'), { target: { value: 'Segura#2026' } });
+    fireEvent.change(campoConfirmacion(), { target: { value: 'Segura#2026' } });
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
 
-    expect(screen.queryByLabelText('Contraseña actual')).not.toBeInTheDocument();
+    expect(campoConfirmacion()).not.toBeInTheDocument();
     abrir('Eliminar mi cuenta');
-    expect(screen.getByLabelText('Contraseña actual')).toHaveValue('');
+    expect(campoConfirmacion()).toHaveValue('');
     expect(desactivarCuenta).not.toHaveBeenCalled();
     expect(eliminarCuenta).not.toHaveBeenCalled();
   });
