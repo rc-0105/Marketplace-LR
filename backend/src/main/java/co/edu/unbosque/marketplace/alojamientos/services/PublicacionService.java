@@ -1,6 +1,8 @@
 package co.edu.unbosque.marketplace.alojamientos.services;
 
+import co.edu.unbosque.marketplace.alojamientos.exceptions.CambioEstadoNoPermitidoException;
 import co.edu.unbosque.marketplace.alojamientos.exceptions.PoliticaCancelacionNoValidaException;
+import co.edu.unbosque.marketplace.alojamientos.exceptions.PublicacionIncompletaException;
 import co.edu.unbosque.marketplace.alojamientos.exceptions.PublicacionNoEliminableException;
 import co.edu.unbosque.marketplace.alojamientos.exceptions.PublicacionNoEncontradaException;
 import co.edu.unbosque.marketplace.alojamientos.exceptions.ServicioAdicionalRepetidoException;
@@ -143,6 +145,48 @@ public class PublicacionService {
         }
         publicaciones.delete(publicacion);
         auditar(publicacionId, usuarioId, esAdministrador, "eliminar");
+    }
+
+    /**
+     * Un borrador completo pasa a PENDIENTE_REVISION y no sale al público hasta que
+     * un administrador lo apruebe (RF-14); uno pausado vuelve directo a ACTIVA (RF-17).
+     */
+    @Transactional
+    public Publicacion activar(Long publicacionId, Long anfitrionId) {
+        Publicacion publicacion = buscarConAcceso(publicacionId, anfitrionId, false);
+        String operacion = switch (publicacion.getEstado()) {
+            case BORRADOR -> {
+                List<String> faltantes = publicacion.camposFaltantesParaActivar();
+                if (!faltantes.isEmpty()) {
+                    throw new PublicacionIncompletaException(faltantes);
+                }
+                publicacion.enviarARevision();
+                yield "enviar_a_revision";
+            }
+            case PAUSADA -> {
+                publicacion.reactivar();
+                yield "reactivar";
+            }
+            case PENDIENTE_REVISION ->
+                throw new CambioEstadoNoPermitidoException("La publicación ya está esperando revisión.");
+            case ACTIVA -> throw new CambioEstadoNoPermitidoException("La publicación ya está activa.");
+        };
+        Publicacion guardada = publicaciones.save(publicacion);
+        auditar(publicacionId, anfitrionId, false, operacion);
+        return guardada;
+    }
+
+    /** Una publicación ACTIVA pasa a PAUSADA y sale de las búsquedas (RF-17). */
+    @Transactional
+    public Publicacion pausar(Long publicacionId, Long anfitrionId) {
+        Publicacion publicacion = buscarConAcceso(publicacionId, anfitrionId, false);
+        if (publicacion.getEstado() != EstadoPublicacion.ACTIVA) {
+            throw new CambioEstadoNoPermitidoException("Solo se puede pausar una publicación activa.");
+        }
+        publicacion.pausar();
+        Publicacion guardada = publicaciones.save(publicacion);
+        auditar(publicacionId, anfitrionId, false, "pausar");
+        return guardada;
     }
 
     // La propiedad va antes que el contenido: a quien no es dueño no se le revela nada más.

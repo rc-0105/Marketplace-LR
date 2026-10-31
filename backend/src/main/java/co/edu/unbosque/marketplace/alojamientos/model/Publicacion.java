@@ -243,6 +243,33 @@ public class Publicacion {
 		return faltantes;
 	}
 
+	/** BORRADOR completo a PENDIENTE_REVISION: queda esperando a un administrador (RF-14). */
+	public void enviarARevision() {
+		if (estado != EstadoPublicacion.BORRADOR) {
+			throw new IllegalStateException("Solo un borrador se envía a revisión");
+		}
+		if (!camposFaltantesParaActivar().isEmpty()) {
+			throw new IllegalStateException("Un borrador incompleto no se envía a revisión");
+		}
+		this.estado = EstadoPublicacion.PENDIENTE_REVISION;
+	}
+
+	/** ACTIVA a PAUSADA: sale de las búsquedas (RF-17). */
+	public void pausar() {
+		if (estado != EstadoPublicacion.ACTIVA) {
+			throw new IllegalStateException("Solo una publicación activa se pausa");
+		}
+		this.estado = EstadoPublicacion.PAUSADA;
+	}
+
+	/** PAUSADA a ACTIVA, sin volver a revisión: ya fue aprobada (RF-17). */
+	public void reactivar() {
+		if (estado != EstadoPublicacion.PAUSADA) {
+			throw new IllegalStateException("Solo una publicación pausada se reactiva");
+		}
+		this.estado = EstadoPublicacion.ACTIVA;
+	}
+
 	private static void agregarSiFalta(List<String> faltantes, String campo, boolean falta) {
 		if (falta) {
 			faltantes.add(campo);
