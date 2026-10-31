@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { get, post, put } from '../../../shared/services/http.js';
 import {
-  actualizarConfiguracion, actualizarImagenes, actualizarServicios, consultarPublicacion, crearPublicacion,
-  editarPublicacion, listarMisPublicaciones, listarPoliticasCancelacion, listarServicios, listarTiposAlojamiento,
+  activarPublicacion, actualizarConfiguracion, actualizarImagenes, actualizarServicios, consultarPublicacion,
+  crearPublicacion, editarPublicacion, listarMisPublicaciones, listarPoliticasCancelacion, listarServicios,
+  listarTiposAlojamiento, pausarPublicacion,
 } from './alojamientosService.js';
 
 vi.mock('../../../shared/services/http.js', async (importOriginal) => ({
@@ -72,6 +73,18 @@ describe('alojamientosService', () => {
 
     expect(put).toHaveBeenCalledWith('/api/v1/publicaciones/5/servicios', { servicios: [1, 2] });
     expect(put).toHaveBeenCalledWith('/api/v1/publicaciones/5/imagenes', { imagenes: ['https://imagenes.com/1.jpg'] });
+  });
+
+  it('activa y pausa la publicación y devuelve el modelo con el estado nuevo', async () => {
+    vi.mocked(post)
+      .mockResolvedValueOnce({ id: 5, titulo: 'Casa', estado: 'PENDIENTE_REVISION' })
+      .mockResolvedValueOnce({ id: 5, titulo: 'Casa', estado: 'PAUSADA' });
+
+    await expect(activarPublicacion(5)).resolves.toMatchObject({ id: 5, estado: 'PENDIENTE_REVISION' });
+    await expect(pausarPublicacion(5)).resolves.toMatchObject({ id: 5, estado: 'PAUSADA' });
+
+    expect(post).toHaveBeenCalledWith('/api/v1/publicaciones/5/activar');
+    expect(post).toHaveBeenCalledWith('/api/v1/publicaciones/5/pausar');
   });
 
   it('lista el catálogo de políticas de cancelación', async () => {

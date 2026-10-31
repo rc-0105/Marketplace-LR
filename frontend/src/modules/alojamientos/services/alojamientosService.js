@@ -90,3 +90,22 @@ export async function actualizarServicios(id, servicioIds) {
 export async function actualizarImagenes(id, urls) {
   return publicacionDesdeApi(await put(`${RUTA}/${id}/imagenes`, { imagenes: urls }));
 }
+
+/**
+ * Pide activar la publicación: un borrador completo queda en revisión y una pausada
+ * vuelve a estar activa. Si faltan datos la API responde 422 y el ErrorApi se propaga.
+ * @param {number | string} id
+ * @returns {Promise<import('../models/publicacion.js').Publicacion>}
+ */
+export async function activarPublicacion(id) {
+  return publicacionDesdeApi(await post(`${RUTA}/${id}/activar`));
+}
+
+/**
+ * Saca de las búsquedas una publicación activa (409 si no está activa).
+ * @param {number | string} id
+ * @returns {Promise<import('../models/publicacion.js').Publicacion>}
+ */
+export async function pausarPublicacion(id) {
+  return publicacionDesdeApi(await post(`${RUTA}/${id}/pausar`));
+}

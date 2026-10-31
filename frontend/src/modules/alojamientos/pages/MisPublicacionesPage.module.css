@@ -35,11 +35,39 @@
   background: var(--color-terracota-oscuro);
 }
 
-.editar {
-  display: inline-block;
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espacio-4);
   margin-top: var(--espacio-3);
+}
+
+.editar {
   color: var(--color-terracota);
   font-weight: 600;
+}
+
+.cambiarEstado {
+  min-height: 2.75rem;
+  padding: 0 var(--espacio-4);
+  border: 1px solid var(--color-terracota);
+  border-radius: var(--radio);
+  background: transparent;
+  color: var(--color-terracota);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transicion);
+}
+
+.cambiarEstado:hover:not(:disabled) {
+  background: var(--color-fondo);
+}
+
+.cambiarEstado:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .nota {
