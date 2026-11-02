@@ -25,4 +25,14 @@ public interface PublicacionRepository extends JpaRepository<Publicacion, Long> 
 
     @Query("select p.anfitrionId from Publicacion p where p.id = :id")
     Optional<Long> buscarAnfitrionId(@Param("id") Long id);
+
+    // La más antigua primero, contando desde que se pidió la revisión. Las que
+    // quedaron pendientes antes de V13 no tienen esa fecha y usan la de creación.
+    @EntityGraph(attributePaths = {"tipo", "politica", "servicios", "imagenes", "serviciosAdicionales"})
+    @Query("""
+            SELECT p FROM Publicacion p
+            WHERE p.estado = co.edu.unbosque.marketplace.alojamientos.model.EstadoPublicacion.PENDIENTE_REVISION
+            ORDER BY COALESCE(p.enviadaARevisionEn, p.creadoEn), p.id
+            """)
+    List<Publicacion> buscarPendientesPorAntiguedad();
 }

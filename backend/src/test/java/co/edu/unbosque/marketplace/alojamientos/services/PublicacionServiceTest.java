@@ -767,6 +767,75 @@ class PublicacionServiceTest {
                 .isInstanceOf(PublicacionNoEncontradaException.class);
     }
 
+    @Test
+    @DisplayName("El panel de revisión recibe las pendientes tal como las ordena el repositorio")
+    void listaPendientesDelRepositorio() {
+        Publicacion pendiente = publicacionEn(EstadoPublicacion.PENDIENTE_REVISION);
+        when(publicaciones.buscarPendientesPorAntiguedad()).thenReturn(List.of(pendiente));
+
+        assertThat(servicio.listarPendientes()).containsExactly(pendiente);
+    }
+
+    @Test
+    @DisplayName("Aprobar una pendiente la deja ACTIVA, la guarda y la audita como acción administrativa")
+    void aprobarPendienteLaActiva() {
+        Publicacion pendiente = publicacionEn(EstadoPublicacion.PENDIENTE_REVISION);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(pendiente));
+
+        Publicacion aprobada = servicio.aprobar(PUBLICACION_ID, ADMINISTRADOR_ID);
+
+        assertThat(aprobada.getEstado()).isEqualTo(EstadoPublicacion.ACTIVA);
+        verify(publicaciones).save(pendiente);
+        EventoCritico evento = eventoPublicado();
+        assertThat(evento.usuario()).isEqualTo(String.valueOf(ADMINISTRADOR_ID));
+        assertThat(evento.accion()).isEqualTo(AccionCritica.ACCION_ADMINISTRATIVA);
+        assertThat(evento.datos()).containsEntry("operacion", "aprobar");
+    }
+
+    @Test
+    @DisplayName("Devolver una pendiente la deja en BORRADOR con el motivo sin espacios sobrantes y la audita")
+    void devolverPendienteLaRegresaABorrador() {
+        Publicacion pendiente = publicacionEn(EstadoPublicacion.PENDIENTE_REVISION);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(pendiente));
+
+        Publicacion devuelta = servicio.devolver(PUBLICACION_ID, ADMINISTRADOR_ID, "  Faltan fotos del baño  ");
+
+        assertThat(devuelta.getEstado()).isEqualTo(EstadoPublicacion.BORRADOR);
+        assertThat(devuelta.getObservacionesRevision()).isEqualTo("Faltan fotos del baño");
+        verify(publicaciones).save(pendiente);
+        EventoCritico evento = eventoPublicado();
+        assertThat(evento.accion()).isEqualTo(AccionCritica.ACCION_ADMINISTRATIVA);
+        assertThat(evento.datos()).containsEntry("operacion", "devolver");
+    }
+
+    @Test
+    @DisplayName("Aprobar o devolver una publicación que no está pendiente responde 409 y no guarda nada")
+    void revisarNoPendienteSeRechaza() {
+        Publicacion activa = publicacionEn(EstadoPublicacion.ACTIVA);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(activa));
+
+        assertThatThrownBy(() -> servicio.aprobar(PUBLICACION_ID, ADMINISTRADOR_ID))
+                .isInstanceOf(CambioEstadoNoPermitidoException.class)
+                .hasMessage("Solo se puede revisar una publicación pendiente de revisión.");
+        assertThatThrownBy(() -> servicio.devolver(PUBLICACION_ID, ADMINISTRADOR_ID, "Motivo"))
+                .isInstanceOf(CambioEstadoNoPermitidoException.class)
+                .hasMessage("Solo se puede revisar una publicación pendiente de revisión.");
+        assertThat(activa.getEstado()).isEqualTo(EstadoPublicacion.ACTIVA);
+        verify(publicaciones, never()).save(any(Publicacion.class));
+        verify(publicador, never()).publicar(any(EventoCritico.class));
+    }
+
+    @Test
+    @DisplayName("Revisar una publicación que no existe lanza 404")
+    void revisarInexistenteLanza404() {
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.aprobar(PUBLICACION_ID, ADMINISTRADOR_ID))
+                .isInstanceOf(PublicacionNoEncontradaException.class);
+        assertThatThrownBy(() -> servicio.devolver(PUBLICACION_ID, ADMINISTRADOR_ID, "Motivo"))
+                .isInstanceOf(PublicacionNoEncontradaException.class);
+    }
+
     private static SolicitudConfiguracion.ServicioAdicional adicional(String nombre, String costo) {
         return new SolicitudConfiguracion.ServicioAdicional(nombre, new BigDecimal(costo));
     }

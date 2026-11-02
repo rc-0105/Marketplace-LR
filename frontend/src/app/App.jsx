@@ -6,6 +6,7 @@ import MiCuentaPage from '../modules/identidad/pages/MiCuentaPage.jsx';
 import RegistroPage from '../modules/identidad/pages/RegistroPage.jsx';
 import MisPublicacionesPage from '../modules/alojamientos/pages/MisPublicacionesPage.jsx';
 import PublicacionFormPage from '../modules/alojamientos/pages/PublicacionFormPage.jsx';
+import RevisionPublicacionesPage from '../modules/alojamientos/pages/RevisionPublicacionesPage.jsx';
 import DisponibilidadPage from '../modules/disponibilidad/pages/DisponibilidadPage.jsx';
 import PanelRolPage from './pages/PanelRolPage.jsx';
 import Encabezado from '../shared/components/Encabezado.jsx';
@@ -54,6 +55,8 @@ export default function App() {
           element={<RutaProtegida rol="ANFITRION"><PublicacionFormPage /></RutaProtegida>} />
         <Route path="/anfitrion/publicaciones/:id/disponibilidad"
           element={<RutaProtegida rol="ANFITRION"><DisponibilidadPage /></RutaProtegida>} />
+        <Route path="/administrador/publicaciones"
+          element={<RutaProtegida rol="ADMINISTRADOR"><RevisionPublicacionesPage /></RutaProtegida>} />
         {ROLES_CON_PANEL.map(({ rol, ruta }) => (
           <Route key={ruta} path={ruta} element={<RutaProtegida rol={rol}><PanelRolPage /></RutaProtegida>} />
         ))}

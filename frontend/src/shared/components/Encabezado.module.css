@@ -16,6 +16,8 @@
 
 .acciones {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
   gap: var(--espacio-3);
   margin-left: auto;
@@ -24,6 +26,24 @@
 .enlace {
   color: var(--color-texto);
   font-size: var(--texto-pequeno);
+}
+
+.volver {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espacio-1);
+  padding: var(--espacio-2) var(--espacio-3);
+  border: 1px solid var(--color-terracota);
+  border-radius: var(--radio);
+  color: var(--color-terracota);
+  font-size: var(--texto-pequeno);
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color var(--transicion);
+}
+
+.volver:hover {
+  background: var(--color-superficie);
 }
 
 .cerrarSesion {

@@ -200,6 +200,41 @@ public class PublicacionService {
         return guardada;
     }
 
+    /** Publicaciones que esperan revisión, la que lleva más tiempo esperando primero (RF-15). */
+    @Transactional(readOnly = true)
+    public List<Publicacion> listarPendientes() {
+        return publicaciones.buscarPendientesPorAntiguedad();
+    }
+
+    /** Una publicación pendiente pasa a ACTIVA y sale al público (RF-15). */
+    @Transactional
+    public Publicacion aprobar(Long publicacionId, Long administradorId) {
+        Publicacion publicacion = buscarPendiente(publicacionId);
+        publicacion.aprobar();
+        Publicacion guardada = publicaciones.save(publicacion);
+        auditar(publicacionId, administradorId, true, "aprobar");
+        return guardada;
+    }
+
+    /** Una publicación pendiente vuelve a BORRADOR con el motivo que verá el anfitrión (RF-15). */
+    @Transactional
+    public Publicacion devolver(Long publicacionId, Long administradorId, String observaciones) {
+        Publicacion publicacion = buscarPendiente(publicacionId);
+        publicacion.devolver(observaciones.trim());
+        Publicacion guardada = publicaciones.save(publicacion);
+        auditar(publicacionId, administradorId, true, "devolver");
+        return guardada;
+    }
+
+    private Publicacion buscarPendiente(Long publicacionId) {
+        Publicacion publicacion = publicaciones.findById(publicacionId)
+                .orElseThrow(PublicacionNoEncontradaException::new);
+        if (publicacion.getEstado() != EstadoPublicacion.PENDIENTE_REVISION) {
+            throw new CambioEstadoNoPermitidoException("Solo se puede revisar una publicación pendiente de revisión.");
+        }
+        return publicacion;
+    }
+
     // La propiedad va antes que el contenido: a quien no es dueño no se le revela nada más.
     private Publicacion buscarConAcceso(Long publicacionId, Long usuarioId, boolean esAdministrador) {
         Publicacion publicacion = publicaciones.findById(publicacionId)

@@ -81,6 +81,15 @@
   color: var(--color-error);
 }
 
+.observaciones {
+  margin: var(--espacio-2) 0 0;
+  padding: var(--espacio-2) var(--espacio-3);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  background: var(--color-fondo);
+  font-size: var(--texto-pequeno);
+}
+
 .lista {
   display: grid;
   gap: var(--espacio-4);
