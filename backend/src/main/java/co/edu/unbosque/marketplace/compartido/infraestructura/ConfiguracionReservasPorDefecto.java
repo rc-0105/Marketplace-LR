@@ -1,6 +1,8 @@
 package co.edu.unbosque.marketplace.compartido.infraestructura;
 
 import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasFuturas;
+import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasPeriodo;
+import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,5 +21,12 @@ public class ConfiguracionReservasPorDefecto {
     @ConditionalOnMissingBean(ConsultaReservasFuturas.class)
     ConsultaReservasFuturas consultaReservasFuturasPorDefecto() {
         return usuarioId -> 0L;
+    }
+
+    // Sin reservas, ninguna bloquea un periodo disponible (RF-24).
+    @Bean
+    @ConditionalOnMissingBean(ConsultaReservasPeriodo.class)
+    ConsultaReservasPeriodo consultaReservasPeriodoPorDefecto() {
+        return (publicacionId, inicio, fin) -> Optional.empty();
     }
 }

@@ -6,6 +6,7 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface PublicacionRepository extends JpaRepository<Publicacion, Long> {
 
@@ -21,6 +22,9 @@ public interface PublicacionRepository extends JpaRepository<Publicacion, Long> 
     // campos faltantes, que miran servicios e imágenes.
     @EntityGraph(attributePaths = {"tipo", "politica", "servicios", "imagenes", "serviciosAdicionales"})
     List<Publicacion> findByAnfitrionIdOrderByCreadoEnDesc(Long anfitrionId);
+
+    @Query("select p.anfitrionId from Publicacion p where p.id = :id")
+    Optional<Long> buscarAnfitrionId(@Param("id") Long id);
 
     // La más antigua primero, contando desde que se pidió la revisión. Las que
     // quedaron pendientes antes de V13 no tienen esa fecha y usan la de creación.
