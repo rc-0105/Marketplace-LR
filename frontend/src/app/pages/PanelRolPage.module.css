@@ -1,7 +1,15 @@
-.pagina {
-  max-width: 28rem;
+.pagina,
+.paginaAmplia {
   margin: 0 auto;
   padding: var(--espacio-12) var(--espacio-4);
+}
+
+.pagina {
+  max-width: 28rem;
+}
+
+.paginaAmplia {
+  max-width: 48rem;
 }
 
 .titulo {
@@ -17,4 +25,49 @@
 .nota {
   margin: 0;
   color: var(--color-texto-secundario);
+}
+
+.subtitulo {
+  margin: var(--espacio-8) 0 var(--espacio-4);
+  font-size: var(--texto-titulo);
+}
+
+.herramientas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--espacio-4);
+}
+
+.tarjeta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espacio-2);
+  padding: var(--espacio-4);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  background: var(--color-superficie);
+}
+
+.tituloTarjeta {
+  margin: 0;
+  font-size: var(--texto-titulo);
+}
+
+.enlace {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  margin-top: auto;
+  padding: 0 var(--espacio-4);
+  border: 1px solid var(--color-terracota);
+  border-radius: var(--radio);
+  color: var(--color-terracota);
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color var(--transicion);
+}
+
+.enlace:hover {
+  background: var(--color-fondo);
 }
