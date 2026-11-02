@@ -127,6 +127,17 @@ public class PublicacionService {
         return buscarConAcceso(publicacionId, usuarioId, esAdministrador);
     }
 
+    /**
+     * Para otros módulos (ADR-2): 404 si la publicación no existe y 403 si no es del
+     * anfitrión. No carga la publicación, solo su dueño.
+     */
+    @Transactional(readOnly = true)
+    public void exigirPropietario(Long publicacionId, Long anfitrionId) {
+        Long propietarioId = publicaciones.buscarAnfitrionId(publicacionId)
+                .orElseThrow(PublicacionNoEncontradaException::new);
+        Propiedad.exigirPropietario(propietarioId, anfitrionId);
+    }
+
     /** Publicaciones del anfitrión, la más reciente primero: de aquí elige cuál editar. */
     @Transactional(readOnly = true)
     public List<Publicacion> listarDelAnfitrion(Long anfitrionId) {

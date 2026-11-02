@@ -345,6 +345,27 @@ class PublicacionServiceTest {
     }
 
     @Test
+    @DisplayName("Exigir propietario acepta al dueño y niega con 403 a otro anfitrión")
+    void exigirPropietarioAceptaAlDuenoYNiegaAOtro() {
+        when(publicaciones.buscarAnfitrionId(PUBLICACION_ID)).thenReturn(Optional.of(ANFITRION_ID));
+
+        servicio.exigirPropietario(PUBLICACION_ID, ANFITRION_ID);
+
+        assertThatThrownBy(() -> servicio.exigirPropietario(PUBLICACION_ID, OTRO_ANFITRION_ID))
+                .isInstanceOf(AccesoDenegadoException.class);
+        verify(publicaciones, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("Exigir propietario de una publicación que no existe lanza 404")
+    void exigirPropietarioDeInexistenteLanza404() {
+        when(publicaciones.buscarAnfitrionId(PUBLICACION_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.exigirPropietario(PUBLICACION_ID, ANFITRION_ID))
+                .isInstanceOf(PublicacionNoEncontradaException.class);
+    }
+
+    @Test
     @DisplayName("El dueño elimina su borrador y deja un evento de publicación con la operación eliminar")
     void duenoEliminaSuBorrador() {
         Publicacion existente = publicacionDe(ANFITRION_ID);
