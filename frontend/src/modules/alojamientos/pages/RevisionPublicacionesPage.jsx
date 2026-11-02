@@ -60,11 +60,11 @@ export default function RevisionPublicacionesPage() {
     }
   }
 
-  function aprobar(publicacion) {
-    revisar(publicacion, () => aprobarPublicacion(publicacion.id), `«${publicacion.titulo}» quedó publicada.`);
+  async function aprobar(publicacion) {
+    await revisar(publicacion, () => aprobarPublicacion(publicacion.id), `«${publicacion.titulo}» quedó publicada.`);
   }
 
-  function devolver(evento, publicacion) {
+  async function devolver(evento, publicacion) {
     evento.preventDefault();
     const texto = observaciones[publicacion.id] ?? '';
     const error = errorDeObservaciones(texto);
@@ -72,7 +72,7 @@ export default function RevisionPublicacionesPage() {
     if (error) {
       return;
     }
-    revisar(publicacion, () => devolverPublicacion(publicacion.id, texto.trim()),
+    await revisar(publicacion, () => devolverPublicacion(publicacion.id, texto.trim()),
       `«${publicacion.titulo}» volvió al anfitrión.`);
   }
 
@@ -80,7 +80,7 @@ export default function RevisionPublicacionesPage() {
     <main className={estilos.pagina}>
       <h1 className={estilos.titulo}>Revisión de publicaciones</h1>
       <p className={estilos.nota}>Aprueba las que cumplen o devuélvelas al anfitrión explicando qué corregir.</p>
-      <div role="status" className={confirmacion ? estilos.confirmacion : undefined}>{confirmacion}</div>
+      <output className={confirmacion ? estilos.confirmacion : undefined}>{confirmacion}</output>
       {errorCarga && <p role="alert" className={estilos.error}>{errorCarga}</p>}
       {!errorCarga && pendientes === null && <p className={estilos.nota}>Cargando publicaciones pendientes…</p>}
       {pendientes?.length === 0 && <p className={estilos.nota}>No hay publicaciones pendientes de revisión.</p>}
