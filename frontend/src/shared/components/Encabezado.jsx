@@ -7,7 +7,7 @@ import estilos from './Encabezado.module.css';
 /**
  * Encabezado común de todas las páginas con la marca y el enlace al inicio.
  * Con sesión ofrece "Mi cuenta" y "Cerrar sesión", que delega en `alCerrarSesion`;
- * al anfitrión además le ofrece "Mis publicaciones".
+ * al anfitrión además le ofrece "Mis publicaciones" y al administrador "Revisar publicaciones".
  */
 export default function Encabezado({ alCerrarSesion }) {
   const sesion = useSesion();
@@ -32,6 +32,9 @@ export default function Encabezado({ alCerrarSesion }) {
         <div className={estilos.acciones}>
           {sesion.usuario.rol === 'ANFITRION' && (
             <Link to="/anfitrion/publicaciones" className={estilos.enlace}>Mis publicaciones</Link>
+          )}
+          {sesion.usuario.rol === 'ADMINISTRADOR' && (
+            <Link to="/administrador/publicaciones" className={estilos.enlace}>Revisar publicaciones</Link>
           )}
           <Link to="/mi-cuenta" className={estilos.enlace}>Mi cuenta</Link>
           <button type="button" className={estilos.cerrarSesion} onClick={cerrar} disabled={cerrando}>

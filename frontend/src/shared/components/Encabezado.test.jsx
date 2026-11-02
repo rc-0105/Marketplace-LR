@@ -46,6 +46,23 @@ describe('Encabezado', () => {
     renderizar(vi.fn());
 
     expect(screen.queryByRole('link', { name: 'Mis publicaciones' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Revisar publicaciones' })).not.toBeInTheDocument();
+  });
+
+  it('al administrador le ofrece revisar publicaciones y solo a él', () => {
+    iniciar('ADMINISTRADOR');
+    renderizar(vi.fn());
+
+    expect(screen.getByRole('link', { name: 'Revisar publicaciones' }))
+      .toHaveAttribute('href', '/administrador/publicaciones');
+    expect(screen.queryByRole('link', { name: 'Mis publicaciones' })).not.toBeInTheDocument();
+  });
+
+  it('al anfitrión no le ofrece revisar publicaciones', () => {
+    iniciar('ANFITRION');
+    renderizar(vi.fn());
+
+    expect(screen.queryByRole('link', { name: 'Revisar publicaciones' })).not.toBeInTheDocument();
   });
 
   it('sin sesión no muestra el botón de cerrar sesión', () => {

@@ -92,6 +92,11 @@ export default function MisPublicacionesPage() {
                   {publicacion.ciudad && ` · ${publicacion.ciudad}`}
                 </p>
                 <p className={estilos.detalle}>{resumenDe(publicacion)}</p>
+                {publicacion.estado === 'BORRADOR' && publicacion.observacionesRevision && (
+                  <p className={estilos.observaciones}>
+                    Devuelta por el administrador: {publicacion.observacionesRevision}
+                  </p>
+                )}
                 {errores[publicacion.id] && (
                   <p role="alert" className={estilos.error}>{errores[publicacion.id]}</p>
                 )}

@@ -109,3 +109,33 @@ export async function activarPublicacion(id) {
 export async function pausarPublicacion(id) {
   return publicacionDesdeApi(await post(`${RUTA}/${id}/pausar`));
 }
+
+const RUTA_REVISION = '/api/v1/admin/publicaciones';
+
+/**
+ * Publicaciones que esperan revisión, en el orden de la API: la que lleva más tiempo esperando primero.
+ * @returns {Promise<import('../models/publicacion.js').Publicacion[]>}
+ */
+export async function listarPendientesDeRevision() {
+  const respuesta = await get(`${RUTA_REVISION}/pendientes`);
+  return respuesta.map(publicacionDesdeApi);
+}
+
+/**
+ * Publica una publicación pendiente (409 si ya no está pendiente).
+ * @param {number | string} id
+ * @returns {Promise<import('../models/publicacion.js').Publicacion>}
+ */
+export async function aprobarPublicacion(id) {
+  return publicacionDesdeApi(await post(`${RUTA_REVISION}/${id}/aprobar`));
+}
+
+/**
+ * Devuelve una publicación pendiente al anfitrión con las observaciones que verá.
+ * @param {number | string} id
+ * @param {string} observaciones
+ * @returns {Promise<import('../models/publicacion.js').Publicacion>}
+ */
+export async function devolverPublicacion(id, observaciones) {
+  return publicacionDesdeApi(await post(`${RUTA_REVISION}/${id}/devolver`, { observaciones }));
+}

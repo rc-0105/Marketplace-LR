@@ -81,6 +81,14 @@
   color: var(--color-error);
 }
 
+.observaciones {
+  margin: var(--espacio-2) 0 0;
+  padding: var(--espacio-2) var(--espacio-3);
+  border-left: 3px solid var(--color-terracota);
+  background: var(--color-fondo);
+  font-size: var(--texto-pequeno);
+}
+
 .lista {
   display: grid;
   gap: var(--espacio-4);

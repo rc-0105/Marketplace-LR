@@ -77,6 +77,18 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Inicia sesión' })).toBeInTheDocument();
   });
 
+  it('muestra la revisión de publicaciones al administrador', () => {
+    iniciar('ADMINISTRADOR');
+    renderizarEn('/administrador/publicaciones');
+    expect(screen.getByRole('heading', { name: 'Revisión de publicaciones' })).toBeInTheDocument();
+  });
+
+  it('un anfitrión que entra a la revisión de publicaciones vuelve a su panel', () => {
+    iniciar('ANFITRION');
+    renderizarEn('/administrador/publicaciones');
+    expect(screen.getByText('Ingresaste como Anfitrión.')).toBeInTheDocument();
+  });
+
   it('un rol ajeno vuelve a su propio panel', () => {
     iniciar('HUESPED');
     renderizarEn('/administrador');
