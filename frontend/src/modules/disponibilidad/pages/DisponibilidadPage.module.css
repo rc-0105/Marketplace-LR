@@ -83,3 +83,33 @@
   opacity: 0.6;
   cursor: wait;
 }
+
+.confirmacion {
+  margin-top: var(--espacio-3);
+  padding: var(--espacio-3) var(--espacio-4);
+  border-radius: var(--radio);
+  background: var(--color-error-fondo);
+}
+
+.pregunta {
+  margin: 0;
+  color: var(--color-error);
+  font-weight: 600;
+}
+
+.peligro {
+  min-height: 2.75rem;
+  padding: 0 var(--espacio-4);
+  border: none;
+  border-radius: var(--radio);
+  background: var(--color-error);
+  color: var(--color-sobre-terracota);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.peligro:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}

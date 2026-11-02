@@ -26,6 +26,7 @@ export default function DisponibilidadPage() {
   const [editando, setEditando] = useState(null);
   const [errores, setErrores] = useState({});
   const [eliminando, setEliminando] = useState(null);
+  const [confirmando, setConfirmando] = useState(null);
 
   useEffect(() => {
     let vigente = true;
@@ -59,7 +60,13 @@ export default function DisponibilidadPage() {
       setErrores((actuales) => ({ ...actuales, [periodo.id]: error.estado ? error.message : MENSAJE_ELIMINAR }));
     } finally {
       setEliminando(null);
+      setConfirmando(null);
     }
+  }
+
+  function pedirConfirmacion(periodo) {
+    setErrores((actuales) => ({ ...actuales, [periodo.id]: null }));
+    setConfirmando(periodo.id);
   }
 
   return (
@@ -101,19 +108,36 @@ export default function DisponibilidadPage() {
                           {errores[periodo.id] && (
                             <p role="alert" className={estilos.error}>{errores[periodo.id]}</p>
                           )}
-                          <div className={estilos.acciones}>
-                            <button type="button" className={estilos.accion}
-                              aria-label={`Editar periodo del ${rango}`}
-                              onClick={() => setEditando(periodo.id)}>
-                              Editar
-                            </button>
-                            <button type="button" className={estilos.accion}
-                              aria-label={`Eliminar periodo del ${rango}`}
-                              disabled={eliminando === periodo.id}
-                              onClick={() => eliminar(periodo)}>
-                              Eliminar
-                            </button>
-                          </div>
+                          {confirmando === periodo.id ? (
+                            <div className={estilos.confirmacion}>
+                              <p className={estilos.pregunta}>{`¿Eliminar el periodo del ${rango}?`}</p>
+                              <div className={estilos.acciones}>
+                                <button type="button" className={estilos.peligro}
+                                  disabled={eliminando === periodo.id}
+                                  onClick={() => eliminar(periodo)}>
+                                  Sí, eliminar
+                                </button>
+                                <button type="button" className={estilos.accion}
+                                  disabled={eliminando === periodo.id}
+                                  onClick={() => setConfirmando(null)}>
+                                  No, conservarlo
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className={estilos.acciones}>
+                              <button type="button" className={estilos.accion}
+                                aria-label={`Editar periodo del ${rango}`}
+                                onClick={() => setEditando(periodo.id)}>
+                                Editar
+                              </button>
+                              <button type="button" className={estilos.accion}
+                                aria-label={`Eliminar periodo del ${rango}`}
+                                onClick={() => pedirConfirmacion(periodo)}>
+                                Eliminar
+                              </button>
+                            </div>
+                          )}
                         </>
                       )}
                     </li>

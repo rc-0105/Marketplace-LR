@@ -122,12 +122,29 @@ describe('DisponibilidadPage', () => {
     expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeInTheDocument();
   });
 
+  it('pide confirmación antes de eliminar y no borra si el anfitrión se arrepiente', async () => {
+    vi.mocked(listarPeriodos).mockResolvedValue([ENERO]);
+    renderizar();
+
+    fireEvent.click(await screen.findByRole('button', { name: `Eliminar periodo del ${RANGO_ENERO}` }));
+
+    expect(screen.getByText(`¿Eliminar el periodo del ${RANGO_ENERO}?`)).toBeInTheDocument();
+    expect(eliminarPeriodo).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'No, conservarlo' }));
+
+    expect(screen.queryByRole('button', { name: 'Sí, eliminar' })).not.toBeInTheDocument();
+    expect(screen.getByText(RANGO_ENERO)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `Eliminar periodo del ${RANGO_ENERO}` })).toBeInTheDocument();
+    expect(eliminarPeriodo).not.toHaveBeenCalled();
+  });
+
   it('elimina un periodo sin reservas', async () => {
     vi.mocked(listarPeriodos).mockResolvedValue([ENERO, MARZO]);
     vi.mocked(eliminarPeriodo).mockResolvedValue(undefined);
     renderizar();
 
     fireEvent.click(await screen.findByRole('button', { name: `Eliminar periodo del ${RANGO_ENERO}` }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, eliminar' }));
 
     await waitFor(() => expect(screen.queryByText(RANGO_ENERO)).not.toBeInTheDocument());
     expect(eliminarPeriodo).toHaveBeenCalledWith(5);
@@ -141,6 +158,7 @@ describe('DisponibilidadPage', () => {
     renderizar();
 
     fireEvent.click(await screen.findByRole('button', { name: `Eliminar periodo del ${RANGO_ENERO}` }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, eliminar' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('reserva 12');
     expect(screen.getByText(RANGO_ENERO)).toBeInTheDocument();
@@ -152,6 +170,7 @@ describe('DisponibilidadPage', () => {
     renderizar();
 
     fireEvent.click(await screen.findByRole('button', { name: `Eliminar periodo del ${RANGO_ENERO}` }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, eliminar' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos eliminar el periodo. Intenta de nuevo.');
   });
