@@ -25,17 +25,20 @@ import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoNoEncontrado
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoSuperpuestoException;
 import co.edu.unbosque.marketplace.disponibilidad.model.PeriodoDisponible;
 import co.edu.unbosque.marketplace.disponibilidad.repository.PeriodoDisponibleRepository;
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.AdditionalAnswers;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class DisponibilidadServiceTest {
@@ -57,7 +60,7 @@ class DisponibilidadServiceTest {
 
     @BeforeEach
     void preparar() {
-        when(periodos.save(any(PeriodoDisponible.class))).then(AdditionalAnswers.returnsFirstArg());
+        when(periodos.saveAndFlush(any(PeriodoDisponible.class))).then(AdditionalAnswers.returnsFirstArg());
         doThrow(new AccesoDenegadoException()).when(publicaciones).exigirPropietario(anyLong(),
                 eq(OTRO_ANFITRION_ID));
     }
@@ -70,7 +73,7 @@ class DisponibilidadServiceTest {
         assertThat(periodo.getPublicacionId()).isEqualTo(PUBLICACION_ID);
         assertThat(periodo.getFechaInicio()).isEqualTo(HOY);
         assertThat(periodo.getFechaFin()).isEqualTo(HOY.plusDays(5));
-        verify(periodos).save(periodo);
+        verify(periodos).saveAndFlush(periodo);
         ArgumentCaptor<EventoCritico> evento = ArgumentCaptor.forClass(EventoCritico.class);
         verify(publicador).publicar(evento.capture());
         assertThat(evento.getValue().usuario()).isEqualTo("7");
@@ -89,7 +92,7 @@ class DisponibilidadServiceTest {
                 .hasMessage("La fecha final debe ser posterior a la fecha inicial.");
         assertThatThrownBy(() -> servicio.registrar(PUBLICACION_ID, ANFITRION_ID, HOY.plusDays(3), HOY.plusDays(1)))
                 .isInstanceOf(FechasPeriodoInvalidasException.class);
-        verify(periodos, never()).save(any());
+        verify(periodos, never()).saveAndFlush(any());
         verify(publicador, never()).publicar(any());
     }
 
@@ -99,18 +102,41 @@ class DisponibilidadServiceTest {
         assertThatThrownBy(() -> servicio.registrar(PUBLICACION_ID, ANFITRION_ID, HOY.minusDays(1), HOY.plusDays(2)))
                 .isInstanceOf(FechasPeriodoInvalidasException.class)
                 .hasMessage("La fecha inicial no puede ser anterior a hoy.");
-        verify(periodos, never()).save(any());
+        verify(periodos, never()).saveAndFlush(any());
     }
 
     @Test
-    @DisplayName("Rechaza un periodo que se cruza con otro de la misma publicación")
+    @DisplayName("Si PostgreSQL rechaza el registro por cruzarse con otro periodo, responde que se cruza y no audita")
     void rechazaPeriodoQueSeCruza() {
-        when(periodos.existeCruce(PUBLICACION_ID, 0L, HOY, HOY.plusDays(4))).thenReturn(true);
+        when(periodos.saveAndFlush(any(PeriodoDisponible.class)))
+                .thenThrow(violacion("periodo_disponible_sin_cruce", "23P01"));
 
         assertThatThrownBy(() -> servicio.registrar(PUBLICACION_ID, ANFITRION_ID, HOY, HOY.plusDays(4)))
                 .isInstanceOf(PeriodoSuperpuestoException.class)
                 .hasMessage("El periodo se cruza con otro periodo disponible de la publicación.");
-        verify(periodos, never()).save(any());
+        verify(publicador, never()).publicar(any());
+    }
+
+    @Test
+    @DisplayName("Si PostgreSQL rechaza la modificación por cruzarse con otro periodo, responde que se cruza")
+    void rechazaModificacionQueSeCruza() {
+        when(periodos.findById(PERIODO_ID)).thenReturn(Optional.of(periodo(HOY.plusDays(1), HOY.plusDays(4))));
+        when(periodos.saveAndFlush(any(PeriodoDisponible.class)))
+                .thenThrow(violacion("periodo_disponible_sin_cruce", "23P01"));
+
+        assertThatThrownBy(() -> servicio.modificar(PERIODO_ID, ANFITRION_ID, HOY.plusDays(2), HOY.plusDays(9)))
+                .isInstanceOf(PeriodoSuperpuestoException.class);
+        verify(publicador, never()).publicar(any());
+    }
+
+    @Test
+    @DisplayName("Otra violación de integridad no se disfraza de cruce de periodos")
+    void otraViolacionSePropagaSinCambios() {
+        DataIntegrityViolationException otra = violacion("periodo_disponible_fechas_check", "23514");
+        when(periodos.saveAndFlush(any(PeriodoDisponible.class))).thenThrow(otra);
+
+        assertThatThrownBy(() -> servicio.registrar(PUBLICACION_ID, ANFITRION_ID, HOY, HOY.plusDays(4)))
+                .isSameAs(otra);
     }
 
     @Test
@@ -118,7 +144,7 @@ class DisponibilidadServiceTest {
     void noRegistraEnPublicacionAjena() {
         assertThatThrownBy(() -> servicio.registrar(PUBLICACION_ID, OTRO_ANFITRION_ID, HOY, HOY.plusDays(2)))
                 .isInstanceOf(AccesoDenegadoException.class);
-        verify(periodos, never()).save(any());
+        verify(periodos, never()).saveAndFlush(any());
     }
 
     @Test
@@ -151,8 +177,7 @@ class DisponibilidadServiceTest {
 
         assertThat(modificado.getFechaInicio()).isEqualTo(HOY.plusDays(2));
         assertThat(modificado.getFechaFin()).isEqualTo(HOY.plusDays(9));
-        verify(periodos).existeCruce(PUBLICACION_ID, PERIODO_ID, HOY.plusDays(2), HOY.plusDays(9));
-        verify(periodos).save(periodo);
+        verify(periodos).saveAndFlush(periodo);
         ArgumentCaptor<EventoCritico> evento = ArgumentCaptor.forClass(EventoCritico.class);
         verify(publicador).publicar(evento.capture());
         assertThat(evento.getValue().entidadId()).isEqualTo("50");
@@ -187,7 +212,7 @@ class DisponibilidadServiceTest {
                 .satisfies(error -> assertThat(((PeriodoConReservaException) error).getPropiedades())
                         .containsEntry("reservaId", 12L));
         assertThat(periodo.getFechaInicio()).isEqualTo(HOY.plusDays(1));
-        verify(periodos, never()).save(any());
+        verify(periodos, never()).saveAndFlush(any());
     }
 
     @Test
@@ -227,7 +252,7 @@ class DisponibilidadServiceTest {
                 .isInstanceOf(AccesoDenegadoException.class);
         assertThatThrownBy(() -> servicio.eliminar(PERIODO_ID, OTRO_ANFITRION_ID))
                 .isInstanceOf(AccesoDenegadoException.class);
-        verify(periodos, never()).save(any());
+        verify(periodos, never()).saveAndFlush(any());
         verify(periodos, never()).delete(any());
     }
 
@@ -241,6 +266,15 @@ class DisponibilidadServiceTest {
                 .hasMessage("No encontramos ese periodo.");
         assertThatThrownBy(() -> servicio.eliminar(PERIODO_ID, ANFITRION_ID))
                 .isInstanceOf(PeriodoNoEncontradoException.class);
+    }
+
+    // Así llega a Spring la violación de una restricción de PostgreSQL al hacer flush:
+    // Hibernate no extrae el nombre de una restricción de exclusión, solo queda en el mensaje.
+    private static DataIntegrityViolationException violacion(String restriccion, String estadoSql) {
+        SQLException sql = new SQLException(
+                "ERROR: conflicting key value violates exclusion constraint \"%s\"".formatted(restriccion), estadoSql);
+        return new DataIntegrityViolationException("could not execute statement",
+                new ConstraintViolationException("could not execute statement", sql, null));
     }
 
     private static PeriodoDisponible periodo(LocalDate inicio, LocalDate fin) {

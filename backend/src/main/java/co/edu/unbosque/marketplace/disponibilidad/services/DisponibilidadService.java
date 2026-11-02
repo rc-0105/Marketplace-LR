@@ -12,12 +12,14 @@ import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoNoEncontrado
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoSuperpuestoException;
 import co.edu.unbosque.marketplace.disponibilidad.model.PeriodoDisponible;
 import co.edu.unbosque.marketplace.disponibilidad.repository.PeriodoDisponibleRepository;
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,7 +33,8 @@ public class DisponibilidadService {
     private static final String ENTIDAD = "PeriodoDisponible";
     // "Hoy" es el día en Colombia, donde están los alojamientos, no el del servidor.
     private static final ZoneId ZONA = ZoneId.of("America/Bogota");
-    private static final Long SIN_PERIODO = 0L;
+    private static final String RESTRICCION_SIN_CRUCE = "periodo_disponible_sin_cruce";
+    private static final String VIOLACION_EXCLUSION = "23P01";
 
     private final PeriodoDisponibleRepository periodos;
     private final PublicacionService publicaciones;
@@ -52,8 +55,7 @@ public class DisponibilidadService {
     public PeriodoDisponible registrar(Long publicacionId, Long anfitrionId, LocalDate inicio, LocalDate fin) {
         publicaciones.exigirPropietario(publicacionId, anfitrionId);
         validarFechas(inicio, fin, null);
-        exigirSinCruce(publicacionId, SIN_PERIODO, inicio, fin);
-        PeriodoDisponible periodo = periodos.save(PeriodoDisponible.nuevo(publicacionId, inicio, fin));
+        PeriodoDisponible periodo = guardar(PeriodoDisponible.nuevo(publicacionId, inicio, fin));
         auditar(periodo, anfitrionId, "registrar_periodo");
         return periodo;
     }
@@ -70,9 +72,8 @@ public class DisponibilidadService {
         PeriodoDisponible periodo = buscarConAcceso(periodoId, anfitrionId);
         exigirSinReserva(periodo);
         validarFechas(inicio, fin, periodo.getFechaInicio());
-        exigirSinCruce(periodo.getPublicacionId(), periodo.getId(), inicio, fin);
         periodo.cambiarFechas(inicio, fin);
-        PeriodoDisponible guardado = periodos.save(periodo);
+        PeriodoDisponible guardado = guardar(periodo);
         auditar(guardado, anfitrionId, "modificar_periodo");
         return guardado;
     }
@@ -103,10 +104,29 @@ public class DisponibilidadService {
         }
     }
 
-    private void exigirSinCruce(Long publicacionId, Long excluirId, LocalDate inicio, LocalDate fin) {
-        if (periodos.existeCruce(publicacionId, excluirId, inicio, fin)) {
-            throw new PeriodoSuperpuestoException();
+    // El cruce lo decide la restricción de exclusión de PostgreSQL, la única que no deja
+    // pasar dos solicitudes simultáneas. El flush la evalúa aquí y no al confirmar.
+    private PeriodoDisponible guardar(PeriodoDisponible periodo) {
+        try {
+            return periodos.saveAndFlush(periodo);
+        } catch (DataIntegrityViolationException error) {
+            if (violaRestriccion(error, RESTRICCION_SIN_CRUCE)) {
+                throw new PeriodoSuperpuestoException();
+            }
+            throw error;
         }
+    }
+
+    // Hibernate no extrae el nombre de una restricción de exclusión (SQLState 23P01), así
+    // que se busca en el mensaje del error de PostgreSQL.
+    private static boolean violaRestriccion(Throwable error, String restriccion) {
+        for (Throwable causa = error; causa != null; causa = causa.getCause()) {
+            if (causa instanceof SQLException sql && VIOLACION_EXCLUSION.equals(sql.getSQLState())
+                    && sql.getMessage() != null && sql.getMessage().contains(restriccion)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void exigirSinReserva(PeriodoDisponible periodo) {

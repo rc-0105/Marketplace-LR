@@ -1,6 +1,7 @@
 package co.edu.unbosque.marketplace.disponibilidad.controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -19,7 +20,14 @@ import co.edu.unbosque.marketplace.identidad.repository.UsuarioRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,6 +36,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -148,6 +157,54 @@ class DisponibilidadIntegracionTest {
         registrar(token, publicacionId, HOY.plusDays(15), HOY.plusDays(20)).andExpect(status().isCreated());
 
         assertThat(periodosGuardados(publicacionId)).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("PostgreSQL rechaza un periodo que se cruza aunque no pase por la API, y acepta uno contiguo")
+    void laBaseRechazaElCruceDirecto() throws Exception {
+        String token = iniciarSesion("luis@correo.com");
+        Long publicacionId = crearPublicacion(token);
+        registrar(token, publicacionId, HOY.plusDays(10), HOY.plusDays(15)).andExpect(status().isCreated());
+        String insertar = "INSERT INTO periodo_disponible (publicacion_id, fecha_inicio, fecha_fin) VALUES (?, ?, ?)";
+
+        assertThatThrownBy(() -> jdbc.update(insertar, publicacionId, HOY.plusDays(12), HOY.plusDays(20)))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("periodo_disponible_sin_cruce");
+        jdbc.update(insertar, publicacionId, HOY.plusDays(15), HOY.plusDays(20));
+
+        assertThat(periodosGuardados(publicacionId)).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Dos solicitudes simultáneas con periodos que se cruzan: una se guarda y la otra responde 409")
+    void solicitudesSimultaneasNoDejanPeriodosCruzados() throws Exception {
+        String token = iniciarSesion("luis@correo.com");
+        Long publicacionId = crearPublicacion(token);
+        int solicitudes = 6;
+        CountDownLatch salida = new CountDownLatch(1);
+        ExecutorService hilos = Executors.newFixedThreadPool(solicitudes);
+        try {
+            List<Future<Integer>> estados = new ArrayList<>();
+            for (int i = 0; i < solicitudes; i++) {
+                LocalDate inicio = HOY.plusDays(10 + i);
+                estados.add(hilos.submit(() -> {
+                    salida.await();
+                    return registrar(token, publicacionId, inicio, inicio.plusDays(10))
+                            .andReturn().getResponse().getStatus();
+                }));
+            }
+            salida.countDown();
+            List<Integer> obtenidos = new ArrayList<>();
+            for (Future<Integer> estado : estados) {
+                obtenidos.add(estado.get(30, TimeUnit.SECONDS));
+            }
+
+            assertThat(obtenidos).containsOnly(201, 409);
+            assertThat(obtenidos).filteredOn(estado -> estado == 201).hasSize(1);
+        } finally {
+            hilos.shutdownNow();
+        }
+        assertThat(periodosGuardados(publicacionId)).isEqualTo(1);
     }
 
     @Test
