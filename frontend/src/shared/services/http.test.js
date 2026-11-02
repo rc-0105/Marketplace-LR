@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ErrorApi, get, post, put } from './http.js';
+import { ErrorApi, eliminar, get, post, put } from './http.js';
 import { guardarSesion, limpiarSesion, obtenerSesion, suscribirExpiracion } from './sesion.js';
 
 function respuesta(estado, cuerpo) {
@@ -46,6 +46,17 @@ describe('http', () => {
       method: 'PUT',
       body: '{"a":2}',
     }));
+  });
+
+  it('elimina con DELETE sin cuerpo y devuelve null ante un 204', async () => {
+    const fetchFalso = vi.fn(() => respuesta(204));
+    vi.stubGlobal('fetch', fetchFalso);
+
+    await expect(eliminar('/api/v1/recurso/1')).resolves.toBeNull();
+    const [ruta, opciones] = fetchFalso.mock.calls[0];
+    expect(ruta).toBe('/api/v1/recurso/1');
+    expect(opciones.method).toBe('DELETE');
+    expect(opciones.body).toBeUndefined();
   });
 
   it('convierte un error de la API en ErrorApi con el detalle y los errores por campo', async () => {

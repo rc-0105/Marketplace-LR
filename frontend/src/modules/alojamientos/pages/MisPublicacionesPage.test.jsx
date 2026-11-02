@@ -42,6 +42,8 @@ describe('MisPublicacionesPage', () => {
     expect(screen.getByText('Tiene todos los datos para activarse.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Editar Casa en la playa' }))
       .toHaveAttribute('href', '/anfitrion/publicaciones/1/editar');
+    expect(screen.getByRole('link', { name: 'Disponibilidad de Casa en la playa' }))
+      .toHaveAttribute('href', '/anfitrion/publicaciones/1/disponibilidad');
   });
 
   it('ofrece crear una publicación nueva', () => {

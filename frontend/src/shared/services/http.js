@@ -76,3 +76,8 @@ export function post(ruta, cuerpo) {
 export function put(ruta, cuerpo) {
   return solicitar(ruta, { method: 'PUT', body: JSON.stringify(cuerpo) });
 }
+
+// `delete` es palabra reservada; un 204 sin cuerpo resuelve en null.
+export function eliminar(ruta) {
+  return solicitar(ruta, { method: 'DELETE' });
+}

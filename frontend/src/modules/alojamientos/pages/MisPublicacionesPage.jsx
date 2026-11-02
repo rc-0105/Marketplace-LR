@@ -100,6 +100,10 @@ export default function MisPublicacionesPage() {
                     aria-label={`Editar ${publicacion.titulo}`}>
                     Editar
                   </Link>
+                  <Link to={`/anfitrion/publicaciones/${publicacion.id}/disponibilidad`} className={estilos.editar}
+                    aria-label={`Disponibilidad de ${publicacion.titulo}`}>
+                    Disponibilidad
+                  </Link>
                   {accion && (
                     <button type="button" className={estilos.cambiarEstado}
                       aria-label={`${accion.etiqueta} ${publicacion.titulo}`}
