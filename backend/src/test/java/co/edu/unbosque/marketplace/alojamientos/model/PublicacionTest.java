@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
@@ -63,6 +64,53 @@ class PublicacionTest {
         assertThatThrownBy(publicacion::pausar).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(publicacion::reactivar).isInstanceOf(IllegalStateException.class);
         assertThat(publicacion.getEstado()).isEqualTo(EstadoPublicacion.BORRADOR);
+    }
+
+    @Test
+    @DisplayName("Enviar a revisión registra cuándo se pidió, para ordenar el panel por antigüedad")
+    void enviarARevisionRegistraLaFecha() {
+        Publicacion publicacion = completa();
+        Instant antes = Instant.now();
+
+        publicacion.enviarARevision();
+
+        assertThat(publicacion.getEnviadaARevisionEn()).isBetween(antes, Instant.now());
+    }
+
+    @Test
+    @DisplayName("Aprobar una publicación pendiente la deja ACTIVA y borra las observaciones anteriores")
+    void aprobarPendienteLaActiva() {
+        Publicacion publicacion = completa();
+        publicacion.enviarARevision();
+        publicacion.devolver("Faltan fotos del baño");
+        publicacion.enviarARevision();
+
+        publicacion.aprobar();
+
+        assertThat(publicacion.getEstado()).isEqualTo(EstadoPublicacion.ACTIVA);
+        assertThat(publicacion.getObservacionesRevision()).isNull();
+    }
+
+    @Test
+    @DisplayName("Devolver una publicación pendiente la deja en BORRADOR con el motivo")
+    void devolverPendienteLaRegresaABorrador() {
+        Publicacion publicacion = en(EstadoPublicacion.PENDIENTE_REVISION);
+
+        publicacion.devolver("Faltan fotos del baño");
+
+        assertThat(publicacion.getEstado()).isEqualTo(EstadoPublicacion.BORRADOR);
+        assertThat(publicacion.getObservacionesRevision()).isEqualTo("Faltan fotos del baño");
+    }
+
+    @Test
+    @DisplayName("Solo una publicación pendiente de revisión se aprueba o se devuelve")
+    void soloUnaPendienteSeRevisa() {
+        Publicacion publicacion = en(EstadoPublicacion.BORRADOR);
+
+        assertThatThrownBy(publicacion::aprobar).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> publicacion.devolver("Motivo")).isInstanceOf(IllegalStateException.class);
+        assertThat(publicacion.getEstado()).isEqualTo(EstadoPublicacion.BORRADOR);
+        assertThat(publicacion.getObservacionesRevision()).isNull();
     }
 
     private static Publicacion completa() {

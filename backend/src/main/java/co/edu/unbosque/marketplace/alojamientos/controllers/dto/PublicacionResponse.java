@@ -9,6 +9,8 @@ import java.util.List;
  * Vista de una publicación. {@code camposFaltantes} indica qué le falta al
  * borrador para poder activarse; vacío significa que está completo.
  * {@code editadoPor} y {@code editadoEn} son nulos mientras nadie la edite.
+ * {@code observacionesRevision} es el motivo de la última devolución del
+ * administrador, y {@code enviadaARevisionEn} cuándo se pidió la última revisión.
  */
 public record PublicacionResponse(
         Long id,
@@ -31,6 +33,8 @@ public record PublicacionResponse(
         Instant creadoEn,
         Long editadoPor,
         Instant editadoEn,
+        String observacionesRevision,
+        Instant enviadaARevisionEn,
         List<String> camposFaltantes) {
 
     public static PublicacionResponse desde(Publicacion publicacion) {
@@ -57,6 +61,8 @@ public record PublicacionResponse(
                 publicacion.getCreadoEn(),
                 publicacion.getEditadoPor(),
                 publicacion.getEditadoEn(),
+                publicacion.getObservacionesRevision(),
+                publicacion.getEnviadaARevisionEn(),
                 publicacion.camposFaltantesParaActivar());
     }
 }
