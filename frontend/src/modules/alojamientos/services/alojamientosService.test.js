@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { get, post, put } from '../../../shared/services/http.js';
 import {
-  activarPublicacion, actualizarConfiguracion, actualizarImagenes, actualizarServicios, consultarPublicacion,
-  crearPublicacion, editarPublicacion, listarMisPublicaciones, listarPoliticasCancelacion, listarServicios,
-  listarTiposAlojamiento, pausarPublicacion,
+  activarPublicacion, actualizarConfiguracion, actualizarImagenes, actualizarServicios, aprobarPublicacion,
+  consultarPublicacion, crearPublicacion, devolverPublicacion, editarPublicacion, listarMisPublicaciones,
+  listarPendientesDeRevision, listarPoliticasCancelacion, listarServicios, listarTiposAlojamiento, pausarPublicacion,
 } from './alojamientosService.js';
 
 vi.mock('../../../shared/services/http.js', async (importOriginal) => ({
@@ -85,6 +85,32 @@ describe('alojamientosService', () => {
 
     expect(post).toHaveBeenCalledWith('/api/v1/publicaciones/5/activar');
     expect(post).toHaveBeenCalledWith('/api/v1/publicaciones/5/pausar');
+  });
+
+  it('lista las publicaciones pendientes de revisión con la fecha en que se enviaron', async () => {
+    vi.mocked(get).mockResolvedValue([
+      { id: 4, titulo: 'Casa', estado: 'PENDIENTE_REVISION', enviadaARevisionEn: '2026-10-15T15:00:00Z' },
+    ]);
+
+    const pendientes = await listarPendientesDeRevision();
+
+    expect(get).toHaveBeenCalledWith('/api/v1/admin/publicaciones/pendientes');
+    expect(pendientes).toEqual([expect.objectContaining({
+      id: 4, estado: 'PENDIENTE_REVISION', enviadaARevisionEn: '2026-10-15T15:00:00Z', observacionesRevision: null,
+    })]);
+  });
+
+  it('aprueba y devuelve con observaciones contra la ruta de administración', async () => {
+    vi.mocked(post)
+      .mockResolvedValueOnce({ id: 4, titulo: 'Casa', estado: 'ACTIVA' })
+      .mockResolvedValueOnce({ id: 4, titulo: 'Casa', estado: 'BORRADOR', observacionesRevision: 'Faltan fotos.' });
+
+    await expect(aprobarPublicacion(4)).resolves.toMatchObject({ id: 4, estado: 'ACTIVA' });
+    await expect(devolverPublicacion(4, 'Faltan fotos.'))
+      .resolves.toMatchObject({ estado: 'BORRADOR', observacionesRevision: 'Faltan fotos.' });
+
+    expect(post).toHaveBeenCalledWith('/api/v1/admin/publicaciones/4/aprobar');
+    expect(post).toHaveBeenCalledWith('/api/v1/admin/publicaciones/4/devolver', { observaciones: 'Faltan fotos.' });
   });
 
   it('lista el catálogo de políticas de cancelación', async () => {

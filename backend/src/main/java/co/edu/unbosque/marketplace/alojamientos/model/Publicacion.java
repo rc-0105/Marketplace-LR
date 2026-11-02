@@ -106,6 +106,13 @@ public class Publicacion {
 	@Column(name = "editado_en")
 	private Instant editadoEn;
 
+	// Motivo de la última devolución (RF-15); se borra cuando un administrador la aprueba.
+	@Column(name = "observaciones_revision", length = 1000)
+	private String observacionesRevision;
+
+	@Column(name = "enviada_revision_en")
+	private Instant enviadaARevisionEn;
+
 	protected Publicacion() {
 		// Requerido por JPA.
 	}
@@ -252,6 +259,27 @@ public class Publicacion {
 			throw new IllegalStateException("Un borrador incompleto no se envía a revisión");
 		}
 		this.estado = EstadoPublicacion.PENDIENTE_REVISION;
+		this.enviadaARevisionEn = Instant.now();
+	}
+
+	/** PENDIENTE_REVISION a ACTIVA: un administrador la aprobó y sale al público (RF-15). */
+	public void aprobar() {
+		exigirPendienteDeRevision();
+		this.estado = EstadoPublicacion.ACTIVA;
+		this.observacionesRevision = null;
+	}
+
+	/** PENDIENTE_REVISION a BORRADOR con el motivo que verá el anfitrión (RF-15). */
+	public void devolver(String observaciones) {
+		exigirPendienteDeRevision();
+		this.estado = EstadoPublicacion.BORRADOR;
+		this.observacionesRevision = observaciones;
+	}
+
+	private void exigirPendienteDeRevision() {
+		if (estado != EstadoPublicacion.PENDIENTE_REVISION) {
+			throw new IllegalStateException("Solo una publicación pendiente de revisión se aprueba o se devuelve");
+		}
 	}
 
 	/** ACTIVA a PAUSADA: sale de las búsquedas (RF-17). */
@@ -366,5 +394,13 @@ public class Publicacion {
 
 	public Instant getEditadoEn() {
 		return editadoEn;
+	}
+
+	public String getObservacionesRevision() {
+		return observacionesRevision;
+	}
+
+	public Instant getEnviadaARevisionEn() {
+		return enviadaARevisionEn;
 	}
 }

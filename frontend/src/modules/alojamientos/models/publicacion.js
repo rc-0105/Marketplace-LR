@@ -41,6 +41,8 @@
  * @property {ServicioAdicional[]} serviciosAdicionales
  * @property {string} estado
  * @property {string[]} camposFaltantes lo que la API dice que falta para activarla
+ * @property {string | null} observacionesRevision motivo de la última devolución del administrador
+ * @property {string | null} enviadaARevisionEn fecha ISO en que se pidió la última revisión
  */
 
 /**
@@ -287,5 +289,20 @@ export function publicacionDesdeApi(respuesta) {
     serviciosAdicionales: respuesta.serviciosAdicionales ?? [],
     estado: respuesta.estado,
     camposFaltantes: respuesta.camposFaltantes ?? [],
+    observacionesRevision: respuesta.observacionesRevision ?? null,
+    enviadaARevisionEn: respuesta.enviadaARevisionEn ?? null,
   };
+}
+
+/**
+ * Mismo formato que exige la API para devolver una publicación: obligatorias y de hasta 1000 caracteres.
+ * @param {string} observaciones
+ * @returns {string | undefined} mensaje de error, o nada si sirven
+ */
+export function errorDeObservaciones(observaciones) {
+  const limpias = observaciones.trim();
+  if (!limpias) {
+    return 'Indica las observaciones para el anfitrión.';
+  }
+  return limpias.length > 1000 ? 'Las observaciones admiten máximo 1000 caracteres.' : undefined;
 }

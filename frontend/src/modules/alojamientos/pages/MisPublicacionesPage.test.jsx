@@ -125,6 +125,18 @@ describe('MisPublicacionesPage', () => {
     expect(screen.getByRole('button', { name: 'Pausar Casa en la playa' })).toBeEnabled();
   });
 
+  it('si el administrador la devolvió, muestra el motivo en el borrador', async () => {
+    vi.mocked(listarMisPublicaciones).mockResolvedValue([
+      publicacion({ id: 1, observacionesRevision: 'Faltan fotos del baño.' }),
+      publicacion({ id: 2, titulo: 'Cabaña', estado: 'PENDIENTE_REVISION', observacionesRevision: 'Motivo anterior.' }),
+    ]);
+
+    renderizar();
+
+    expect(await screen.findByText('Devuelta por el administrador: Faltan fotos del baño.')).toBeInTheDocument();
+    expect(screen.queryByText(/Motivo anterior/)).not.toBeInTheDocument();
+  });
+
   it('muestra un error si la API falla', async () => {
     vi.mocked(listarMisPublicaciones).mockRejectedValue(new ErrorApi(500, 'Error interno.'));
 
