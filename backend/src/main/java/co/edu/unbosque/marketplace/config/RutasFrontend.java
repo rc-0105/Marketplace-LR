@@ -4,6 +4,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 
 /**
  * En producción la misma aplicación sirve el build de React (SOF-97): así frontend y API
@@ -24,7 +25,7 @@ public class RutasFrontend {
             && !peticion.getRequestURI().startsWith("/actuator");
 
     @GetMapping({"/", "/{ruta:" + NO_ES_PAGINA + "[^.]*}", "/{ruta:" + NO_ES_PAGINA + "[^.]*}/**"})
-    public String pagina() {
+    public String pagina(@PathVariable(required = false) String ruta) {
         return "forward:/index.html";
     }
 }
