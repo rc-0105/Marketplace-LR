@@ -15,6 +15,11 @@ spring:
 server:
   port: ${PUERTO:8080}
 
+# Commit desplegado, visible en /api/estado. Render lo publica en RENDER_GIT_COMMIT;
+# VERSION_COMMIT permite fijarlo en otro entorno.
+aplicacion:
+  version: ${VERSION_COMMIT:${RENDER_GIT_COMMIT:desarrollo}}
+
 # Contrato OpenAPI que exige el enunciado.
 #   JSON: /v3/api-docs      interfaz: /swagger-ui.html
 springdoc:

@@ -41,3 +41,7 @@ Thumbs.db
 
 # ---------- Artefactos locales de agentes (SDD) ----------
 .atl/
+
+# ---------- Despliegue ----------
+# El build de React se copia aquí solo dentro de la imagen Docker.
+backend/src/main/resources/static/
