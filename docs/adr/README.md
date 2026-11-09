@@ -11,6 +11,7 @@ que es lo que pide la trazabilidad ASR → decisión → implementación → med
 | ADR-3 | Modelo de disponibilidad sin superposición y consultable | Propuesta |
 | ADR-4 | Flujo de reserva y pago | Propuesta |
 | ADR-5 | [Autorización por rol](adr-005-autorizacion-por-rol.md) | Aceptada |
+| ADR-6 | [Despliegue continuo en Render con una sola imagen](adr-006-despliegue.md) | Propuesta |
 
 Al cerrar un ADR, copien aquí la versión final como `adr-00X-<nombre>.md` y
 actualicen el estado en Confluence en el mismo pull request.

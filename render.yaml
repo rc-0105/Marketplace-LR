@@ -1,0 +1,48 @@
+# Blueprint de Render (SOF-97, ADR-6): un servicio web con la imagen del
+# Dockerfile y un PostgreSQL 16 en la misma región. Render no despliega solo:
+# lo pide el workflow "Despliegue" cuando el CI de main pasa.
+services:
+  - type: web
+    name: marketplace-lr
+    runtime: docker
+    plan: free
+    region: virginia
+    dockerfilePath: ./Dockerfile
+    autoDeploy: false
+    healthCheckPath: /api/estado
+    envVars:
+      - key: PUERTO
+        value: "10000"
+      - key: DB_HOST
+        fromDatabase:
+          name: marketplace-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: marketplace-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: marketplace-db
+          property: database
+      - key: SPRING_DATASOURCE_USERNAME
+        fromDatabase:
+          name: marketplace-db
+          property: user
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase:
+          name: marketplace-db
+          property: password
+      # Render lo genera una vez y lo guarda; nunca pasa por el repositorio (RNF-17).
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORREO_MODO
+        value: log
+
+databases:
+  - name: marketplace-db
+    plan: free
+    region: virginia
+    databaseName: marketplace
+    user: marketplace
+    postgresMajorVersion: "16"

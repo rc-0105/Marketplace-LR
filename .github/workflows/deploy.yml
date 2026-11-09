@@ -1,0 +1,58 @@
+name: Despliegue
+
+# Despliegue continuo (SOF-97, ADR-6): solo cuando el CI de un push a main termina
+# en verde. Un PR o un CI fallido no despliegan nada.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+# Un despliegue a la vez y en orden: el siguiente espera, no cancela al que corre.
+concurrency:
+  group: despliegue-produccion
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  desplegar:
+    name: Desplegar en Render y verificar
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: produccion
+      url: ${{ vars.URL_PRODUCCION }}
+    env:
+      COMMIT: ${{ github.event.workflow_run.head_sha }}
+      URL_PRODUCCION: ${{ vars.URL_PRODUCCION }}
+
+    steps:
+      - name: Pedir a Render que despliegue el commit verificado
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$DEPLOY_HOOK" ] || [ -z "$URL_PRODUCCION" ]; then
+            echo "::error::Faltan el secreto RENDER_DEPLOY_HOOK_URL o la variable URL_PRODUCCION del entorno produccion."
+            exit 1
+          fi
+          curl -fsS -X POST "${DEPLOY_HOOK}&ref=${COMMIT}" > /dev/null
+          echo "Despliegue de ${COMMIT} solicitado."
+
+      # El build en el plan gratuito tarda varios minutos; se espera hasta 20.
+      - name: Verificar que /api/estado responde con el commit desplegado
+        run: |
+          for intento in $(seq 1 80); do
+            respuesta=$(curl -fsS --max-time 10 "${URL_PRODUCCION}/api/estado" || true)
+            estado=$(echo "$respuesta" | jq -r '.estado // empty' 2>/dev/null || true)
+            version=$(echo "$respuesta" | jq -r '.version // empty' 2>/dev/null || true)
+            if [ "$estado" = "activa" ] && [ "$version" = "$COMMIT" ]; then
+              echo "Desplegado y activo: ${version}"
+              exit 0
+            fi
+            echo "Intento ${intento}: estado='${estado}' version='${version}'; se espera ${COMMIT}."
+            sleep 15
+          done
+          echo "::error::${URL_PRODUCCION}/api/estado no respondió con el commit ${COMMIT}."
+          exit 1
