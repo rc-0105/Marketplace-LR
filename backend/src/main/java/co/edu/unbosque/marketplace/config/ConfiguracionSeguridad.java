@@ -58,6 +58,8 @@ public class ConfiguracionSeguridad {
                                 "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         // El rol lo verifica el @PreAuthorize del endpoint; sin él, se niega.
                         .requestMatchers("/api/v1/**").access(autorizacionDeclarada)
+                        // El build de React y sus rutas; nunca algo de /api ni del actuator.
+                        .requestMatchers(RutasFrontend.PAGINAS).permitAll()
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(oauth -> oauth
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(convertidor))

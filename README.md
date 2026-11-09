@@ -98,6 +98,48 @@ complétenlo localmente.
 | `MAIL_USERNAME`, `MAIL_PASSWORD` | Cuenta SMTP. Con Gmail, la contraseña es una [contraseña de aplicación](https://myaccount.google.com/apppasswords), no la de la cuenta |
 | `MAIL_FROM` | Remitente de los correos. Si se omite, se usa `MAIL_USERNAME` |
 | `STRIPE_CLAVE_PRUEBA` | Clave de la pasarela en modo prueba |
+| `DB_HOST`, `DB_PORT`, `DB_NAME` | Solo en la imagen Docker: si falta `SPRING_DATASOURCE_URL`, se arma con estos tres (así los entrega Render) |
+| `VERSION_COMMIT` | Commit que informa `/api/estado`. En Render se usa `RENDER_GIT_COMMIT`; sin ninguno, `desarrollo` |
+
+## Despliegue
+
+Producción corre en Render con una sola imagen (`Dockerfile`): Spring Boot sirve la
+API y el frontend desde el mismo origen. La decisión está en
+[ADR-6](docs/adr/adr-006-despliegue.md).
+
+Cada push a `main` con el CI en verde se despliega solo: el workflow `Despliegue`
+pide a Render ese commit y espera a que `/api/estado` responda con él en `version`.
+Un PR o un CI fallido no despliegan nada.
+
+### Puesta en marcha (una sola vez)
+
+1. En Render: **New → Blueprint**, elige este repositorio y aplica `render.yaml`.
+   Crea el servicio `marketplace-lr` y la base `marketplace-db`, y genera
+   `JWT_SECRET`. Las migraciones de Flyway, `btree_gist` incluida, corren al arrancar.
+2. En el servicio de Render, **Settings → Deploy Hook**: copia la URL.
+3. En GitHub, **Settings → Environments → New environment** `produccion`:
+   - secreto `RENDER_DEPLOY_HOOK_URL` con la URL del paso 2;
+   - variable `URL_PRODUCCION` con la URL pública del servicio, sin `/` final
+     (por ejemplo `https://marketplace-lr.onrender.com`).
+4. En GitHub, **Settings → Rules → Rulesets**: activa "Proteccion de main" para que
+   un push directo a `main` se rechace.
+
+### Volver a la versión anterior
+
+1. En Render, en **Events** del servicio, elige el último despliegue sano y pulsa
+   **Rollback**; o vuelve a llamar el deploy hook con `&ref=<commit anterior>`.
+2. Comprueba que `/api/estado` informa ese commit en `version`.
+3. Corrige el problema con un PR normal; al integrarlo se despliega solo.
+
+La base no se revierte: por eso las migraciones deben ser compatibles con la versión
+anterior (ver ADR-6).
+
+### Probar la imagen en local
+
+```bash
+docker build -t marketplace-lr .
+docker run --rm -p 8080:8080 --env-file .env marketplace-lr
+```
 
 ## Documentación
 

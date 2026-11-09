@@ -79,6 +79,9 @@ En cada pull request contra `main` corren dos trabajos, y ambos deben pasar:
 | `Backend · build, pruebas y Sonar` | Compila con Maven y Java 21, corre las pruebas contra un PostgreSQL 16 de servicio, mide cobertura con JaCoCo y analiza en SonarCloud |
 | `Frontend · build, pruebas y Sonar` | Instala con `npm ci`, revisa estilo con ESLint, corre Vitest con cobertura lcov, compila y analiza en SonarCloud |
 
+Cuando el CI de un push a `main` termina en verde, el workflow `Despliegue` lo
+publica en Render y verifica `/api/estado` (ver la sección Despliegue del README).
+
 ## Reglas que protegen `main`
 
 No se puede empujar directo a `main`, ni forzar, ni borrarla. El merge solo se
