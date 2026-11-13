@@ -54,6 +54,13 @@ describe('PanelRolPage', () => {
     expect(await screen.findByText('No hay publicaciones pendientes de revisión.')).toBeInTheDocument();
   });
 
+  it('al huésped le ofrece buscar alojamiento', () => {
+    iniciar('HUESPED');
+    renderizar();
+
+    expect(screen.getByRole('link', { name: 'Buscar alojamiento' })).toHaveAttribute('href', '/huesped/busqueda');
+  });
+
   it.each(['HUESPED', 'ANFITRION'])('a un %s no le muestra las herramientas del administrador', (rol) => {
     iniciar(rol);
     renderizar();
