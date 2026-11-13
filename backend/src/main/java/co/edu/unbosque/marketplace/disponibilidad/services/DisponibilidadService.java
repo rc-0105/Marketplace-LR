@@ -17,15 +17,18 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Periodos en que el anfitrión ofrece su alojamiento (RF-23) y sus cambios, que una
- * reserva confirmada dentro del periodo impide (RF-24).
+ * Periodos en que el anfitrión ofrece su alojamientos y sus cambios, que una
+ * reserva confirmada dentro del periodo impide.
  */
 @Service
 public class DisponibilidadService {
@@ -65,6 +68,23 @@ public class DisponibilidadService {
     public List<PeriodoDisponible> listar(Long publicacionId, Long anfitrionId) {
         publicaciones.exigirPropietario(publicacionId, anfitrionId);
         return periodos.findByPublicacionIdOrderByFechaInicioAsc(publicacionId);
+    }
+
+    /**
+     * De las publicaciones dadas, las que ofrecen toda la estancia {@code [llegada, salida)},
+     * Es el único punto donde la búsqueda pregunta por disponibilidad: cuando existan las
+     * reservas confirmadas, aquí se descuentan sin cambiar a quien llama.
+     */
+    @Transactional(readOnly = true)
+    public Set<Long> filtrarDisponibles(Collection<Long> publicacionIds, LocalDate llegada, LocalDate salida) {
+        if (publicacionIds.isEmpty()) {
+            return Set.of();
+        }
+        return periodos
+                .findByPublicacionIdInAndFechaInicioLessThanEqualAndFechaFinGreaterThanEqual(publicacionIds, llegada, salida)
+                .stream()
+                .map(PeriodoDisponible::getPublicacionId)
+                .collect(Collectors.toSet());
     }
 
     @Transactional

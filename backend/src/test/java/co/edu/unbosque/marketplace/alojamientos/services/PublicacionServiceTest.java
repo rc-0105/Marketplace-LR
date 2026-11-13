@@ -24,6 +24,7 @@ import co.edu.unbosque.marketplace.alojamientos.model.ServicioAdicional;
 import co.edu.unbosque.marketplace.alojamientos.model.Servicio;
 import co.edu.unbosque.marketplace.alojamientos.model.TipoAlojamiento;
 import co.edu.unbosque.marketplace.alojamientos.repository.PoliticaCancelacionRepository;
+import co.edu.unbosque.marketplace.alojamientos.repository.AnfitrionDePublicacion;
 import co.edu.unbosque.marketplace.alojamientos.repository.PublicacionRepository;
 import co.edu.unbosque.marketplace.alojamientos.repository.ServicioRepository;
 import co.edu.unbosque.marketplace.alojamientos.repository.TipoAlojamientoRepository;
@@ -33,6 +34,7 @@ import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
 import co.edu.unbosque.marketplace.compartido.exceptions.AccesoDenegadoException;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -347,7 +349,8 @@ class PublicacionServiceTest {
     @Test
     @DisplayName("Exigir propietario acepta al dueño y niega con 403 a otro anfitrión")
     void exigirPropietarioAceptaAlDuenoYNiegaAOtro() {
-        when(publicaciones.buscarAnfitrionId(PUBLICACION_ID)).thenReturn(Optional.of(ANFITRION_ID));
+        AnfitrionDePublicacion dueno = () -> ANFITRION_ID;
+        when(publicaciones.findAnfitrionById(PUBLICACION_ID)).thenReturn(Optional.of(dueno));
 
         servicio.exigirPropietario(PUBLICACION_ID, ANFITRION_ID);
 
@@ -359,7 +362,7 @@ class PublicacionServiceTest {
     @Test
     @DisplayName("Exigir propietario de una publicación que no existe lanza 404")
     void exigirPropietarioDeInexistenteLanza404() {
-        when(publicaciones.buscarAnfitrionId(PUBLICACION_ID)).thenReturn(Optional.empty());
+        when(publicaciones.findAnfitrionById(PUBLICACION_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> servicio.exigirPropietario(PUBLICACION_ID, ANFITRION_ID))
                 .isInstanceOf(PublicacionNoEncontradaException.class);
@@ -768,12 +771,34 @@ class PublicacionServiceTest {
     }
 
     @Test
-    @DisplayName("El panel de revisión recibe las pendientes tal como las ordena el repositorio")
-    void listaPendientesDelRepositorio() {
-        Publicacion pendiente = publicacionEn(EstadoPublicacion.PENDIENTE_REVISION);
-        when(publicaciones.buscarPendientesPorAntiguedad()).thenReturn(List.of(pendiente));
+    @DisplayName("El panel de revisión lista primero la pendiente que lleva más tiempo esperando")
+    void listaPendientesDeLaMasAntiguaALaMasReciente() {
+        Publicacion reciente = pendienteDesde(1L, "2026-11-05T10:00:00Z", "2026-11-01T10:00:00Z");
+        Publicacion antigua = pendienteDesde(2L, "2026-11-02T10:00:00Z", "2026-10-01T10:00:00Z");
+        // Quedó pendiente antes de V13: no tiene fecha de envío y cuenta desde que se creó.
+        Publicacion sinFechaDeEnvio = pendienteDesde(3L, null, "2026-11-03T10:00:00Z");
+        when(publicaciones.findByEstado(EstadoPublicacion.PENDIENTE_REVISION))
+                .thenReturn(List.of(reciente, sinFechaDeEnvio, antigua));
 
-        assertThat(servicio.listarPendientes()).containsExactly(pendiente);
+        assertThat(servicio.listarPendientes()).containsExactly(antigua, sinFechaDeEnvio, reciente);
+    }
+
+    @Test
+    @DisplayName("Los candidatos de búsqueda llevan lo que muestra la tarjeta: tipo, precio e imagen principal")
+    void candidatosDeBusquedaTraenLoQueMuestraLaTarjeta() {
+        when(publicaciones.findByEstadoAndCiudadIgnoreCaseOrderById(EstadoPublicacion.ACTIVA, "Santa Marta"))
+                .thenReturn(List.of(publicacionEn(EstadoPublicacion.ACTIVA)));
+
+        List<CandidatoBusqueda> candidatos = servicio.buscarCandidatos("Santa Marta");
+
+        assertThat(candidatos).singleElement().satisfies(c -> {
+            assertThat(c.titulo()).isEqualTo("Casa en la playa");
+            assertThat(c.ciudad()).isEqualTo("Santa Marta");
+            assertThat(c.tipo()).isEqualTo("Casa");
+            assertThat(c.capacidad()).isEqualTo(4);
+            assertThat(c.precioNoche()).isEqualByComparingTo("250000");
+            assertThat(c.imagenPrincipal()).isEqualTo("https://imagenes.com/1.jpg");
+        });
     }
 
     @Test
@@ -855,6 +880,14 @@ class PublicacionServiceTest {
     private static Publicacion publicacionEn(EstadoPublicacion estado) {
         Publicacion publicacion = publicacionCompletaDe(ANFITRION_ID);
         ReflectionTestUtils.setField(publicacion, "estado", estado);
+        return publicacion;
+    }
+
+    private static Publicacion pendienteDesde(Long id, String enviadaEn, String creadaEn) {
+        Publicacion publicacion = publicacionEn(EstadoPublicacion.PENDIENTE_REVISION);
+        ReflectionTestUtils.setField(publicacion, "id", id);
+        ReflectionTestUtils.setField(publicacion, "creadoEn", Instant.parse(creadaEn));
+        ReflectionTestUtils.setField(publicacion, "enviadaARevisionEn", enviadaEn == null ? null : Instant.parse(enviadaEn));
         return publicacion;
     }
 
