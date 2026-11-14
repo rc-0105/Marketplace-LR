@@ -9,6 +9,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import co.edu.unbosque.marketplace.alojamientos.exceptions.PublicacionNoEncontradaException;
@@ -165,6 +166,16 @@ class DisponibilidadServiceTest {
         assertThat(servicio.listar(PUBLICACION_ID, ANFITRION_ID)).containsExactly(periodo);
         assertThatThrownBy(() -> servicio.listar(PUBLICACION_ID, OTRO_ANFITRION_ID))
                 .isInstanceOf(AccesoDenegadoException.class);
+    }
+
+    @Test
+    @DisplayName("El calendario público devuelve solo las fechas de cada periodo, sin pedir ser el dueño")
+    void listarLibresDevuelveLasFechas() {
+        when(periodos.findByPublicacionIdOrderByFechaInicioAsc(PUBLICACION_ID))
+                .thenReturn(List.of(periodo(HOY, HOY.plusDays(3))));
+
+        assertThat(servicio.listarLibres(PUBLICACION_ID)).containsExactly(new PeriodoLibre(HOY, HOY.plusDays(3)));
+        verifyNoInteractions(publicaciones);
     }
 
     @Test

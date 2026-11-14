@@ -802,6 +802,39 @@ class PublicacionServiceTest {
     }
 
     @Test
+    @DisplayName("El detalle público de una ACTIVA trae lo que ve el huésped")
+    void consultarActivaDevuelveElDetalle() {
+        when(publicaciones.findById(PUBLICACION_ID))
+                .thenReturn(Optional.of(publicacionEn(EstadoPublicacion.ACTIVA)));
+
+        DetalleAlojamiento detalle = servicio.consultarActiva(PUBLICACION_ID);
+
+        assertThat(detalle.titulo()).isEqualTo("Casa en la playa");
+        assertThat(detalle.ciudad()).isEqualTo("Santa Marta");
+        assertThat(detalle.tipo()).isEqualTo("Casa");
+        assertThat(detalle.capacidad()).isEqualTo(4);
+        assertThat(detalle.precioNoche()).isEqualByComparingTo("250000");
+        assertThat(detalle.imagenes()).containsExactly("https://imagenes.com/1.jpg");
+    }
+
+    @Test
+    @DisplayName("El detalle público responde 404 si la publicación no existe o no está ACTIVA")
+    void consultarActivaRechazaLasQueNoEstanActivas() {
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> servicio.consultarActiva(PUBLICACION_ID))
+                .isInstanceOf(PublicacionNoEncontradaException.class);
+
+        for (EstadoPublicacion estado : EstadoPublicacion.values()) {
+            if (estado == EstadoPublicacion.ACTIVA) {
+                continue;
+            }
+            when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(publicacionEn(estado)));
+            assertThatThrownBy(() -> servicio.consultarActiva(PUBLICACION_ID))
+                    .isInstanceOf(PublicacionNoEncontradaException.class);
+        }
+    }
+
+    @Test
     @DisplayName("Aprobar una pendiente la deja ACTIVA, la guarda y la audita como acción administrativa")
     void aprobarPendienteLaActiva() {
         Publicacion pendiente = publicacionEn(EstadoPublicacion.PENDIENTE_REVISION);

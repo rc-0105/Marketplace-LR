@@ -218,6 +218,16 @@ public class PublicacionService {
 				.map(CandidatoBusqueda::desde).toList();
 	}
 
+	/** Detalle público: solo una publicación ACTIVA; si no existe o no está activa responde 404. */
+	@Transactional(readOnly = true)
+	public DetalleAlojamiento consultarActiva(Long publicacionId) {
+		Optional<Publicacion> encontrada = publicaciones.findById(publicacionId);
+		if (encontrada.isEmpty() || encontrada.get().getEstado() != EstadoPublicacion.ACTIVA) {
+			throw new PublicacionNoEncontradaException();
+		}
+		return DetalleAlojamiento.desde(encontrada.get());
+	}
+
 	/**
 	 * Publicaciones que esperan revisión, la que lleva más tiempo esperando primero
 	 * 

@@ -1,4 +1,5 @@
 import { get } from '../../../shared/services/http.js';
+import { detalleDesdeApi } from '../models/detalleAlojamiento.js';
 import { resultadoDesdeApi } from '../models/resultadoBusqueda.js';
 
 const RUTA = '/api/v1/busqueda';
@@ -24,4 +25,14 @@ export async function buscarAlojamientos({ ciudad, llegada, salida, servicios = 
   servicios.forEach((id) => consulta.append('servicios', id));
   const respuesta = await get(`${RUTA}?${consulta}`);
   return respuesta.map(resultadoDesdeApi);
+}
+
+/**
+ * Detalle de un alojamiento ACTIVO con su calendario. Si no existe o ya no está activo
+ * la API responde 404 y el ErrorApi se propaga.
+ * @param {number | string} id
+ * @returns {Promise<import('../models/detalleAlojamiento.js').DetalleAlojamiento>}
+ */
+export async function consultarDetalle(id) {
+  return detalleDesdeApi(await get(`${RUTA}/${id}`));
 }
