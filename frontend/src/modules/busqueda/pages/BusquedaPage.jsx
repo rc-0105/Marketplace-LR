@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { listarServicios, listarTiposAlojamiento } from '../../alojamientos/services/alojamientosService.js';
 import Campo from '../../../shared/components/Campo.jsx';
 import { buscarAlojamientos } from '../services/busquedaService.js';
@@ -128,7 +129,9 @@ export default function BusquedaPage() {
               {resultado.imagenPrincipal && (
                 <img src={resultado.imagenPrincipal} alt={`Foto de ${resultado.titulo}`} className={estilos.imagen} />
               )}
-              <h2 className={estilos.nombre}>{resultado.titulo}</h2>
+              <h2 className={estilos.nombre}>
+                <Link to={`/huesped/busqueda/${resultado.id}`}>{resultado.titulo}</Link>
+              </h2>
               <p className={estilos.detalle}>
                 {[resultado.tipo, resultado.ciudad].filter(Boolean).join(' · ')}
                 {resultado.capacidad != null && ` · Hasta ${resultado.capacidad} huéspedes`}
