@@ -7,10 +7,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import co.edu.unbosque.marketplace.alojamientos.exceptions.PublicacionNoEncontradaException;
 import co.edu.unbosque.marketplace.alojamientos.services.CandidatoBusqueda;
+import co.edu.unbosque.marketplace.alojamientos.services.DetalleAlojamiento;
 import co.edu.unbosque.marketplace.alojamientos.services.PublicacionService;
 import co.edu.unbosque.marketplace.busqueda.exceptions.BusquedaInvalidaException;
 import co.edu.unbosque.marketplace.disponibilidad.services.DisponibilidadService;
+import co.edu.unbosque.marketplace.disponibilidad.services.PeriodoLibre;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.HashSet;
@@ -115,6 +118,31 @@ class BusquedaServiceTest {
                 .isInstanceOf(BusquedaInvalidaException.class);
 
         verifyNoInteractions(publicaciones, disponibilidad);
+    }
+
+    @Test
+    @DisplayName("El detalle junta el alojamiento activo con su calendario")
+    void detalleIncluyeElCalendario() {
+        DetalleAlojamiento alojamiento = new DetalleAlojamiento(1L, "Casa 1", "Frente al mar", "Santa Marta", "Casa",
+                4, new BigDecimal("250000"), "No fumar", List.of(), List.of("Wifi"), "Flexible", "Devolución total");
+        PeriodoLibre periodo = new PeriodoLibre(LLEGADA, SALIDA);
+        when(publicaciones.consultarActiva(1L)).thenReturn(alojamiento);
+        when(disponibilidad.listarLibres(1L)).thenReturn(List.of(periodo));
+
+        DetalleBusqueda detalle = servicio.detalle(1L);
+
+        assertThat(detalle.alojamiento()).isEqualTo(alojamiento);
+        assertThat(detalle.periodos()).containsExactly(periodo);
+    }
+
+    @Test
+    @DisplayName("Si la publicación no está activa el detalle falla y no consulta el calendario")
+    void detalleDeUnaNoActivaNoConsultaElCalendario() {
+        when(publicaciones.consultarActiva(2L)).thenThrow(new PublicacionNoEncontradaException());
+
+        assertThatThrownBy(() -> servicio.detalle(2L)).isInstanceOf(PublicacionNoEncontradaException.class);
+
+        verifyNoInteractions(disponibilidad);
     }
 
     private void todosDisponibles(CandidatoBusqueda... candidatos) {

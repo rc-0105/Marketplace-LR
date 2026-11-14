@@ -1,6 +1,7 @@
 package co.edu.unbosque.marketplace.busqueda.services;
 
 import co.edu.unbosque.marketplace.alojamientos.services.CandidatoBusqueda;
+import co.edu.unbosque.marketplace.alojamientos.services.DetalleAlojamiento;
 import co.edu.unbosque.marketplace.alojamientos.services.PublicacionService;
 import co.edu.unbosque.marketplace.busqueda.exceptions.BusquedaInvalidaException;
 import co.edu.unbosque.marketplace.disponibilidad.services.DisponibilidadService;
@@ -12,9 +13,8 @@ import java.util.Set;
 import org.springframework.stereotype.Service;
 
 /**
- * Búsqueda de alojamientos por ciudad y fechas, con filtros combinados (RF-28, RF-29, RF-30). Solo orquesta:
- * {@code alojamientos} entrega las publicaciones ACTIVAS de la ciudad y
- * {@code disponibilidad} dice cuáles ofrecen toda la estancia (ADR-2).
+ * Búsqueda de alojamientos por ciudad y fechas, con filtros combinados.
+ * entrega las publicaciones ACTIVAS de la ciudad ymdice cuáles ofrecen toda la estancia.
  */
 @Service
 public class BusquedaService {
@@ -54,6 +54,12 @@ public class BusquedaService {
             }
         }
         return resultado;
+    }
+
+    /** Detalle de una publicación ACTIVA con su calendario; si no está activa, 404 y no consulta el calendario. */
+    public DetalleBusqueda detalle(Long publicacionId) {
+        DetalleAlojamiento alojamiento = publicaciones.consultarActiva(publicacionId);
+        return new DetalleBusqueda(alojamiento, disponibilidad.listarLibres(publicacionId));
     }
 
     private boolean cumpleFiltros(CandidatoBusqueda candidato, FiltrosBusqueda filtros) {

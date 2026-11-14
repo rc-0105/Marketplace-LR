@@ -103,6 +103,47 @@ class BusquedaIntegracionTest {
                 .param("salida", SALIDA.toString())).andExpect(status().isUnauthorized());
     }
 
+    @Test
+    @DisplayName("El detalle de una ACTIVA trae sus datos, su calendario y la calificación vacía")
+    void detalleDeUnaActiva() throws Exception {
+        Long id = publicacion(iniciarSesion("luis@correo.com"), "Santa Marta", "ACTIVA", LLEGADA, SALIDA);
+
+        detalle(iniciarSesion("ana@correo.com"), id)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id.intValue()))
+                .andExpect(jsonPath("$.titulo").value("Casa en la playa"))
+                .andExpect(jsonPath("$.ciudad").value("Santa Marta"))
+                .andExpect(jsonPath("$.periodos.length()").value(1))
+                .andExpect(jsonPath("$.periodos[0].inicio").value(LLEGADA.toString()))
+                .andExpect(jsonPath("$.calificacionPromedio").doesNotExist())
+                .andExpect(jsonPath("$.anfitrionId").doesNotExist())
+                .andExpect(jsonPath("$.estado").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("El detalle de una publicación que no está ACTIVA o no existe responde 404")
+    void detalleDeUnaNoActivaResponde404() throws Exception {
+        String anfitrion = iniciarSesion("luis@correo.com");
+        Long borrador = publicacion(anfitrion, "Santa Marta", "BORRADOR", LLEGADA, SALIDA);
+        Long pausada = publicacion(anfitrion, "Santa Marta", "PAUSADA", LLEGADA, SALIDA);
+        String huesped = iniciarSesion("ana@correo.com");
+
+        detalle(huesped, borrador).andExpect(status().isNotFound());
+        detalle(huesped, pausada).andExpect(status().isNotFound());
+        detalle(huesped, 999999L).andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("Solo el huésped consulta el detalle: el anfitrión recibe 403 y sin token 401")
+    void soloElHuespedConsultaElDetalle() throws Exception {
+        detalle(iniciarSesion("luis@correo.com"), 1L).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/busqueda/1")).andExpect(status().isUnauthorized());
+    }
+
+    private ResultActions detalle(String token, Long id) throws Exception {
+        return mvc.perform(get("/api/v1/busqueda/" + id).header(HttpHeaders.AUTHORIZATION, "Bearer " + token));
+    }
+
     private ResultActions buscar(String token, String ciudad, LocalDate llegada, LocalDate salida) throws Exception {
         return mvc.perform(get("/api/v1/busqueda").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .param("ciudad", ciudad).param("llegada", llegada.toString()).param("salida", salida.toString()));
