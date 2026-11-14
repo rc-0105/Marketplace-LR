@@ -28,6 +28,8 @@ export default function BusquedaPage() {
   const [servicios, setServicios] = useState([]);
   const [errores, setErrores] = useState({});
   const [resultados, setResultados] = useState(null);
+  // Las fechas con que se obtuvieron los resultados: viajan al detalle para precargar la cotización.
+  const [fechasBuscadas, setFechasBuscadas] = useState({ llegada: '', salida: '' });
   const [errorBusqueda, setErrorBusqueda] = useState(null);
   const [buscando, setBuscando] = useState(false);
 
@@ -66,6 +68,7 @@ export default function BusquedaPage() {
     setBuscando(true);
     try {
       setResultados(await buscarAlojamientos({ ...criterios, ciudad: criterios.ciudad.trim() }));
+      setFechasBuscadas({ llegada: criterios.llegada, salida: criterios.salida });
     } catch (error) {
       setResultados(null);
       setErrorBusqueda(error.estado === 400 ? error.message : MENSAJE_ERROR);
@@ -130,7 +133,9 @@ export default function BusquedaPage() {
                 <img src={resultado.imagenPrincipal} alt={`Foto de ${resultado.titulo}`} className={estilos.imagen} />
               )}
               <h2 className={estilos.nombre}>
-                <Link to={`/huesped/busqueda/${resultado.id}`}>{resultado.titulo}</Link>
+                <Link to={`/huesped/busqueda/${resultado.id}?${new URLSearchParams(fechasBuscadas)}`}>
+                  {resultado.titulo}
+                </Link>
               </h2>
               <p className={estilos.detalle}>
                 {[resultado.tipo, resultado.ciudad].filter(Boolean).join(' · ')}
