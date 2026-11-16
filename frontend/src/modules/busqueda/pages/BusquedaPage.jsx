@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import Campo from '../../../shared/components/Campo.jsx';
 import { buscarAlojamientos } from '../services/busquedaService.js';
 import estilos from './BusquedaPage.module.css';
@@ -79,6 +80,9 @@ export default function BusquedaPage() {
               {resultado.precioNoche != null && (
                 <p className={estilos.precio}>{FORMATO_PESOS.format(resultado.precioNoche)} por noche</p>
               )}
+              <Link to={`/huesped/publicaciones/${resultado.id}/calendario`} className={estilos.calendario}>
+                Ver calendario
+              </Link>
             </li>
           ))}
         </ul>
