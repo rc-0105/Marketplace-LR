@@ -10,6 +10,11 @@ public interface PeriodoDisponibleRepository extends JpaRepository<PeriodoDispon
 
 	List<PeriodoDisponible> findByPublicacionIdOrderByFechaInicioAsc(Long publicacionId);
 
+	// Periodos de la publicación que se cruzan con la ventana [desde, hasta): inicio < hasta y fin > desde, de
+	// modo que uno que solo la toca por el borde no cuenta. Los argumentos van en el orden del nombre.
+	List<PeriodoDisponible> findByPublicacionIdAndFechaInicioLessThanAndFechaFinGreaterThan(Long publicacionId,
+			LocalDate hasta, LocalDate desde);
+
 	// Periodos de las publicaciones dadas que cubren toda la estancia [llegada,
 	// salida): un solo periodo debe contenerla, porque dos contiguos los ofreció el anfitrión por separado.
 	List<PeriodoDisponible> findByPublicacionIdInAndFechaInicioLessThanEqualAndFechaFinGreaterThanEqual(
