@@ -188,6 +188,8 @@ class AdministracionUsuariosIntegracionTest {
                 .andExpect(jsonPath("$[0].id").value(idAna));
         listar(token, "OTRO.COM").andExpect(jsonPath("$[0].id").value(beto));
         listar(token, "nadie").andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        listar(token, "_").andExpect(jsonPath("$.length()").value(0));
+        listar(token, "%").andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test

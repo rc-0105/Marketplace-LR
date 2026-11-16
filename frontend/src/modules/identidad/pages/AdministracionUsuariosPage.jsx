@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSesion } from '../../../shared/sesion/useSesion.js';
 import { errorDeMotivo } from '../models/usuario.js';
 import {
@@ -24,17 +24,29 @@ export default function AdministracionUsuariosPage() {
   const [enCurso, setEnCurso] = useState(null);
   const [confirmacion, setConfirmacion] = useState(null);
 
+  // Cada carga lleva un número: solo la última aplica su respuesta, y ninguna tras desmontar la página.
+  const ultimaCarga = useRef(0);
+
   const cargar = useCallback(async (filtro) => {
+    const numero = ++ultimaCarga.current;
     setErrorCarga(null);
     try {
-      setUsuarios(await listarUsuariosAdministrables(filtro));
+      const lista = await listarUsuariosAdministrables(filtro);
+      if (numero === ultimaCarga.current) {
+        setUsuarios(lista);
+      }
     } catch {
-      setErrorCarga(MENSAJE_ERROR);
+      if (numero === ultimaCarga.current) {
+        setErrorCarga(MENSAJE_ERROR);
+      }
     }
   }, []);
 
   useEffect(() => {
     cargar('');
+    return () => {
+      ultimaCarga.current += 1;
+    };
   }, [cargar]);
 
   async function buscar(evento) {
@@ -73,11 +85,11 @@ export default function AdministracionUsuariosPage() {
     if (error) {
       return;
     }
-    await ejecutar(usuario, () => restringirUsuario(usuario.id, motivo), `${usuario.nombre} quedó restringido.`);
+    await ejecutar(usuario, () => restringirUsuario(usuario.id, motivo), `La cuenta de ${usuario.nombre} quedó restringida.`);
   }
 
   async function rehabilitar(usuario) {
-    await ejecutar(usuario, () => rehabilitarUsuario(usuario.id), `${usuario.nombre} recuperó el acceso.`);
+    await ejecutar(usuario, () => rehabilitarUsuario(usuario.id), `La cuenta de ${usuario.nombre} recuperó el acceso.`);
   }
 
   return (

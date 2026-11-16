@@ -17,12 +17,15 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     Optional<Usuario> findByCorreo(String correo);
 
-    /** Cuentas cuyo nombre o correo contienen el texto, sin las eliminadas, ordenadas por nombre. */
+    /**
+     * Cuentas cuyo nombre o correo contienen el texto, sin las eliminadas, ordenadas por nombre. El texto llega
+     * con {@code \}, {@code %} y {@code _} escapados para que se busquen literalmente.
+     */
     @Query("""
             SELECT u FROM Usuario u
             WHERE u.estado <> co.edu.unbosque.marketplace.identidad.model.EstadoCuenta.ELIMINADA
-              AND (LOWER(u.nombre) LIKE LOWER(CONCAT('%', :texto, '%'))
-                   OR LOWER(u.correo) LIKE LOWER(CONCAT('%', :texto, '%')))
+              AND (LOWER(u.nombre) LIKE LOWER(CONCAT('%', :texto, '%')) ESCAPE '\\'
+                   OR LOWER(u.correo) LIKE LOWER(CONCAT('%', :texto, '%')) ESCAPE '\\')
             ORDER BY u.nombre, u.id
             """)
     List<Usuario> buscarParaAdministracion(@Param("texto") String texto, Pageable pagina);

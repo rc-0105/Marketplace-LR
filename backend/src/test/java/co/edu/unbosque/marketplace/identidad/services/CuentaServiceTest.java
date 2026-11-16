@@ -78,6 +78,14 @@ class CuentaServiceTest {
     }
 
     @Test
+    @DisplayName("El texto del listado escapa los comodines de LIKE para buscarlos literalmente")
+    void escapaComodinesDelListado() {
+        servicio.listarParaAdministracion(" 50%_a\\b ");
+
+        verify(usuarios).buscarParaAdministracion("50\\%\\_a\\\\b", PageRequest.of(0, 50));
+    }
+
+    @Test
     @DisplayName("Filtrar restringidos devuelve los que la base marca RESTRINGIDA y sin ids no consulta")
     void filtraRestringidos() {
         when(usuarios.findIdsByIdInAndEstado(Set.of(AFECTADO, ADMIN), EstadoCuenta.RESTRINGIDA))

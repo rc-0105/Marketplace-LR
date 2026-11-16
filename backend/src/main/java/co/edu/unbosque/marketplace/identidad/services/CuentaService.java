@@ -82,7 +82,9 @@ public class CuentaService {
     @Transactional(readOnly = true)
     public List<Usuario> listarParaAdministracion(String texto) {
         String filtro = texto == null ? "" : texto.strip();
-        return usuarios.buscarParaAdministracion(filtro, PageRequest.of(0, MAXIMO_LISTADO));
+        // Escapados para LIKE: quien busca "_" quiere ese carácter, no cualquiera.
+        String literal = filtro.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+        return usuarios.buscarParaAdministracion(literal, PageRequest.of(0, MAXIMO_LISTADO));
     }
 
     /** De los usuarios recibidos, los que hoy están restringidos; la búsqueda oculta sus publicaciones (RF-58). */

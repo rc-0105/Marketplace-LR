@@ -99,6 +99,23 @@ describe('AdministracionUsuariosPage', () => {
     expect(screen.getByText('Beto Ruiz')).toBeInTheDocument();
   });
 
+  it('si una búsqueda anterior responde tarde, muestra solo el resultado de la última', async () => {
+    let responderPrimera;
+    vi.mocked(listarUsuariosAdministrables)
+      .mockReturnValueOnce(new Promise((resolver) => { responderPrimera = resolver; }))
+      .mockResolvedValueOnce([BETO]);
+    render(<AdministracionUsuariosPage />);
+
+    fireEvent.change(screen.getByLabelText('Buscar por nombre o correo'), { target: { value: 'beto' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
+    expect(await screen.findByText('Beto Ruiz')).toBeInTheDocument();
+
+    responderPrimera([ANA]);
+
+    await waitFor(() => expect(screen.queryByText('Ana Gómez')).not.toBeInTheDocument());
+    expect(screen.getByText('Beto Ruiz')).toBeInTheDocument();
+  });
+
   it('sin motivo no restringe y señala el campo', async () => {
     vi.mocked(listarUsuariosAdministrables).mockResolvedValue([ANA]);
     render(<AdministracionUsuariosPage />);
@@ -121,7 +138,7 @@ describe('AdministracionUsuariosPage', () => {
       { target: { value: 'Pagos en disputa' } });
     fireEvent.click(screen.getByRole('button', { name: 'Restringir a Ana Gómez' }));
 
-    expect(await screen.findByText('Ana Gómez quedó restringido.')).toBeInTheDocument();
+    expect(await screen.findByText('La cuenta de Ana Gómez quedó restringida.')).toBeInTheDocument();
     expect(restringirUsuario).toHaveBeenCalledWith(7, 'Pagos en disputa');
     expect(listarUsuariosAdministrables).toHaveBeenCalledTimes(2);
     expect(listarUsuariosAdministrables).toHaveBeenLastCalledWith('');
@@ -136,7 +153,7 @@ describe('AdministracionUsuariosPage', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Rehabilitar a Beto Ruiz' }));
 
-    expect(await screen.findByText('Beto Ruiz recuperó el acceso.')).toBeInTheDocument();
+    expect(await screen.findByText('La cuenta de Beto Ruiz recuperó el acceso.')).toBeInTheDocument();
     expect(rehabilitarUsuario).toHaveBeenCalledWith(8);
     expect(await screen.findByRole('button', { name: 'Restringir a Beto Ruiz' })).toBeInTheDocument();
   });
