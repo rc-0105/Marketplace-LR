@@ -282,4 +282,24 @@ class DisponibilidadServiceTest {
         ReflectionTestUtils.setField(periodo, "id", PERIODO_ID);
         return periodo;
     }
+
+    @Test
+    @DisplayName("Filtrar disponibles pregunta al repositorio por el rango completo y devuelve solo esos ids")
+    void filtrarDisponiblesDevuelveLosQueCubrenLaEstancia() {
+        when(periodos.findByPublicacionIdInAndFechaInicioLessThanEqualAndFechaFinGreaterThanEqual(
+                List.of(1L, 2L), HOY, HOY.plusDays(3)))
+                .thenReturn(List.of(PeriodoDisponible.nuevo(2L, HOY, HOY.plusDays(5)),
+                        PeriodoDisponible.nuevo(2L, HOY.minusDays(9), HOY.plusDays(9))));
+
+        assertThat(servicio.filtrarDisponibles(List.of(1L, 2L), HOY, HOY.plusDays(3))).containsExactly(2L);
+    }
+
+    @Test
+    @DisplayName("Filtrar disponibles sin publicaciones no consulta la base de datos")
+    void filtrarDisponiblesSinPublicacionesNoConsulta() {
+        assertThat(servicio.filtrarDisponibles(List.of(), HOY, HOY.plusDays(3))).isEmpty();
+
+        verify(periodos, never())
+                .findByPublicacionIdInAndFechaInicioLessThanEqualAndFechaFinGreaterThanEqual(any(), any(), any());
+    }
 }

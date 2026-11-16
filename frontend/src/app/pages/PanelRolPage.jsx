@@ -41,7 +41,12 @@ export default function PanelRolPage() {
       {esAdministrador ? (
         <HerramientasAdministrador />
       ) : (
-        <p className={estilos.nota}>Tu panel está en construcción. Pronto verás aquí tus herramientas.</p>
+        <>
+          <p className={estilos.nota}>Tu panel está en construcción. Pronto verás aquí tus herramientas.</p>
+          {usuario.rol === 'HUESPED' && (
+            <Link to="/huesped/busqueda" className={estilos.enlace}>Buscar alojamiento</Link>
+          )}
+        </>
       )}
     </main>
   );
