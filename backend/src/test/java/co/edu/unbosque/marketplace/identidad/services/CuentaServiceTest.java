@@ -24,8 +24,10 @@ import co.edu.unbosque.marketplace.identidad.model.EstadoCuenta;
 import co.edu.unbosque.marketplace.identidad.model.Rol;
 import co.edu.unbosque.marketplace.identidad.model.Usuario;
 import co.edu.unbosque.marketplace.identidad.repository.UsuarioRepository;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,6 +38,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InOrder;
 import org.mockito.ArgumentCaptor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -60,6 +63,29 @@ class CuentaServiceTest {
     @BeforeEach
     void preparar() {
         servicio = new CuentaService(usuarios, publicador, codificador, reservas);
+    }
+
+    @Test
+    @DisplayName("El listado de administración recorta el texto, trata nulo como vacío y pide como máximo 50 cuentas")
+    void listaParaAdministracionConTextoRecortado() {
+        Usuario ana = UsuariosDePrueba.activa(AFECTADO);
+        when(usuarios.buscarParaAdministracion("ana", PageRequest.of(0, 50))).thenReturn(List.of(ana));
+        when(usuarios.buscarParaAdministracion("", PageRequest.of(0, 50))).thenReturn(List.of());
+
+        assertThat(servicio.listarParaAdministracion("  ana ")).containsExactly(ana);
+        assertThat(servicio.listarParaAdministracion(null)).isEmpty();
+        verifyNoInteractions(publicador);
+    }
+
+    @Test
+    @DisplayName("Filtrar restringidos devuelve los que la base marca RESTRINGIDA y sin ids no consulta")
+    void filtraRestringidos() {
+        when(usuarios.findIdsByIdInAndEstado(Set.of(AFECTADO, ADMIN), EstadoCuenta.RESTRINGIDA))
+                .thenReturn(Set.of(AFECTADO));
+
+        assertThat(servicio.filtrarRestringidos(Set.of(AFECTADO, ADMIN))).containsExactly(AFECTADO);
+        assertThat(servicio.filtrarRestringidos(Set.of())).isEmpty();
+        verify(usuarios).findIdsByIdInAndEstado(Set.of(AFECTADO, ADMIN), EstadoCuenta.RESTRINGIDA);
     }
 
     @Test

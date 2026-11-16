@@ -1,10 +1,8 @@
 package co.edu.unbosque.marketplace.identidad.controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -27,15 +25,16 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
-/** Restringir y levantar la restricción (RF-06) con tokens reales y PostgreSQL. */
+/** Listar, restringir y rehabilitar cuentas (RF-06, RF-58) con tokens reales y PostgreSQL. */
 @SpringBootTest
 @AutoConfigureMockMvc
-class RestriccionCuentaIntegracionTest {
+class AdministracionUsuariosIntegracionTest {
 
     private static final String CONTRASENA = "Segura#2026";
     private static final String MOTIVO = "Pagos en disputa";
     private static final String RUTA_PROTEGIDA = "/api/v1/otra";
     private static final String CODIGO = "OPERACION_CUENTA_NO_PERMITIDA";
+    private static final String RUTA_LISTADO = "/api/v1/admin/usuarios";
 
     @Autowired
     private MockMvc mvc;
@@ -117,7 +116,7 @@ class RestriccionCuentaIntegracionTest {
     }
 
     @Test
-    @DisplayName("Levantar la restricción deja la cuenta activa y sin motivo, con auditoría sin el texto")
+    @DisplayName("Rehabilitar deja la cuenta activa y sin motivo, con auditoría sin el texto")
     void levantaRestriccion() throws Exception {
         String token = token("admin@correo.com");
         restringir(token, idAna, cuerpo(MOTIVO)).andExpect(status().isNoContent());
@@ -145,21 +144,48 @@ class RestriccionCuentaIntegracionTest {
             restringir(token, idAna, cuerpo(MOTIVO)).andExpect(status().isForbidden());
             levantar(token, idAna).andExpect(status().isForbidden())
                     .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+            listar(token, "").andExpect(status().isForbidden());
         }
 
         assertThat(estado(idAna)).isEqualTo("ACTIVA");
     }
 
     @Test
-    @DisplayName("Sin token las dos operaciones dan 401")
-    void sinTokenResponde401() throws Exception {
-        mvc.perform(put(ruta(idAna)).contentType(MediaType.APPLICATION_JSON).content(cuerpo(MOTIVO)))
-                .andExpect(status().isUnauthorized());
-        mvc.perform(delete(ruta(idAna))).andExpect(status().isUnauthorized());
+    @DisplayName("El listado filtra por nombre o correo sin distinguir mayúsculas, ordena por nombre y omite eliminadas")
+    void listaCuentasParaAdministrar() throws Exception {
+        String token = token("admin@correo.com");
+        Long beto = guardar("Beto Ruiz", "beto@otro.com", Rol.ANFITRION);
+        Usuario eliminada = usuarios.findById(guardar("Ana Vieja", "ana.vieja@correo.com", Rol.HUESPED)).orElseThrow();
+        eliminada.eliminar(codificador.encode("inservible"));
+        usuarios.save(eliminada);
+        restringir(token, beto, cuerpo(MOTIVO)).andExpect(status().isNoContent());
+
+        listar(token, "").andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[0].nombre").value("Admin"))
+                .andExpect(jsonPath("$[1].nombre").value("Ana Gómez"))
+                .andExpect(jsonPath("$[2].nombre").value("Beto Ruiz"))
+                .andExpect(jsonPath("$[2].estado").value("RESTRINGIDA"))
+                .andExpect(jsonPath("$[2].motivoRestriccion").value(MOTIVO))
+                .andExpect(jsonPath("$[2].rol").value("ANFITRION"))
+                .andExpect(jsonPath("$[0].contrasenaHash").doesNotExist());
+        listar(token, "  ANA ").andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(idAna));
+        listar(token, "OTRO.COM").andExpect(jsonPath("$[0].id").value(beto));
+        listar(token, "nadie").andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test
-    @DisplayName("Al restringir a Ana su token vivo da 401, su login da 403 con motivo y al levantar vuelve a entrar")
+    @DisplayName("Sin token el listado, restringir y rehabilitar dan 401")
+    void sinTokenResponde401() throws Exception {
+        mvc.perform(post(ruta(idAna, "restringir")).contentType(MediaType.APPLICATION_JSON).content(cuerpo(MOTIVO)))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post(ruta(idAna, "rehabilitar"))).andExpect(status().isUnauthorized());
+        mvc.perform(get(RUTA_LISTADO)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("Al restringir a Ana su token vivo da 401, su login da 403 con motivo y al rehabilitarla vuelve a entrar")
     void restriccionInvalidaElTokenVivo() throws Exception {
         String admin = token("admin@correo.com");
         String ana = token("ana@correo.com");
@@ -220,8 +246,8 @@ class RestriccionCuentaIntegracionTest {
         return jdbc.queryForObject("SELECT motivo_restriccion FROM usuario WHERE id = ?", String.class, id);
     }
 
-    private static String ruta(Long id) {
-        return "/api/v1/admin/usuarios/" + id + "/restriccion";
+    private static String ruta(Long id, String accion) {
+        return RUTA_LISTADO + "/" + id + "/" + accion;
     }
 
     private static String cuerpo(String motivo) {
@@ -241,11 +267,16 @@ class RestriccionCuentaIntegracionTest {
     }
 
     private ResultActions restringir(String token, Long id, String cuerpo) throws Exception {
-        return mvc.perform(put(ruta(id)).header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+        return mvc.perform(post(ruta(id, "restringir")).header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON).content(cuerpo));
     }
 
+    private ResultActions listar(String token, String texto) throws Exception {
+        return mvc.perform(get(RUTA_LISTADO).param("texto", texto)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token));
+    }
+
     private ResultActions levantar(String token, Long id) throws Exception {
-        return mvc.perform(delete(ruta(id)).header(HttpHeaders.AUTHORIZATION, "Bearer " + token));
+        return mvc.perform(post(ruta(id, "rehabilitar")).header(HttpHeaders.AUTHORIZATION, "Bearer " + token));
     }
 }
