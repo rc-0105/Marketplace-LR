@@ -94,9 +94,25 @@ class CalendarioIntegracionTest {
     }
 
     @Test
-    @DisplayName("Sin token responde 401")
+    @DisplayName("Sin token responde 401 como problem+json")
     void sinTokenResponde401() throws Exception {
-        mvc.perform(get(ruta(publicacionId, VENTANA))).andExpect(status().isUnauthorized());
+        mvc.perform(get(ruta(publicacionId, VENTANA)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
+    @Test
+    @DisplayName("Un usuarioId inventado en la query se ignora: el dueño lo decide el token")
+    void elUsuarioIdDeLaQuerySeIgnora() throws Exception {
+        Long duenoId = jdbc.queryForObject("SELECT id FROM usuario WHERE correo = ?", Long.class, "luis@correo.com");
+
+        String cuerpo = consultar(huespedToken, publicacionId,
+                VENTANA + "&usuarioId=" + duenoId + "&propietarioId=" + duenoId + "&esDueno=true")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dias[2].estado").value("RESERVADO"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(cuerpo).doesNotContain("reservaId");
     }
 
     @Test
