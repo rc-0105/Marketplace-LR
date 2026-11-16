@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSesion } from '../../../shared/sesion/useSesion.js';
 import { errorDeMotivo } from '../models/usuario.js';
 import {
   listarUsuariosAdministrables, rehabilitarUsuario, restringirUsuario,
@@ -12,6 +13,7 @@ const NOMBRE_ESTADO = { ACTIVA: 'Activa', DESACTIVADA: 'Desactivada', RESTRINGID
 
 /** Pantalla del administrador para buscar cuentas, restringirlas con un motivo y rehabilitarlas (RF-58). */
 export default function AdministracionUsuariosPage() {
+  const sesion = useSesion();
   const [texto, setTexto] = useState('');
   const [buscado, setBuscado] = useState('');
   const [usuarios, setUsuarios] = useState(null);
@@ -103,6 +105,8 @@ export default function AdministracionUsuariosPage() {
             const idMotivo = `motivo-${usuario.id}`;
             const errorMotivo = erroresMotivo[usuario.id];
             const ocupado = enCurso === usuario.id;
+            // La API rechaza igual la propia cuenta; aquí solo se evita ofrecer una acción que no procede.
+            const esPropia = usuario.id === sesion?.usuario.id;
             return (
               <li key={usuario.id} className={estilos.tarjeta}>
                 <div className={estilos.cabecera}>
@@ -116,7 +120,8 @@ export default function AdministracionUsuariosPage() {
                   <p className={estilos.motivo}>Motivo: {usuario.motivoRestriccion}</p>
                 )}
                 {errores[usuario.id] && <p role="alert" className={estilos.error}>{errores[usuario.id]}</p>}
-                {usuario.estado === 'ACTIVA' && (
+                {esPropia && <p className={estilos.detalle}>Es tu cuenta: no puedes restringirla.</p>}
+                {!esPropia && usuario.estado === 'ACTIVA' && (
                   <form className={estilos.accion} onSubmit={(evento) => restringir(evento, usuario)} noValidate>
                     <div className={estilos.campo}>
                       <label className={estilos.etiqueta} htmlFor={idMotivo}>
@@ -137,7 +142,7 @@ export default function AdministracionUsuariosPage() {
                     </button>
                   </form>
                 )}
-                {usuario.estado === 'RESTRINGIDA' && (
+                {!esPropia && usuario.estado === 'RESTRINGIDA' && (
                   <div className={estilos.accion}>
                     <button type="button" className={estilos.primario} disabled={ocupado}
                       aria-label={`Rehabilitar a ${usuario.nombre}`} onClick={() => rehabilitar(usuario)}>

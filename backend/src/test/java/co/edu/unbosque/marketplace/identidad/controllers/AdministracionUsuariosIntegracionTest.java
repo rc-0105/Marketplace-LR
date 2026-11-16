@@ -106,6 +106,21 @@ class AdministracionUsuariosIntegracionTest {
     }
 
     @Test
+    @DisplayName("El administrador no puede restringirse a sí mismo: 409 con el mensaje, sigue activo y puede entrar")
+    void noPuedeRestringirseASiMismo() throws Exception {
+        String token = token("admin@correo.com");
+
+        restringir(token, idAdmin, cuerpo(MOTIVO)).andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.codigo").value(CODIGO))
+                .andExpect(jsonPath("$.detail").value("No puedes restringir tu propia cuenta."));
+
+        assertThat(estado(idAdmin)).isEqualTo("ACTIVA");
+        assertThat(motivo(idAdmin)).isNull();
+        login("admin@correo.com").andExpect(status().isOk());
+    }
+
+    @Test
     @DisplayName("Un usuario inexistente da 404 ProblemDetail")
     void usuarioInexistente() throws Exception {
         String token = token("admin@correo.com");

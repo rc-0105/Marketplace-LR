@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi } from '../../../shared/services/http.js';
+import { guardarSesion, limpiarSesion } from '../../../shared/services/sesion.js';
 import {
   listarUsuariosAdministrables, rehabilitarUsuario, restringirUsuario,
 } from '../services/identidadService.js';
@@ -27,6 +28,21 @@ const BETO = usuario({
 
 describe('AdministracionUsuariosPage', () => {
   beforeEach(() => vi.resetAllMocks());
+  afterEach(() => limpiarSesion());
+
+  it('en la cuenta del administrador con sesión no ofrece restringir ni rehabilitar', async () => {
+    const expiraEn = new Date(Date.now() + 3600_000).toISOString();
+    guardarSesion({ token: 't', expiraEn, usuario: { id: 7, nombre: 'Ana Gómez', correo: 'ana@correo.com',
+      rol: 'ADMINISTRADOR', activa: true } });
+    vi.mocked(listarUsuariosAdministrables).mockResolvedValue([usuario({ rol: 'ADMINISTRADOR' }), BETO]);
+
+    render(<AdministracionUsuariosPage />);
+
+    expect(await screen.findByText('Es tu cuenta: no puedes restringirla.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Restringir a Ana Gómez' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Motivo de la restricción para Ana Gómez')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Rehabilitar a Beto Ruiz' })).toBeInTheDocument();
+  });
 
   it('muestra las cuentas con su correo, rol, estado y el motivo de las restringidas', async () => {
     vi.mocked(listarUsuariosAdministrables).mockResolvedValue([ANA, BETO]);
