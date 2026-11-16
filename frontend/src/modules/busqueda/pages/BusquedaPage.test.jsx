@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi } from '../../../shared/services/http.js';
 import { listarServicios, listarTiposAlojamiento } from '../../alojamientos/services/alojamientosService.js';
@@ -32,7 +33,7 @@ describe('BusquedaPage', () => {
       { id: 1, titulo: 'Casa en la playa', ciudad: 'Santa Marta', tipo: 'Casa', capacidad: 4, precioNoche: 250000,
         imagenPrincipal: 'https://imagenes.com/1.jpg' },
     ]);
-    render(<BusquedaPage />);
+    render(<MemoryRouter><BusquedaPage /></MemoryRouter>);
 
     llenar();
 
@@ -47,7 +48,7 @@ describe('BusquedaPage', () => {
 
   it('si no hay resultados muestra el estado vacío con la sugerencia de ampliar fechas, sin error', async () => {
     vi.mocked(buscarAlojamientos).mockResolvedValue([]);
-    render(<BusquedaPage />);
+    render(<MemoryRouter><BusquedaPage /></MemoryRouter>);
 
     llenar({ ciudad: 'Leticia' });
 
@@ -58,7 +59,7 @@ describe('BusquedaPage', () => {
   it('si la API rechaza las fechas muestra su mensaje', async () => {
     vi.mocked(buscarAlojamientos).mockRejectedValue(
       new ErrorApi(400, 'La fecha de salida debe ser posterior a la de llegada'));
-    render(<BusquedaPage />);
+    render(<MemoryRouter><BusquedaPage /></MemoryRouter>);
 
     llenar({ llegada: '2026-12-25', salida: '2026-12-20' });
 
@@ -66,7 +67,7 @@ describe('BusquedaPage', () => {
   });
 
   it('no busca si falta la ciudad o alguna fecha y señala qué falta', async () => {
-    render(<BusquedaPage />);
+    render(<MemoryRouter><BusquedaPage /></MemoryRouter>);
 
     fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
 
@@ -78,7 +79,7 @@ describe('BusquedaPage', () => {
 
   it('envía los filtros combinados junto con la ciudad y las fechas', async () => {
     vi.mocked(buscarAlojamientos).mockResolvedValue([]);
-    render(<BusquedaPage />);
+    render(<MemoryRouter><BusquedaPage /></MemoryRouter>);
     await screen.findByLabelText('Wifi');
 
     fireEvent.change(screen.getByLabelText('Huéspedes (mínimo)'), { target: { value: '4' } });
@@ -97,7 +98,7 @@ describe('BusquedaPage', () => {
 
   it('al quitar un servicio y buscar de nuevo conserva ciudad, fechas y los demás filtros', async () => {
     vi.mocked(buscarAlojamientos).mockResolvedValue([]);
-    render(<BusquedaPage />);
+    render(<MemoryRouter><BusquedaPage /></MemoryRouter>);
     await screen.findByLabelText('Wifi');
     fireEvent.click(screen.getByLabelText('Wifi'));
     fireEvent.click(screen.getByLabelText('Piscina'));
@@ -113,7 +114,7 @@ describe('BusquedaPage', () => {
   });
 
   it('limpiar filtros los quita pero deja la ciudad y las fechas', async () => {
-    render(<BusquedaPage />);
+    render(<MemoryRouter><BusquedaPage /></MemoryRouter>);
     await screen.findByLabelText('Wifi');
     fireEvent.change(screen.getByLabelText('Ciudad'), { target: { value: 'Santa Marta' } });
     fireEvent.change(screen.getByLabelText('Huéspedes (mínimo)'), { target: { value: '4' } });
@@ -130,7 +131,7 @@ describe('BusquedaPage', () => {
     vi.mocked(listarTiposAlojamiento).mockRejectedValue(new Error('caído'));
     vi.mocked(listarServicios).mockRejectedValue(new Error('caído'));
     vi.mocked(buscarAlojamientos).mockResolvedValue([]);
-    render(<BusquedaPage />);
+    render(<MemoryRouter><BusquedaPage /></MemoryRouter>);
 
     llenar();
 

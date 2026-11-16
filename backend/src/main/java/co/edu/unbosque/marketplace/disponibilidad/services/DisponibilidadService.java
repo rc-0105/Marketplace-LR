@@ -17,6 +17,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -68,6 +69,16 @@ public class DisponibilidadService {
     public List<PeriodoDisponible> listar(Long publicacionId, Long anfitrionId) {
         publicaciones.exigirPropietario(publicacionId, anfitrionId);
         return periodos.findByPublicacionIdOrderByFechaInicioAsc(publicacionId);
+    }
+
+    /** Calendario público de la publicación, del periodo más próximo al más lejano. */
+    @Transactional(readOnly = true)
+    public List<PeriodoLibre> listarLibres(Long publicacionId) {
+        List<PeriodoLibre> libres = new ArrayList<>();
+        for (PeriodoDisponible periodo : periodos.findByPublicacionIdOrderByFechaInicioAsc(publicacionId)) {
+            libres.add(PeriodoLibre.desde(periodo));
+        }
+        return libres;
     }
 
     /**
