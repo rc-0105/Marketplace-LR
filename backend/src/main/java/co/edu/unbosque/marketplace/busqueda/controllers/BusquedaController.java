@@ -27,6 +27,6 @@ public class BusquedaController {
 	@GetMapping("/busqueda")
 	public List<ResultadoBusquedaResponse> buscar(@Valid BusquedaRequest data) {
 		return ResultadoBusquedaResponse
-				.desde(busquedaService.buscar(data.ciudad(), data.llegada(), data.salida()));
+				.desde(busquedaService.buscar(data.ciudad(), data.llegada(), data.salida(), data.filtros()));
 	}
 }

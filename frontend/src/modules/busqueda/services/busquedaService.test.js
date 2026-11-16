@@ -15,6 +15,19 @@ describe('buscarAlojamientos', () => {
     expect(get).toHaveBeenCalledWith('/api/v1/busqueda?ciudad=Santa+Marta&llegada=2026-12-20&salida=2026-12-25');
   });
 
+  it('agrega los filtros informados y omite los vacíos', async () => {
+    vi.mocked(get).mockResolvedValue([]);
+
+    await buscarAlojamientos({
+      ciudad: 'Santa Marta', llegada: '2026-12-20', salida: '2026-12-25',
+      capacidad: '4', tipo: 'Casa', precioMin: '', precioMax: '500000', servicios: [10, 20],
+    });
+
+    expect(get).toHaveBeenCalledWith(
+      '/api/v1/busqueda?ciudad=Santa+Marta&llegada=2026-12-20&salida=2026-12-25'
+      + '&capacidad=4&tipo=Casa&precioMax=500000&servicios=10&servicios=20');
+  });
+
   it('convierte cada resultado al modelo del frontend', async () => {
     vi.mocked(get).mockResolvedValue([
       { id: 1, titulo: 'Casa', ciudad: 'Santa Marta', tipo: 'Casa', capacidad: 4, precioNoche: '250000.00' },
