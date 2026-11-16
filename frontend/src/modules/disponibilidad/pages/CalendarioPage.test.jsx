@@ -1,7 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { Link, MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { guardarSesion, limpiarSesion, obtenerSesion } from '../../../shared/services/sesion.js';
+import ProveedorSesion from '../../../shared/sesion/ProveedorSesion.jsx';
 import CalendarioPage from './CalendarioPage.jsx';
 
 const CALENDARIO = {
@@ -18,6 +19,11 @@ const CALENDARIO = {
 
 function responder(estado, cuerpo) {
   return { ok: estado < 400, status: estado, text: async () => JSON.stringify(cuerpo) };
+}
+
+function Ubicacion() {
+  const { pathname, state } = useLocation();
+  return <p>{`${pathname} ${state?.sesionExpirada ? 'expirada' : ''}`}</p>;
 }
 
 function renderizar() {
@@ -113,24 +119,51 @@ describe('CalendarioPage', () => {
     expect(obtenerSesion()).not.toBeNull();
   });
 
-  it('con un 401 cierra la sesión como lo hace el cliente HTTP', async () => {
+  it('con un 401 cierra la sesión y redirige al inicio de sesión con el aviso de sesión expirada', async () => {
     fetch.mockResolvedValue(responder(401, { detail: 'Sesión vencida' }));
 
-    renderizar();
+    render(
+      <MemoryRouter initialEntries={['/huesped/publicaciones/10/calendario']}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <ProveedorSesion>
+          <Routes>
+            <Route path="/huesped/publicaciones/:id/calendario" element={<CalendarioPage />} />
+            <Route path="/inicio-sesion" element={<Ubicacion />} />
+          </Routes>
+        </ProveedorSesion>
+      </MemoryRouter>,
+    );
 
-    await screen.findByRole('alert');
+    expect(await screen.findByText('/inicio-sesion expirada')).toBeInTheDocument();
     expect(obtenerSesion()).toBeNull();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
-  it('no actualiza nada si se sale de la página antes de que responda la API', async () => {
-    let resolver;
-    fetch.mockReturnValue(new Promise((resultado) => { resolver = resultado; }));
-    const { unmount } = renderizar();
+  it('ignora la respuesta tardía de una publicación anterior si la ruta cambió', async () => {
+    const pendientes = {};
+    fetch.mockImplementation((ruta) => new Promise((resultado) => { pendientes[ruta] = resultado; }));
+    render(
+      <MemoryRouter initialEntries={['/huesped/publicaciones/10/calendario']}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Link to="/huesped/publicaciones/20/calendario">Ir a la 20</Link>
+        <Routes>
+          <Route path="/huesped/publicaciones/:id/calendario" element={<CalendarioPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
 
-    unmount();
-    resolver(responder(200, CALENDARIO));
+    fireEvent.click(screen.getByRole('link', { name: 'Ir a la 20' }));
+    await act(async () => {
+      pendientes['/api/v1/publicaciones/20/calendario'](
+        responder(200, { ...CALENDARIO, publicacionId: 20, dias: [{ fecha: '2026-12-01', estado: 'BLOQUEADO' }] }));
+    });
+    expect(await screen.findByRole('cell', { name: /^1 de diciembre de 2026.*Bloqueado/ })).toBeInTheDocument();
 
-    await Promise.resolve();
-    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    await act(async () => {
+      pendientes['/api/v1/publicaciones/10/calendario'](responder(200, CALENDARIO));
+    });
+
+    expect(screen.getByRole('cell', { name: /^1 de diciembre de 2026.*Bloqueado/ })).toBeInTheDocument();
+    expect(screen.queryByRole('cell', { name: /Disponible/ })).not.toBeInTheDocument();
   });
 });
