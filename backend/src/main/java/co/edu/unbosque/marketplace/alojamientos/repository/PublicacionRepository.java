@@ -21,6 +21,8 @@ public interface PublicacionRepository extends JpaRepository<Publicacion, Long> 
 
     Optional<AnfitrionDePublicacion> findAnfitrionById(Long id);
 
+    Optional<AccesoDePublicacion> findAccesoById(Long id);
+
     @EntityGraph(attributePaths = {"tipo", "politica", "servicios", "imagenes", "serviciosAdicionales"})
     List<Publicacion> findByEstado(EstadoPublicacion estado);
 }

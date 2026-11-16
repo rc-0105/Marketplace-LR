@@ -24,6 +24,7 @@ import co.edu.unbosque.marketplace.alojamientos.model.ServicioAdicional;
 import co.edu.unbosque.marketplace.alojamientos.model.Servicio;
 import co.edu.unbosque.marketplace.alojamientos.model.TipoAlojamiento;
 import co.edu.unbosque.marketplace.alojamientos.repository.PoliticaCancelacionRepository;
+import co.edu.unbosque.marketplace.alojamientos.repository.AccesoDePublicacion;
 import co.edu.unbosque.marketplace.alojamientos.repository.AnfitrionDePublicacion;
 import co.edu.unbosque.marketplace.alojamientos.repository.PublicacionRepository;
 import co.edu.unbosque.marketplace.alojamientos.repository.ServicioRepository;
@@ -366,6 +367,40 @@ class PublicacionServiceTest {
 
         assertThatThrownBy(() -> servicio.exigirPropietario(PUBLICACION_ID, ANFITRION_ID))
                 .isInstanceOf(PublicacionNoEncontradaException.class);
+    }
+
+    @Test
+    @DisplayName("Consultar el acceso de una publicación ACTIVA informa su dueño y que es pública")
+    void consultarAccesoDeActivaEsPublica() {
+        when(publicaciones.findAccesoById(PUBLICACION_ID))
+                .thenReturn(Optional.of(accesoDe(ANFITRION_ID, EstadoPublicacion.ACTIVA)));
+
+        Optional<AccesoPublicacion> acceso = servicio.consultarAcceso(PUBLICACION_ID);
+
+        assertThat(acceso).contains(new AccesoPublicacion(ANFITRION_ID, true));
+        assertThat(acceso.orElseThrow().esDe(ANFITRION_ID)).isTrue();
+        assertThat(acceso.orElseThrow().esDe(OTRO_ANFITRION_ID)).isFalse();
+    }
+
+    @Test
+    @DisplayName("Consultar el acceso de una publicación en BORRADOR o en revisión informa que no es pública, sin lanzar")
+    void consultarAccesoDeNoActivaNoEsPublica() {
+        when(publicaciones.findAccesoById(PUBLICACION_ID))
+                .thenReturn(Optional.of(accesoDe(ANFITRION_ID, EstadoPublicacion.BORRADOR)));
+        assertThat(servicio.consultarAcceso(PUBLICACION_ID)).contains(new AccesoPublicacion(ANFITRION_ID, false));
+
+        when(publicaciones.findAccesoById(PUBLICACION_ID))
+                .thenReturn(Optional.of(accesoDe(ANFITRION_ID, EstadoPublicacion.PENDIENTE_REVISION)));
+        assertThat(servicio.consultarAcceso(PUBLICACION_ID)).contains(new AccesoPublicacion(ANFITRION_ID, false));
+    }
+
+    @Test
+    @DisplayName("Consultar el acceso de una publicación que no existe devuelve vacío en vez de lanzar 404")
+    void consultarAccesoDeInexistenteDevuelveVacio() {
+        when(publicaciones.findAccesoById(PUBLICACION_ID)).thenReturn(Optional.empty());
+
+        assertThat(servicio.consultarAcceso(PUBLICACION_ID)).isEmpty();
+        verify(publicaciones, never()).findById(any());
     }
 
     @Test
@@ -899,5 +934,19 @@ class PublicacionServiceTest {
         ArgumentCaptor<EventoCritico> captor = ArgumentCaptor.forClass(EventoCritico.class);
         verify(publicador).publicar(captor.capture());
         return captor.getValue();
+    }
+
+    private static AccesoDePublicacion accesoDe(Long anfitrionId, EstadoPublicacion estado) {
+        return new AccesoDePublicacion() {
+            @Override
+            public Long getAnfitrionId() {
+                return anfitrionId;
+            }
+
+            @Override
+            public EstadoPublicacion getEstado() {
+                return estado;
+            }
+        };
     }
 }
