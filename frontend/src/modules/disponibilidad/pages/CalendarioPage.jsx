@@ -10,7 +10,7 @@ export default function CalendarioPage() {
     <main className={estilos.pagina}>
       <Link to="/huesped/busqueda" className={estilos.volver}>Volver a la búsqueda</Link>
       <h1 className={estilos.titulo}>Calendario de disponibilidad</h1>
-      <CalendarioConsulta publicacionId={id} />
+      <CalendarioConsulta key={id} publicacionId={id} />
     </main>
   );
 }
