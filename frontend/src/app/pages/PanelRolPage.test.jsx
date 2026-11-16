@@ -49,6 +49,7 @@ describe('PanelRolPage', () => {
     expect(screen.getByRole('heading', { name: 'Tus herramientas' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Revisar publicaciones' }))
       .toHaveAttribute('href', '/administrador/publicaciones');
+    expect(screen.getByRole('link', { name: 'Administrar usuarios' })).toHaveAttribute('href', '/administrador/usuarios');
     expect(screen.getByRole('link', { name: 'Ir a Mi cuenta' })).toHaveAttribute('href', '/mi-cuenta');
     expect(screen.queryByText(/en construcción/)).not.toBeInTheDocument();
     expect(await screen.findByText('No hay publicaciones pendientes de revisión.')).toBeInTheDocument();
@@ -66,6 +67,7 @@ describe('PanelRolPage', () => {
     renderizar();
 
     expect(screen.queryByRole('link', { name: 'Revisar publicaciones' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Administrar usuarios' })).not.toBeInTheDocument();
     expect(screen.getByText('Tu panel está en construcción. Pronto verás aquí tus herramientas.')).toBeInTheDocument();
     expect(listarPendientesDeRevision).not.toHaveBeenCalled();
   });

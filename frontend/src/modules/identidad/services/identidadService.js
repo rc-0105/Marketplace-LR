@@ -1,6 +1,6 @@
 import { get, post, put } from '../../../shared/services/http.js';
 import { guardarSesion, limpiarSesion, obtenerSesion } from '../../../shared/services/sesion.js';
-import { perfilDesdeApi, usuarioDesdeApi } from '../models/usuario.js';
+import { perfilDesdeApi, usuarioAdministradoDesdeApi, usuarioDesdeApi } from '../models/usuario.js';
 
 /**
  * @param {import('../models/usuario.js').DatosRegistro} datos
@@ -106,6 +106,36 @@ export async function actualizarPerfil(datos) {
  */
 export async function cambiarContrasena(datos) {
   await put('/api/v1/perfil/contrasena', datos);
+}
+
+const RUTA_ADMIN_USUARIOS = '/api/v1/admin/usuarios';
+
+/**
+ * Cuentas cuyo nombre o correo contienen el texto, en el orden de la API (por nombre, hasta 50).
+ * @param {string} texto vacío para ver las primeras
+ * @returns {Promise<import('../models/usuario.js').UsuarioAdministrado[]>}
+ */
+export async function listarUsuariosAdministrables(texto) {
+  const respuesta = await get(`${RUTA_ADMIN_USUARIOS}?texto=${encodeURIComponent(texto.trim())}`);
+  return respuesta.map(usuarioAdministradoDesdeApi);
+}
+
+/**
+ * Si la cuenta no está activa (409) o es la propia, la API rechaza y el ErrorApi se propaga.
+ * @param {number} id
+ * @param {string} motivo
+ * @returns {Promise<void>}
+ */
+export async function restringirUsuario(id, motivo) {
+  await post(`${RUTA_ADMIN_USUARIOS}/${id}/restringir`, { motivo: motivo.trim() });
+}
+
+/**
+ * @param {number} id
+ * @returns {Promise<void>}
+ */
+export async function rehabilitarUsuario(id) {
+  await post(`${RUTA_ADMIN_USUARIOS}/${id}/rehabilitar`);
 }
 
 /** Siempre deja al usuario sin sesión local, falle o no el logout del servidor. */

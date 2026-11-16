@@ -3,7 +3,8 @@ import { ErrorApi, get, post, put } from '../../../shared/services/http.js';
 import { guardarSesion, obtenerSesion } from '../../../shared/services/sesion.js';
 import {
   actualizarPerfil, cambiarContrasena, cerrarSesion, confirmarRecuperacion, desactivarCuenta, eliminarCuenta,
-  iniciarSesion, obtenerPerfil, reactivarCuenta, registrarUsuario, solicitarRecuperacion,
+  iniciarSesion, listarUsuariosAdministrables, obtenerPerfil, reactivarCuenta, registrarUsuario,
+  rehabilitarUsuario, restringirUsuario, solicitarRecuperacion,
 } from './identidadService.js';
 
 vi.mock('../../../shared/services/http.js', async (importOriginal) => ({
@@ -213,5 +214,38 @@ describe('identidadService', () => {
     const error = new ErrorApi(403, 'La contraseña no es correcta.', {}, { codigo: 'CONFIRMACION_INVALIDA' });
     vi.mocked(put).mockRejectedValueOnce(error);
     await expect(cambiarContrasena(datos)).rejects.toBe(error);
+  });
+
+  it('lista las cuentas administrables con el texto recortado y codificado, sin motivo como vacío', async () => {
+    vi.mocked(get).mockResolvedValue([
+      { id: 7, nombre: 'Ana', correo: 'ana@correo.com', rol: 'HUESPED', estado: 'ACTIVA', motivoRestriccion: null },
+      { id: 8, nombre: 'Beto', correo: 'beto@correo.com', rol: 'ANFITRION', estado: 'RESTRINGIDA',
+        motivoRestriccion: 'Fotos engañosas' },
+    ]);
+
+    const usuarios = await listarUsuariosAdministrables('  ana & co ');
+
+    expect(get).toHaveBeenCalledWith('/api/v1/admin/usuarios?texto=ana%20%26%20co');
+    expect(usuarios).toEqual([
+      { id: 7, nombre: 'Ana', correo: 'ana@correo.com', rol: 'HUESPED', estado: 'ACTIVA', motivoRestriccion: '' },
+      { id: 8, nombre: 'Beto', correo: 'beto@correo.com', rol: 'ANFITRION', estado: 'RESTRINGIDA',
+        motivoRestriccion: 'Fotos engañosas' },
+    ]);
+  });
+
+  it('restringe con el motivo recortado y rehabilita por las rutas de administración', async () => {
+    vi.mocked(post).mockResolvedValue(null);
+
+    await restringirUsuario(8, '  Fotos engañosas ');
+    await rehabilitarUsuario(8);
+
+    expect(post).toHaveBeenNthCalledWith(1, '/api/v1/admin/usuarios/8/restringir', { motivo: 'Fotos engañosas' });
+    expect(post).toHaveBeenNthCalledWith(2, '/api/v1/admin/usuarios/8/rehabilitar');
+  });
+
+  it('propaga el rechazo de la API al restringir', async () => {
+    vi.mocked(post).mockRejectedValue(new ErrorApi(409, 'Solo se puede restringir una cuenta activa.'));
+
+    await expect(restringirUsuario(8, 'Motivo')).rejects.toThrow('Solo se puede restringir una cuenta activa.');
   });
 });
