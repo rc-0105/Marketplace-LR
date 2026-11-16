@@ -1,5 +1,6 @@
 package co.edu.unbosque.marketplace.busqueda.controllers;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -77,6 +78,39 @@ class BusquedaIntegracionTest {
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(cubierta.intValue()))
                 .andExpect(jsonPath("$[0].ciudad").value("Santa Marta"));
+    }
+
+    @Test
+    @DisplayName("Al restringir al anfitrión sus ACTIVAS salen de la búsqueda y al rehabilitarlo vuelven, sin tocar otras")
+    void restringirAlAnfitrionOcultaSusPublicaciones() throws Exception {
+        Long luis = usuarios.findByCorreo("luis@correo.com").orElseThrow().getId();
+        usuarios.save(Usuario.nuevo("Marta Ríos", "marta@correo.com", codificador.encode(CONTRASENA), Rol.ANFITRION));
+        usuarios.save(Usuario.nuevo("Admin", "admin@correo.com", codificador.encode(CONTRASENA), Rol.ADMINISTRADOR));
+        Long deLuis = publicacion(iniciarSesion("luis@correo.com"), "Santa Marta", "ACTIVA", LLEGADA, SALIDA);
+        Long deMarta = publicacion(iniciarSesion("marta@correo.com"), "Santa Marta", "ACTIVA", LLEGADA, SALIDA);
+        String admin = iniciarSesion("admin@correo.com");
+        String ana = iniciarSesion("ana@correo.com");
+
+        mvc.perform(post("/api/v1/admin/usuarios/" + luis + "/restringir")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + admin)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"motivo\": \"Fotos engañosas\"}"))
+                .andExpect(status().isNoContent());
+
+        buscar(ana, "Santa Marta", LLEGADA, SALIDA)
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(deMarta.intValue()))
+                .andExpect(jsonPath("$[0].anfitrionId").doesNotExist());
+        assertThat(jdbc.queryForObject("SELECT estado FROM publicacion WHERE id = ?", String.class, deLuis))
+                .isEqualTo("ACTIVA");
+
+        mvc.perform(post("/api/v1/admin/usuarios/" + luis + "/rehabilitar")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + admin))
+                .andExpect(status().isNoContent());
+
+        buscar(ana, "Santa Marta", LLEGADA, SALIDA)
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].id").value(deLuis.intValue()))
+                .andExpect(jsonPath("$[1].id").value(deMarta.intValue()));
     }
 
     @Test

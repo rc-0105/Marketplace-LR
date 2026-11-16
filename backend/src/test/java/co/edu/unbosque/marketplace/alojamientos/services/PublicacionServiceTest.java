@@ -793,6 +793,7 @@ class PublicacionServiceTest {
 
         assertThat(candidatos).singleElement().satisfies(c -> {
             assertThat(c.titulo()).isEqualTo("Casa en la playa");
+            assertThat(c.anfitrionId()).isEqualTo(ANFITRION_ID);
             assertThat(c.ciudad()).isEqualTo("Santa Marta");
             assertThat(c.tipo()).isEqualTo("Casa");
             assertThat(c.capacidad()).isEqualTo(4);
