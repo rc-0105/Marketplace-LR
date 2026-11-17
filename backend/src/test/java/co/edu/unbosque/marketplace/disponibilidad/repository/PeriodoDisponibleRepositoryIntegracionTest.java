@@ -95,6 +95,16 @@ class PeriodoDisponibleRepositoryIntegracionTest {
         assertThat(consultar(otraPublicacionId)).hasSize(1);
     }
 
+    @Test
+    @DisplayName("Saber si la publicación tiene algún periodo no depende de la ventana ni de otras publicaciones")
+    void existeAlgunPeriodoSinImportarLaVentana() {
+        guardar(publicacionId, "2027-06-01", "2027-06-05");
+
+        assertThat(consultar(publicacionId)).isEmpty();
+        assertThat(periodos.existsByPublicacionId(publicacionId)).isTrue();
+        assertThat(periodos.existsByPublicacionId(otraPublicacionId)).isFalse();
+    }
+
     private List<PeriodoDisponible> consultar(Long id) {
         return periodos.findByPublicacionIdAndFechaInicioLessThanAndFechaFinGreaterThan(id, HASTA, DESDE);
     }
