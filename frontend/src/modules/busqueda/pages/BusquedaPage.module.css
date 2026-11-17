@@ -89,3 +89,10 @@
   margin: var(--espacio-2) 0 0;
   font-weight: 600;
 }
+
+.calendario {
+  display: inline-block;
+  margin-top: var(--espacio-3);
+  color: var(--color-terracota);
+  font-weight: 600;
+}

@@ -8,6 +8,7 @@ import MisPublicacionesPage from '../modules/alojamientos/pages/MisPublicaciones
 import PublicacionFormPage from '../modules/alojamientos/pages/PublicacionFormPage.jsx';
 import RevisionPublicacionesPage from '../modules/alojamientos/pages/RevisionPublicacionesPage.jsx';
 import BusquedaPage from '../modules/busqueda/pages/BusquedaPage.jsx';
+import CalendarioPage from '../modules/disponibilidad/pages/CalendarioPage.jsx';
 import DisponibilidadPage from '../modules/disponibilidad/pages/DisponibilidadPage.jsx';
 import PanelRolPage from './pages/PanelRolPage.jsx';
 import Encabezado from '../shared/components/Encabezado.jsx';
@@ -58,6 +59,8 @@ export default function App() {
           element={<RutaProtegida rol="ANFITRION"><DisponibilidadPage /></RutaProtegida>} />
         <Route path="/huesped/busqueda"
           element={<RutaProtegida rol="HUESPED"><BusquedaPage /></RutaProtegida>} />
+        <Route path="/huesped/publicaciones/:id/calendario"
+          element={<RutaProtegida rol="HUESPED"><CalendarioPage /></RutaProtegida>} />
         <Route path="/administrador/publicaciones"
           element={<RutaProtegida rol="ADMINISTRADOR"><RevisionPublicacionesPage /></RutaProtegida>} />
         {ROLES_CON_PANEL.map(({ rol, ruta }) => (
