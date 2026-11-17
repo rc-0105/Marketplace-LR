@@ -144,6 +144,16 @@ public class PublicacionService {
 	}
 
 	/**
+	 * Para otros módulos: dueño y visibilidad de la publicación, o vacío si no existe. A diferencia de
+	 * {@link #exigirPropietario}, nunca lanza: quien consulta decide qué respuesta dar.
+	 */
+	@Transactional(readOnly = true)
+	public Optional<AccesoPublicacion> consultarAcceso(Long publicacionId) {
+		return publicaciones.findAccesoById(publicacionId).map(acceso -> new AccesoPublicacion(
+				acceso.getAnfitrionId(), acceso.getEstado() == EstadoPublicacion.ACTIVA));
+	}
+
+	/**
 	 * Publicaciones del anfitrión, la más reciente primero: de aquí elige cuál
 	 * editar.
 	 */
