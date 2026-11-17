@@ -1,6 +1,7 @@
 package co.edu.unbosque.marketplace.disponibilidad.services;
 
 import co.edu.unbosque.marketplace.alojamientos.services.PublicacionService;
+import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasCalendario;
 import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasPeriodo;
 import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
@@ -10,6 +11,7 @@ import co.edu.unbosque.marketplace.disponibilidad.exceptions.FechasPeriodoInvali
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoConReservaException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoNoEncontradoException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoSuperpuestoException;
+import co.edu.unbosque.marketplace.disponibilidad.model.MotivoNoDisponible;
 import co.edu.unbosque.marketplace.disponibilidad.model.PeriodoDisponible;
 import co.edu.unbosque.marketplace.disponibilidad.repository.PeriodoDisponibleRepository;
 import java.sql.SQLException;
@@ -18,6 +20,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,14 +45,17 @@ public class DisponibilidadService {
     private final PeriodoDisponibleRepository periodos;
     private final PublicacionService publicaciones;
     private final ConsultaReservasPeriodo reservas;
+    private final ConsultaReservasCalendario ocupacion;
     private final PublicadorEventos publicador;
     private final Clock reloj;
 
     public DisponibilidadService(PeriodoDisponibleRepository periodos, PublicacionService publicaciones,
-            ConsultaReservasPeriodo reservas, PublicadorEventos publicador, Clock reloj) {
+            ConsultaReservasPeriodo reservas, ConsultaReservasCalendario ocupacion, PublicadorEventos publicador,
+            Clock reloj) {
         this.periodos = periodos;
         this.publicaciones = publicaciones;
         this.reservas = reservas;
+        this.ocupacion = ocupacion;
         this.publicador = publicador;
         this.reloj = reloj;
     }
@@ -71,20 +77,40 @@ public class DisponibilidadService {
     }
 
     /**
-     * De las publicaciones dadas, las que ofrecen toda la estancia {@code [llegada, salida)},
-     * Es el único punto donde la búsqueda pregunta por disponibilidad: cuando existan las
-     * reservas confirmadas, aquí se descuentan sin cambiar a quien llama.
+     * De las publicaciones dadas, las que ofrecen toda la estancia {@code [llegada, salida)}: un periodo la
+     * contiene y ninguna reserva que ocupa noches la cruza. Es el único punto donde la búsqueda pregunta por
+     * disponibilidad, y es informativo: la garantía contra el doble reservado la da la base de datos (ADR-3).
      */
     @Transactional(readOnly = true)
     public Set<Long> filtrarDisponibles(Collection<Long> publicacionIds, LocalDate llegada, LocalDate salida) {
+        Set<Long> noDisponibles = evaluar(publicacionIds, llegada, salida).keySet();
+        return publicacionIds.stream().filter(id -> !noDisponibles.contains(id)).collect(Collectors.toSet());
+    }
+
+    /**
+     * Regla única de disponibilidad: por cada publicación NO disponible, el motivo. Una publicación
+     * disponible no aparece en el mapa. Sin periodo que contenga la estancia gana FUERA_DE_PERIODO, y al
+     * puerto de reservas solo se le pregunta por las que sí tienen periodo.
+     */
+    private Map<Long, MotivoNoDisponible> evaluar(Collection<Long> publicacionIds, LocalDate desde, LocalDate hasta) {
         if (publicacionIds.isEmpty()) {
-            return Set.of();
+            return Map.of();
         }
-        return periodos
-                .findByPublicacionIdInAndFechaInicioLessThanEqualAndFechaFinGreaterThanEqual(publicacionIds, llegada, salida)
+        Set<Long> conPeriodo = periodos
+                .findByPublicacionIdInAndFechaInicioLessThanEqualAndFechaFinGreaterThanEqual(publicacionIds, desde, hasta)
                 .stream()
                 .map(PeriodoDisponible::getPublicacionId)
                 .collect(Collectors.toSet());
+        Set<Long> ocupadas = ocupacion.publicacionesOcupadas(conPeriodo, desde, hasta);
+        Map<Long, MotivoNoDisponible> motivos = new HashMap<>();
+        for (Long id : publicacionIds) {
+            if (!conPeriodo.contains(id)) {
+                motivos.put(id, MotivoNoDisponible.FUERA_DE_PERIODO);
+            } else if (ocupadas.contains(id)) {
+                motivos.put(id, MotivoNoDisponible.RESERVADO);
+            }
+        }
+        return motivos;
     }
 
     @Transactional
