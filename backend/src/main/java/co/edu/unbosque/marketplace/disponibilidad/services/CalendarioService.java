@@ -59,7 +59,7 @@ public class CalendarioService {
 
         List<PeriodoDisponible> periodosDeLaVentana = periodos
                 .findByPublicacionIdAndFechaInicioLessThanAndFechaFinGreaterThan(publicacionId, fin, inicio);
-        List<ReservaOcupada> reservasDeLaVentana = reservas.confirmadasEntre(publicacionId, inicio, fin);
+        List<ReservaOcupada> reservasDeLaVentana = reservas.ocupantesEntre(publicacionId, inicio, fin);
         List<DiaCalendario> dias = CalculadoraDias.calcular(inicio, fin, periodosDeLaVentana, reservasDeLaVentana,
                 acceso.esDe(usuarioId));
         return new Calendario(publicacionId, inicio, fin, periodos.existsByPublicacionId(publicacionId), dias);

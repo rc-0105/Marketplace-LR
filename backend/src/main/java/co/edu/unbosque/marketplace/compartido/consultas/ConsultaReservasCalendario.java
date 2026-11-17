@@ -19,5 +19,5 @@ public interface ConsultaReservasCalendario {
      * Reservas confirmadas de la publicación que se cruzan con la ventana semiabierta {@code [desde, hasta)},
      * sin orden garantizado.
      */
-    List<ReservaOcupada> confirmadasEntre(Long publicacionId, LocalDate desde, LocalDate hasta);
+    List<ReservaOcupada> ocupantesEntre(Long publicacionId, LocalDate desde, LocalDate hasta);
 }

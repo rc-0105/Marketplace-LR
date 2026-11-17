@@ -82,7 +82,7 @@ class CalendarioIntegracionTest {
         publicacionId = publicacion(duenoToken, "ACTIVA");
         jdbc.update("INSERT INTO periodo_disponible (publicacion_id, fecha_inicio, fecha_fin) VALUES (?, ?, ?)",
                 publicacionId, java.sql.Date.valueOf("2026-12-01"), java.sql.Date.valueOf("2026-12-10"));
-        when(reservas.confirmadasEntre(any(), any(), any())).thenReturn(
+        when(reservas.ocupantesEntre(any(), any(), any())).thenReturn(
                 List.of(new ReservaOcupada(77L, LocalDate.of(2026, 12, 3), LocalDate.of(2026, 12, 6))));
     }
 
@@ -246,7 +246,7 @@ class CalendarioIntegracionTest {
     @Test
     @DisplayName("Una ventana sin periodos da todos los días BLOQUEADO y tienePeriodos sigue en true")
     void tienePeriodosNoDependeDeLaVentana() throws Exception {
-        when(reservas.confirmadasEntre(any(), any(), any())).thenReturn(List.of());
+        when(reservas.ocupantesEntre(any(), any(), any())).thenReturn(List.of());
 
         consultar(huespedToken, publicacionId, "desde=2027-03-01&hasta=2027-03-05")
                 .andExpect(status().isOk())

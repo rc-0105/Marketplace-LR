@@ -65,8 +65,8 @@ class ConfiguracionReservasPorDefectoTest {
         contexto.run(ctx -> {
             assertThat(ctx).hasSingleBean(ConsultaReservasCalendario.class);
             ConsultaReservasCalendario puerto = ctx.getBean(ConsultaReservasCalendario.class);
-            assertThat(puerto.confirmadasEntre(30L, LocalDate.of(2027, 1, 1), LocalDate.of(2027, 2, 1))).isEmpty();
-            assertThat(puerto.confirmadasEntre(31L, LocalDate.of(2028, 5, 1), LocalDate.of(2028, 5, 9))).isEmpty();
+            assertThat(puerto.ocupantesEntre(30L, LocalDate.of(2027, 1, 1), LocalDate.of(2027, 2, 1))).isEmpty();
+            assertThat(puerto.ocupantesEntre(31L, LocalDate.of(2028, 5, 1), LocalDate.of(2028, 5, 9))).isEmpty();
         });
     }
 
@@ -78,7 +78,7 @@ class ConfiguracionReservasPorDefectoTest {
         contexto.withBean(ConsultaReservasCalendario.class, () -> (publicacion, desde, hasta) -> List.of(reserva))
                 .run(ctx -> {
                     assertThat(ctx).hasSingleBean(ConsultaReservasCalendario.class);
-                    assertThat(ctx.getBean(ConsultaReservasCalendario.class).confirmadasEntre(10L,
+                    assertThat(ctx.getBean(ConsultaReservasCalendario.class).ocupantesEntre(10L,
                             LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 10))).containsExactly(reserva);
                 });
     }
@@ -97,7 +97,7 @@ class ConfiguracionReservasPorDefectoTest {
 
         contexto.withBean(ConsultaReservasCalendario.class, () -> porEstado).run(ctx -> {
             assertThat(ctx).hasSingleBean(ConsultaReservasCalendario.class);
-            assertThat(ctx.getBean(ConsultaReservasCalendario.class).confirmadasEntre(10L,
+            assertThat(ctx.getBean(ConsultaReservasCalendario.class).ocupantesEntre(10L,
                     LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 10)))
                     .extracting(ReservaOcupada::reservaId).containsExactly(77L);
         });
