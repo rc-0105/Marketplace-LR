@@ -1,12 +1,13 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ErrorApi, post } from '../shared/services/http.js';
+import { ErrorApi, get, post } from '../shared/services/http.js';
 import { guardarSesion, limpiarSesion, obtenerSesion } from '../shared/services/sesion.js';
 import App from './App.jsx';
 
 vi.mock('../shared/services/http.js', async (importOriginal) => ({
   ...(await importOriginal()),
+  get: vi.fn(),
   post: vi.fn(),
 }));
 
@@ -81,6 +82,28 @@ describe('App', () => {
     iniciar('ADMINISTRADOR');
     renderizarEn('/administrador/publicaciones');
     expect(screen.getByRole('heading', { name: 'Revisión de publicaciones' })).toBeInTheDocument();
+  });
+
+  it('muestra el calendario de la publicación al huésped y lo pide a la API', async () => {
+    get.mockResolvedValue({ publicacionId: 10, desde: '2026-12-01', hasta: '2026-12-02', tienePeriodos: true,
+      dias: [{ fecha: '2026-12-01', estado: 'DISPONIBLE' }] });
+    iniciar('HUESPED');
+    renderizarEn('/huesped/publicaciones/10/calendario');
+
+    expect(screen.getByRole('heading', { name: 'Calendario de disponibilidad' })).toBeInTheDocument();
+    expect(await screen.findByRole('table')).toBeInTheDocument();
+    expect(get).toHaveBeenCalledWith('/api/v1/publicaciones/10/calendario');
+  });
+
+  it('sin sesión el calendario del huésped lleva al inicio de sesión', () => {
+    renderizarEn('/huesped/publicaciones/10/calendario');
+    expect(screen.getByRole('heading', { name: 'Inicia sesión' })).toBeInTheDocument();
+  });
+
+  it('un anfitrión que entra al calendario del huésped vuelve a su panel', () => {
+    iniciar('ANFITRION');
+    renderizarEn('/huesped/publicaciones/10/calendario');
+    expect(screen.getByText('Ingresaste como Anfitrión.')).toBeInTheDocument();
   });
 
   it('un anfitrión que entra a la revisión de publicaciones vuelve a su panel', () => {

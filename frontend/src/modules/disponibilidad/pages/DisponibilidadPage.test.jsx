@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi } from '../../../shared/services/http.js';
 import {
+  consultarCalendario,
   eliminarPeriodo,
   listarPeriodos,
   modificarPeriodo,
@@ -11,6 +12,7 @@ import {
 import DisponibilidadPage from './DisponibilidadPage.jsx';
 
 vi.mock('../services/disponibilidadService.js', () => ({
+  consultarCalendario: vi.fn(),
   eliminarPeriodo: vi.fn(),
   listarPeriodos: vi.fn(),
   modificarPeriodo: vi.fn(),
@@ -19,6 +21,20 @@ vi.mock('../services/disponibilidadService.js', () => ({
 
 const ENERO = { id: 5, publicacionId: 3, fechaInicio: '2027-01-10', fechaFin: '2027-01-15' };
 const MARZO = { id: 6, publicacionId: 3, fechaInicio: '2027-03-01', fechaFin: '2027-03-05' };
+function calendario(estadoDelPrimerDia = 'DISPONIBLE') {
+  return {
+    publicacionId: 3,
+    desde: '2027-01-01',
+    hasta: '2027-01-04',
+    tienePeriodos: true,
+    dias: [
+      { fecha: '2027-01-01', estado: estadoDelPrimerDia },
+      { fecha: '2027-01-02', estado: 'RESERVADO', reservaId: 77 },
+      { fecha: '2027-01-03', estado: 'RESERVADO' },
+    ],
+  };
+}
+
 const RANGO_ENERO = '10 de enero de 2027 al 15 de enero de 2027';
 
 function renderizar() {
@@ -33,7 +49,10 @@ function renderizar() {
 }
 
 describe('DisponibilidadPage', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(consultarCalendario).mockResolvedValue(calendario());
+  });
 
   it('muestra los periodos registrados de la publicación', async () => {
     vi.mocked(listarPeriodos).mockResolvedValue([ENERO, MARZO]);
@@ -181,5 +200,73 @@ describe('DisponibilidadPage', () => {
     renderizar();
 
     expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos cargar la disponibilidad. Intenta de nuevo.');
+  });
+
+  describe('calendario', () => {
+    it('muestra el calendario de la publicación con el número de reserva que entrega la API', async () => {
+      vi.mocked(listarPeriodos).mockResolvedValue([ENERO]);
+
+      renderizar();
+
+      expect(await screen.findByRole('heading', { name: 'Calendario' })).toBeInTheDocument();
+      expect(await screen.findByRole('cell', { name: /^2 de enero de 2027.*Reservado.*Reserva 77/ })).toBeInTheDocument();
+      expect(screen.getByRole('cell', { name: /^3 de enero de 2027.*Reservado/ }).getAttribute('aria-label'))
+        .not.toMatch(/Reserva \d/);
+      expect(consultarCalendario).toHaveBeenCalledWith('3');
+      expect(screen.getByText(RANGO_ENERO)).toBeInTheDocument();
+    });
+
+    it('recarga el calendario después de agregar un periodo', async () => {
+      vi.mocked(listarPeriodos).mockResolvedValue([MARZO]);
+      vi.mocked(registrarPeriodo).mockResolvedValue(ENERO);
+      vi.mocked(consultarCalendario).mockResolvedValueOnce(calendario()).mockResolvedValueOnce(calendario('BLOQUEADO'));
+      renderizar();
+      const formulario = await screen.findByRole('form', { name: 'Nuevo periodo' });
+
+      fireEvent.change(within(formulario).getByLabelText('Fecha inicial'), { target: { value: '2027-01-10' } });
+      fireEvent.change(within(formulario).getByLabelText('Fecha final'), { target: { value: '2027-01-15' } });
+      fireEvent.click(within(formulario).getByRole('button', { name: 'Agregar periodo' }));
+
+      expect(await screen.findByRole('cell', { name: /^1 de enero de 2027.*Bloqueado/ })).toBeInTheDocument();
+      expect(consultarCalendario).toHaveBeenCalledTimes(2);
+    });
+
+    it('recarga el calendario después de modificar un periodo', async () => {
+      vi.mocked(listarPeriodos).mockResolvedValue([ENERO]);
+      vi.mocked(modificarPeriodo).mockResolvedValue({ ...ENERO, fechaFin: '2027-01-20' });
+      vi.mocked(consultarCalendario).mockResolvedValueOnce(calendario()).mockResolvedValueOnce(calendario('BLOQUEADO'));
+      renderizar();
+
+      fireEvent.click(await screen.findByRole('button', { name: `Editar periodo del ${RANGO_ENERO}` }));
+      fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+      expect(await screen.findByRole('cell', { name: /^1 de enero de 2027.*Bloqueado/ })).toBeInTheDocument();
+      expect(consultarCalendario).toHaveBeenCalledTimes(2);
+    });
+
+    it('recarga el calendario después de eliminar un periodo', async () => {
+      vi.mocked(listarPeriodos).mockResolvedValue([ENERO]);
+      vi.mocked(eliminarPeriodo).mockResolvedValue(undefined);
+      vi.mocked(consultarCalendario).mockResolvedValueOnce(calendario()).mockResolvedValueOnce(calendario('BLOQUEADO'));
+      renderizar();
+
+      fireEvent.click(await screen.findByRole('button', { name: `Eliminar periodo del ${RANGO_ENERO}` }));
+      fireEvent.click(screen.getByRole('button', { name: 'Sí, eliminar' }));
+
+      expect(await screen.findByRole('cell', { name: /^1 de enero de 2027.*Bloqueado/ })).toBeInTheDocument();
+      expect(consultarCalendario).toHaveBeenCalledTimes(2);
+    });
+
+    it('no recarga el calendario si la API rechaza el cambio', async () => {
+      vi.mocked(listarPeriodos).mockResolvedValue([ENERO]);
+      vi.mocked(eliminarPeriodo).mockRejectedValue(new ErrorApi(409, 'El periodo tiene la reserva 12 confirmada.'));
+      renderizar();
+
+      fireEvent.click(await screen.findByRole('button', { name: `Eliminar periodo del ${RANGO_ENERO}` }));
+      fireEvent.click(screen.getByRole('button', { name: 'Sí, eliminar' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('reserva 12');
+      expect(consultarCalendario).toHaveBeenCalledTimes(1);
+    });
   });
 });
