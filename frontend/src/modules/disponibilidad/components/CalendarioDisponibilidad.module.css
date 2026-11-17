@@ -52,7 +52,11 @@
   margin-bottom: var(--espacio-2);
   font-size: var(--texto-titulo);
   font-weight: 600;
-  text-transform: capitalize;
+}
+
+/* Solo la inicial: capitalize volvía "De" en "noviembre de 2026". */
+.mes::first-letter {
+  text-transform: uppercase;
 }
 
 .encabezado {
