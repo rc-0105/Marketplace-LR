@@ -15,6 +15,9 @@ public interface PeriodoDisponibleRepository extends JpaRepository<PeriodoDispon
 	List<PeriodoDisponible> findByPublicacionIdAndFechaInicioLessThanAndFechaFinGreaterThan(Long publicacionId,
 			LocalDate hasta, LocalDate desde);
 
+	// Si la publicación tiene algún periodo, en cualquier fecha: el calendario lo usa para avisar que está vacía.
+	boolean existsByPublicacionId(Long publicacionId);
+
 	// Periodos de las publicaciones dadas que cubren toda la estancia [llegada,
 	// salida): un solo periodo debe contenerla, porque dos contiguos los ofreció el anfitrión por separado.
 	List<PeriodoDisponible> findByPublicacionIdInAndFechaInicioLessThanEqualAndFechaFinGreaterThanEqual(
