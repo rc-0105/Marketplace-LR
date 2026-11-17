@@ -15,7 +15,7 @@ import java.util.List;
  * Spring, ni el reloj, ni el repositorio.
  *
  * <p>Parte con todos los días BLOQUEADOS, marca como DISPONIBLES los que cubre algún periodo y, al final,
- * como RESERVADOS los que ocupa alguna reserva, así que la reserva gana aunque caiga fuera de todo periodo.
+ * como RESERVADOS los que ocupa alguna reserva, así que la reserva gana aunque caiga fuera de cualquier periodo.
  * Cada pasada recorta el rango a la ventana y toca a lo sumo una celda por día: O(n + p + r).
  */
 final class CalculadoraDias {

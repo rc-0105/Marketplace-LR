@@ -11,7 +11,7 @@ public enum EstadoDia {
     DISPONIBLE,
     /**
      * Ningún periodo lo cubre. Es un estado derivado, no una marca guardada: hasta que exista un bloqueo
-     * manual, "bloqueado" significa "fuera de todo periodo".
+     * manual, "bloqueado" significa "fuera de cualquier periodo".
      */
     BLOQUEADO
 }

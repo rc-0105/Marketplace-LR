@@ -47,9 +47,9 @@ export default function CalendarioDisponibilidad({ calendario }) {
   return (
     <section className={estilos.calendario} aria-label="Calendario de disponibilidad">
       {!calendario.tienePeriodos && (
-        <p role="status" className={estilos.aviso}>
+        <output className={estilos.aviso}>
           La publicación aún no tiene periodos de disponibilidad.
-        </p>
+        </output>
       )}
       {mes && (
         <>

@@ -72,7 +72,7 @@ export function mesesDe(dias) {
   }
   const porFecha = new Map(dias.map((dia) => [dia.fecha, dia]));
   const primero = aFecha(dias[0].fecha);
-  const ultimo = aFecha(dias[dias.length - 1].fecha);
+  const ultimo = aFecha(dias.at(-1).fecha);
   const meses = [];
 
   for (
@@ -82,7 +82,7 @@ export function mesesDe(dias) {
   ) {
     const diasDelMes = new Date(Date.UTC(inicio.getUTCFullYear(), inicio.getUTCMonth() + 1, 0)).getUTCDate();
     // getUTCDay: domingo = 0. Con lunes primero, el desfase es (dia + 6) % 7.
-    const celdas = Array((inicio.getUTCDay() + 6) % 7).fill(null);
+    const celdas = new Array((inicio.getUTCDay() + 6) % 7).fill(null);
     for (let numero = 0; numero < diasDelMes; numero += 1) {
       const fecha = aIso(new Date(inicio.getTime() + numero * MS_POR_DIA));
       celdas.push(porFecha.get(fecha) ?? { fecha, estado: null });

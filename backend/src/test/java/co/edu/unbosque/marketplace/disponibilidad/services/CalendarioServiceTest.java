@@ -114,8 +114,10 @@ class CalendarioServiceTest {
     @Test
     @DisplayName("Con hasta menor que desde responde 400 sin consultar periodos ni reservas")
     void hastaMenorQueDesdeEs400SinConsultar() {
-        assertThatThrownBy(
-                () -> servicio.consultar(PUBLICACION_ID, DUENO_ID, fecha("2026-12-10"), fecha("2026-12-09")))
+        LocalDate desde = fecha("2026-12-10");
+        LocalDate hasta = fecha("2026-12-09");
+
+        assertThatThrownBy(() -> servicio.consultar(PUBLICACION_ID, DUENO_ID, desde, hasta))
                 .isInstanceOf(RangoCalendarioInvalidoException.class)
                 .hasMessage("La fecha final no puede ser anterior a la inicial.");
 
@@ -129,8 +131,10 @@ class CalendarioServiceTest {
                 fecha("2027-01-02"));
         assertThat(calendario.dias()).hasSize(366);
 
-        assertThatThrownBy(() -> servicio.consultar(PUBLICACION_ID, DUENO_ID, fecha("2026-01-01"),
-                fecha("2027-01-03")))
+        LocalDate desde = fecha("2026-01-01");
+        LocalDate hasta = fecha("2027-01-03");
+
+        assertThatThrownBy(() -> servicio.consultar(PUBLICACION_ID, DUENO_ID, desde, hasta))
                 .isInstanceOf(RangoCalendarioInvalidoException.class)
                 .hasMessage("El calendario no puede abarcar más de 366 días.");
         verify(reservas, never()).confirmadasEntre(PUBLICACION_ID, fecha("2026-01-01"), fecha("2027-01-03"));
@@ -216,8 +220,10 @@ class CalendarioServiceTest {
     void elAccesoSeEvaluaAntesQueElRango() {
         when(publicaciones.consultarAcceso(PUBLICACION_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(
-                () -> servicio.consultar(PUBLICACION_ID, HUESPED_ID, fecha("2026-12-10"), fecha("2026-12-09")))
+        LocalDate desde = fecha("2026-12-10");
+        LocalDate hasta = fecha("2026-12-09");
+
+        assertThatThrownBy(() -> servicio.consultar(PUBLICACION_ID, HUESPED_ID, desde, hasta))
                 .isInstanceOf(CalendarioNoEncontradoException.class);
     }
 

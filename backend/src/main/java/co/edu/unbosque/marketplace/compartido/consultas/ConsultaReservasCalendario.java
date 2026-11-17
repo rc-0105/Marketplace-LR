@@ -10,7 +10,7 @@ import java.util.List;
  * <p>Contrato para HU-22: la implementación real MUST ser un {@code @Service} o {@code @Component}
  * escaneado, como la de {@link ConsultaReservasFuturas}, y MUST devolver solo reservas CONFIRMADAS. Las
  * pendientes, canceladas o de cualquier otro estado no ocupan días: {@code disponibilidad} no reinterpreta
- * estados, todo lo que el puerto devuelve queda ocupado. Mientras no exista, {@code
+ * estados, cada reserva que el puerto devuelve queda ocupada. Mientras no exista, {@code
  * ConfiguracionReservasPorDefecto} registra un bean que no devuelve reservas.
  */
 public interface ConsultaReservasCalendario {

@@ -46,7 +46,7 @@ export default function CalendarioConsulta({ publicacionId, recarga = 0 }) {
     );
   }
   if (!calendario) {
-    return <p role="status" className={estilos.carga}>Cargando calendario…</p>;
+    return <output className={estilos.carga}>Cargando calendario…</output>;
   }
   return <CalendarioDisponibilidad calendario={calendario} />;
 }

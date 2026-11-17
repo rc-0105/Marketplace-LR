@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi } from '../../../shared/services/http.js';
 import { consultarCalendario } from '../services/disponibilidadService.js';
@@ -44,6 +44,6 @@ describe('CalendarioConsulta', () => {
     expect(await screen.findByRole('alert')).toBeInTheDocument();
     vi.mocked(consultarCalendario).mockResolvedValueOnce(calendario());
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
-    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument());
+    expect(await screen.findByRole('table')).toBeInTheDocument();
   });
 });
