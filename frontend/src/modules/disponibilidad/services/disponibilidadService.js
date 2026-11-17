@@ -1,4 +1,5 @@
 import { eliminar, get, post, put } from '../../../shared/services/http.js';
+import { calendarioDesdeApi } from '../models/calendario.js';
 import { periodoDesdeApi } from '../models/periodo.js';
 
 /**
@@ -37,4 +38,20 @@ export async function modificarPeriodo(periodoId, fechas) {
  */
 export async function eliminarPeriodo(periodoId) {
   await eliminar(`/api/v1/disponibilidad/${periodoId}`);
+}
+
+/**
+ * Calendario de la publicación en la ventana [desde, hasta); `hasta` no entra. Sin parámetros, la API
+ * entrega los próximos 12 meses. Responde 404 si la publicación no existe o no es visible.
+ * @param {number | string} publicacionId
+ * @param {{desde?: string, hasta?: string}} [ventana] fechas AAAA-MM-DD
+ * @returns {Promise<import('../models/calendario.js').Calendario>}
+ */
+export async function consultarCalendario(publicacionId, { desde, hasta } = {}) {
+  const consulta = new URLSearchParams();
+  if (desde) consulta.set('desde', desde);
+  if (hasta) consulta.set('hasta', hasta);
+  const texto = consulta.toString();
+  const ruta = `/api/v1/publicaciones/${publicacionId}/calendario`;
+  return calendarioDesdeApi(await get(texto ? `${ruta}?${texto}` : ruta));
 }

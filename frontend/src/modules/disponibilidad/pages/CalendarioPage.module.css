@@ -1,0 +1,15 @@
+.pagina {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: var(--espacio-12) var(--espacio-4);
+}
+
+.volver {
+  color: var(--color-terracota);
+  font-weight: 600;
+}
+
+.titulo {
+  margin: var(--espacio-4) 0 var(--espacio-6);
+  font-size: var(--texto-encabezado);
+}
