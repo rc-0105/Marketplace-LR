@@ -10,6 +10,8 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class ConsultaReservasCalendarioTest {
 
@@ -20,42 +22,14 @@ class ConsultaReservasCalendarioTest {
         return new ReservaOcupada(1L, LocalDate.parse(llegada), LocalDate.parse(salida));
     }
 
-    @Test
-    @DisplayName("Una reserva que se solapa con la estancia la cruza")
-    void cruzaCuandoSeSolapa() {
-        assertThat(reserva("2026-12-05", "2026-12-08").cruza(DESDE, HASTA)).isTrue();
-        assertThat(reserva("2026-12-01", "2026-12-04").cruza(DESDE, HASTA)).isTrue();
-    }
-
-    @Test
-    @DisplayName("Una reserva contenida en la estancia la cruza")
-    void cruzaCuandoEstaContenida() {
-        assertThat(reserva("2026-12-04", "2026-12-05").cruza(DESDE, HASTA)).isTrue();
-    }
-
-    @Test
-    @DisplayName("Una reserva que sobresale por los dos lados de la estancia la cruza")
-    void cruzaCuandoSobresale() {
-        assertThat(reserva("2026-12-01", "2026-12-10").cruza(DESDE, HASTA)).isTrue();
-    }
-
-    @Test
-    @DisplayName("Una reserva que termina el día de llegada no cruza")
-    void noCruzaSiTerminaElDiaDeLlegada() {
-        assertThat(reserva("2026-12-01", "2026-12-03").cruza(DESDE, HASTA)).isFalse();
-    }
-
-    @Test
-    @DisplayName("Una reserva que empieza el día de salida no cruza")
-    void noCruzaSiEmpiezaElDiaDeSalida() {
-        assertThat(reserva("2026-12-06", "2026-12-09").cruza(DESDE, HASTA)).isFalse();
-    }
-
-    @Test
-    @DisplayName("Una reserva lejana de la estancia no cruza")
-    void noCruzaSiEstaLejos() {
-        assertThat(reserva("2026-11-01", "2026-11-05").cruza(DESDE, HASTA)).isFalse();
-        assertThat(reserva("2027-01-10", "2027-01-12").cruza(DESDE, HASTA)).isFalse();
+    @ParameterizedTest(name = "[{0}, {1}) sobre la estancia [03, 06) de diciembre: cruza = {2}")
+    @CsvSource({
+            "2026-12-05, 2026-12-08, true", "2026-12-01, 2026-12-04, true", "2026-12-04, 2026-12-05, true",
+            "2026-12-01, 2026-12-10, true", "2026-12-01, 2026-12-03, false", "2026-12-06, 2026-12-09, false",
+            "2026-11-01, 2026-11-05, false", "2027-01-10, 2027-01-12, false"})
+    @DisplayName("Una reserva cruza la estancia solo si ocupa alguna de sus noches: tocar el borde no cruza")
+    void cruzaSoloSiOcupaAlgunaNoche(String llegada, String salida, boolean esperado) {
+        assertThat(reserva(llegada, salida).cruza(DESDE, HASTA)).isEqualTo(esperado);
     }
 
     @Test
@@ -97,14 +71,5 @@ class ConsultaReservasCalendarioTest {
         assertThat(invocaciones).hasValue(0);
         assertThat(puerto.publicacionesOcupadas(List.of(10L), DESDE, HASTA)).containsExactly(10L);
         assertThat(invocaciones).hasValue(1);
-    }
-
-    @Test
-    @DisplayName("El puerto sigue siendo una interfaz funcional que acepta una lambda")
-    void elPuertoAceptaUnaLambda() {
-        ConsultaReservasCalendario puerto = (publicacionId, desde, hasta) -> List.of();
-
-        assertThat(puerto.ocupantesEntre(10L, DESDE, HASTA)).isEmpty();
-        assertThat(puerto.publicacionesOcupadas(List.of(10L, 11L), DESDE, HASTA)).isEmpty();
     }
 }
