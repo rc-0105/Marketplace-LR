@@ -1,7 +1,10 @@
 package co.edu.unbosque.marketplace.compartido.consultas;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Puerto con el que {@code disponibilidad} pregunta qué noches ocupan las reservas de una publicación, para
@@ -22,4 +25,15 @@ public interface ConsultaReservasCalendario {
      * hasta)}, sin orden garantizado.
      */
     List<ReservaOcupada> ocupantesEntre(Long publicacionId, LocalDate desde, LocalDate hasta);
+
+    /**
+     * Ids de las publicaciones dadas con alguna reserva ocupante que cruza {@code [desde, hasta)}. Por defecto
+     * itera {@link #ocupantesEntre} una vez por id; una colección vacía no consulta nada. SOF-33 SHOULD
+     * sobrescribirlo con una sola consulta y devolver vacío sin consultar si la colección está vacía.
+     */
+    default Set<Long> publicacionesOcupadas(Collection<Long> publicacionIds, LocalDate desde, LocalDate hasta) {
+        return publicacionIds.stream()
+                .filter(id -> ocupantesEntre(id, desde, hasta).stream().anyMatch(r -> r.cruza(desde, hasta)))
+                .collect(Collectors.toUnmodifiableSet());
+    }
 }
