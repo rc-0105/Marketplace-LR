@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { eliminar, get, post, put } from '../../../shared/services/http.js';
-import { eliminarPeriodo, listarPeriodos, modificarPeriodo, registrarPeriodo } from './disponibilidadService.js';
+import {
+  consultarCalendario,
+  eliminarPeriodo,
+  listarPeriodos,
+  modificarPeriodo,
+  registrarPeriodo,
+} from './disponibilidadService.js';
 
 vi.mock('../../../shared/services/http.js', () => ({
   eliminar: vi.fn(),
@@ -41,5 +47,35 @@ describe('disponibilidadService', () => {
 
     await expect(eliminarPeriodo(5)).resolves.toBeUndefined();
     expect(eliminar).toHaveBeenCalledWith('/api/v1/disponibilidad/5');
+  });
+
+  describe('consultarCalendario', () => {
+    const CALENDARIO = {
+      publicacionId: 10, desde: '2026-12-01', hasta: '2026-12-03', tienePeriodos: true,
+      dias: [{ fecha: '2026-12-01', estado: 'DISPONIBLE', reservaId: null }, { fecha: '2026-12-02', estado: 'RESERVADO', reservaId: 77 }],
+    };
+
+    it('pide el calendario sin query cuando no se indica la ventana y convierte la respuesta', async () => {
+      vi.mocked(get).mockResolvedValue(CALENDARIO);
+
+      const calendario = await consultarCalendario(10);
+
+      expect(get).toHaveBeenCalledWith('/api/v1/publicaciones/10/calendario');
+      expect(calendario.dias[0]).toEqual({ fecha: '2026-12-01', estado: 'DISPONIBLE' });
+      expect(calendario.dias[1]).toEqual({ fecha: '2026-12-02', estado: 'RESERVADO', reservaId: 77 });
+    });
+
+    it('envía desde y hasta solo cuando se indican', async () => {
+      vi.mocked(get).mockResolvedValue(CALENDARIO);
+
+      await consultarCalendario(10, { desde: '2026-12-01', hasta: '2026-12-11' });
+      expect(get).toHaveBeenLastCalledWith('/api/v1/publicaciones/10/calendario?desde=2026-12-01&hasta=2026-12-11');
+
+      await consultarCalendario(10, { desde: '2026-12-01' });
+      expect(get).toHaveBeenLastCalledWith('/api/v1/publicaciones/10/calendario?desde=2026-12-01');
+
+      await consultarCalendario(10, { hasta: '2026-12-11' });
+      expect(get).toHaveBeenLastCalledWith('/api/v1/publicaciones/10/calendario?hasta=2026-12-11');
+    });
   });
 });

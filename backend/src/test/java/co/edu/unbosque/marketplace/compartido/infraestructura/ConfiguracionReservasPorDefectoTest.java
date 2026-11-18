@@ -2,9 +2,12 @@ package co.edu.unbosque.marketplace.compartido.infraestructura;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasCalendario;
 import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasFuturas;
 import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasPeriodo;
+import co.edu.unbosque.marketplace.compartido.consultas.ReservaOcupada;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,5 +57,49 @@ class ConfiguracionReservasPorDefectoTest {
                             .reservaConfirmadaEn(30L, LocalDate.of(2027, 1, 10), LocalDate.of(2027, 1, 15)))
                             .contains(12L);
                 });
+    }
+
+    @Test
+    @DisplayName("Sin otra implementación, el calendario no tiene reservas que ocupen días")
+    void sinOtroBeanElCalendarioNoTieneReservas() {
+        contexto.run(ctx -> {
+            assertThat(ctx).hasSingleBean(ConsultaReservasCalendario.class);
+            ConsultaReservasCalendario puerto = ctx.getBean(ConsultaReservasCalendario.class);
+            assertThat(puerto.confirmadasEntre(30L, LocalDate.of(2027, 1, 1), LocalDate.of(2027, 2, 1))).isEmpty();
+            assertThat(puerto.confirmadasEntre(31L, LocalDate.of(2028, 5, 1), LocalDate.of(2028, 5, 9))).isEmpty();
+        });
+    }
+
+    @Test
+    @DisplayName("Una implementación real del calendario reemplaza al bean por defecto y sus reservas ocupan días")
+    void laConsultaRealDelCalendarioReemplazaAlPorDefecto() {
+        ReservaOcupada reserva = new ReservaOcupada(77L, LocalDate.of(2026, 12, 3), LocalDate.of(2026, 12, 6));
+
+        contexto.withBean(ConsultaReservasCalendario.class, () -> (publicacion, desde, hasta) -> List.of(reserva))
+                .run(ctx -> {
+                    assertThat(ctx).hasSingleBean(ConsultaReservasCalendario.class);
+                    assertThat(ctx.getBean(ConsultaReservasCalendario.class).confirmadasEntre(10L,
+                            LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 10))).containsExactly(reserva);
+                });
+    }
+
+    @Test
+    @DisplayName("El contrato del calendario devuelve solo las CONFIRMADAS y quien lo consume no reinterpreta estados")
+    void elContratoDevuelveSoloLasConfirmadas() {
+        record Almacenada(Long id, String estado, LocalDate llegada, LocalDate salida) {
+        }
+        List<Almacenada> almacen = List.of(
+                new Almacenada(77L, "CONFIRMADA", LocalDate.of(2026, 12, 3), LocalDate.of(2026, 12, 6)),
+                new Almacenada(80L, "PENDIENTE", LocalDate.of(2026, 12, 3), LocalDate.of(2026, 12, 6)));
+        ConsultaReservasCalendario porEstado = (publicacion, desde, hasta) -> almacen.stream()
+                .filter(r -> r.estado().equals("CONFIRMADA") && r.llegada().isBefore(hasta) && r.salida().isAfter(desde))
+                .map(r -> new ReservaOcupada(r.id(), r.llegada(), r.salida())).toList();
+
+        contexto.withBean(ConsultaReservasCalendario.class, () -> porEstado).run(ctx -> {
+            assertThat(ctx).hasSingleBean(ConsultaReservasCalendario.class);
+            assertThat(ctx.getBean(ConsultaReservasCalendario.class).confirmadasEntre(10L,
+                    LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 10)))
+                    .extracting(ReservaOcupada::reservaId).containsExactly(77L);
+        });
     }
 }

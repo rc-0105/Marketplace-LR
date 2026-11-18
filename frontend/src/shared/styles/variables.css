@@ -22,6 +22,11 @@
   --color-exito: #3f6b48;
   --color-exito-fondo: #e6efe6;
 
+  /* Calendario: reservado y bloqueado (el disponible usa --color-exito). Contraste AA con --color-texto */
+  --color-reservado: #7a4a00;
+  --color-reservado-fondo: #f7e9cc;
+  --color-bloqueado-fondo: #ddd5cc;
+
   /* Tipografía: escala fija en rem, razón 1.2 */
   --fuente: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --texto-pequeno: 0.875rem;

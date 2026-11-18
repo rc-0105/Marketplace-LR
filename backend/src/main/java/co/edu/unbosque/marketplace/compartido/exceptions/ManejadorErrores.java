@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class ManejadorErrores {
 
+    private static final String FORMATO_INVALIDO = "El valor no tiene el formato esperado (por ejemplo, 2027-01-15).";
+
     @ExceptionHandler(NegocioException.class)
     public ProblemDetail negocio(NegocioException error) {
         ProblemDetail problema = ProblemDetail.forStatusAndDetail(error.getEstado(), error.getMessage());
@@ -26,8 +28,9 @@ public class ManejadorErrores {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail validacion(MethodArgumentNotValidException error) {
         Map<String, String> errores = new LinkedHashMap<>();
-        error.getBindingResult().getFieldErrors()
-                .forEach(campo -> errores.putIfAbsent(campo.getField(), campo.getDefaultMessage()));
+        // Un fallo de conversión (una fecha mal escrita) trae un texto técnico en inglés: no se expone.
+        error.getBindingResult().getFieldErrors().forEach(campo -> errores.putIfAbsent(campo.getField(),
+                campo.isBindingFailure() ? FORMATO_INVALIDO : campo.getDefaultMessage()));
         ProblemDetail problema = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "La solicitud tiene datos inválidos.");
         problema.setProperty("errores", errores);

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import CalendarioConsulta from '../components/CalendarioConsulta.jsx';
 import FormularioPeriodo from '../components/FormularioPeriodo.jsx';
 import { fechaLegible } from '../models/periodo.js';
 import {
@@ -27,6 +28,8 @@ export default function DisponibilidadPage() {
   const [errores, setErrores] = useState({});
   const [eliminando, setEliminando] = useState(null);
   const [confirmando, setConfirmando] = useState(null);
+  // Sube cada vez que un cambio de periodos tiene éxito, para que el calendario se vuelva a pedir.
+  const [versionCalendario, setVersionCalendario] = useState(0);
 
   useEffect(() => {
     let vigente = true;
@@ -42,12 +45,14 @@ export default function DisponibilidadPage() {
   async function registrar(fechas) {
     const creado = await registrarPeriodo(id, fechas);
     setPeriodos((lista) => ordenados([...lista, creado]));
+    setVersionCalendario((version) => version + 1);
   }
 
   async function modificar(periodo, fechas) {
     const modificado = await modificarPeriodo(periodo.id, fechas);
     setPeriodos((lista) => ordenados(lista.map((otro) => (otro.id === modificado.id ? modificado : otro))));
     setEditando(null);
+    setVersionCalendario((version) => version + 1);
   }
 
   async function eliminar(periodo) {
@@ -56,6 +61,7 @@ export default function DisponibilidadPage() {
     try {
       await eliminarPeriodo(periodo.id);
       setPeriodos((lista) => lista.filter((otro) => otro.id !== periodo.id));
+      setVersionCalendario((version) => version + 1);
     } catch (error) {
       setErrores((actuales) => ({ ...actuales, [periodo.id]: error.estado ? error.message : MENSAJE_ELIMINAR }));
     } finally {
@@ -148,6 +154,10 @@ export default function DisponibilidadPage() {
           </section>
         </>
       )}
+      <section className={estilos.seccion} aria-labelledby="titulo-calendario">
+        <h2 id="titulo-calendario" className={estilos.subtitulo}>Calendario</h2>
+        <CalendarioConsulta key={id} publicacionId={id} recarga={versionCalendario} />
+      </section>
     </main>
   );
 }
