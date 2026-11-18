@@ -11,6 +11,7 @@ import co.edu.unbosque.marketplace.alojamientos.services.CandidatoBusqueda;
 import co.edu.unbosque.marketplace.alojamientos.services.PublicacionService;
 import co.edu.unbosque.marketplace.busqueda.exceptions.BusquedaInvalidaException;
 import co.edu.unbosque.marketplace.disponibilidad.services.DisponibilidadService;
+import co.edu.unbosque.marketplace.identidad.services.CuentaService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -25,7 +26,8 @@ class BusquedaServiceTest {
 
     private final PublicacionService publicaciones = mock(PublicacionService.class);
     private final DisponibilidadService disponibilidad = mock(DisponibilidadService.class);
-    private final BusquedaService servicio = new BusquedaService(publicaciones, disponibilidad);
+    private final CuentaService cuentas = mock(CuentaService.class);
+    private final BusquedaService servicio = new BusquedaService(publicaciones, disponibilidad, cuentas);
 
     @Test
     @DisplayName("Devuelve solo los candidatos de la ciudad que tienen disponibilidad en el rango")
@@ -55,10 +57,27 @@ class BusquedaServiceTest {
         assertThatThrownBy(() -> servicio.buscar("Santa Marta", SALIDA, LLEGADA))
                 .isInstanceOf(BusquedaInvalidaException.class);
 
-        verifyNoInteractions(publicaciones, disponibilidad);
+        verifyNoInteractions(publicaciones, disponibilidad, cuentas);
+    }
+
+    @Test
+    @DisplayName("Descarta las publicaciones de anfitriones restringidos antes de consultar la disponibilidad")
+    void descartaAnfitrionesRestringidos() {
+        CandidatoBusqueda deRestringido = candidato(1L, 10L);
+        CandidatoBusqueda deActivo = candidato(2L, 20L);
+        when(publicaciones.buscarCandidatos("Santa Marta")).thenReturn(List.of(deRestringido, deActivo));
+        when(cuentas.filtrarRestringidos(Set.of(10L, 20L))).thenReturn(Set.of(10L));
+        when(disponibilidad.filtrarDisponibles(Set.of(2L), LLEGADA, SALIDA)).thenReturn(Set.of(2L));
+
+        assertThat(servicio.buscar("Santa Marta", LLEGADA, SALIDA)).containsExactly(deActivo);
+        verify(disponibilidad).filtrarDisponibles(Set.of(2L), LLEGADA, SALIDA);
     }
 
     private static CandidatoBusqueda candidato(Long id) {
-        return new CandidatoBusqueda(id, "Casa " + id, "Santa Marta", "Casa", 4, new BigDecimal("250000"), null);
+        return candidato(id, 10L);
+    }
+
+    private static CandidatoBusqueda candidato(Long id, Long anfitrionId) {
+        return new CandidatoBusqueda(id, anfitrionId, "Casa " + id, "Santa Marta", "Casa", 4, new BigDecimal("250000"), null);
     }
 }

@@ -13,9 +13,13 @@ import co.edu.unbosque.marketplace.identidad.model.EstadoCuenta;
 import co.edu.unbosque.marketplace.identidad.model.Usuario;
 import co.edu.unbosque.marketplace.identidad.repository.UsuarioRepository;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +40,7 @@ public class CuentaService {
     private static final String ELIMINAR = "eliminar_cuenta";
     private static final String CAMBIAR_CONTRASENA = "cambiar_contrasena";
     private static final String MOTIVO = "motivo";
+    static final int MAXIMO_LISTADO = 50;
 
     private final UsuarioRepository usuarios;
     private final PublicadorEventos publicador;
@@ -71,6 +76,24 @@ public class CuentaService {
         usuario.levantarRestriccion();
         usuarios.save(usuario);
         auditar(adminId, usuarioId, LEVANTAR);
+    }
+
+    /** Cuentas que el administrador puede gestionar (RF-58): sin las eliminadas y como máximo {@value #MAXIMO_LISTADO}. */
+    @Transactional(readOnly = true)
+    public List<Usuario> listarParaAdministracion(String texto) {
+        String filtro = texto == null ? "" : texto.strip();
+        // Escapados para LIKE: quien busca "_" quiere ese carácter, no cualquiera.
+        String literal = filtro.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+        return usuarios.buscarParaAdministracion(literal, PageRequest.of(0, MAXIMO_LISTADO));
+    }
+
+    /** De los usuarios recibidos, los que hoy están restringidos; la búsqueda oculta sus publicaciones (RF-58). */
+    @Transactional(readOnly = true)
+    public Set<Long> filtrarRestringidos(Collection<Long> usuarioIds) {
+        if (usuarioIds.isEmpty()) {
+            return Set.of();
+        }
+        return usuarios.findIdsByIdInAndEstado(usuarioIds, EstadoCuenta.RESTRINGIDA);
     }
 
     /** El dueño desactiva su cuenta. Orden: contraseña, estado ACTIVA, reservas y recién entonces la transición. */

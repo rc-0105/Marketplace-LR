@@ -3,6 +3,7 @@ import { cerrarSesion } from '../modules/identidad/services/identidadService.js'
 import InicioSesionPage from '../modules/identidad/pages/InicioSesionPage.jsx';
 import RecuperacionPage from '../modules/identidad/pages/RecuperacionPage.jsx';
 import MiCuentaPage from '../modules/identidad/pages/MiCuentaPage.jsx';
+import AdministracionUsuariosPage from '../modules/identidad/pages/AdministracionUsuariosPage.jsx';
 import RegistroPage from '../modules/identidad/pages/RegistroPage.jsx';
 import MisPublicacionesPage from '../modules/alojamientos/pages/MisPublicacionesPage.jsx';
 import PublicacionFormPage from '../modules/alojamientos/pages/PublicacionFormPage.jsx';
@@ -63,6 +64,8 @@ export default function App() {
           element={<RutaProtegida rol="HUESPED"><CalendarioPage /></RutaProtegida>} />
         <Route path="/administrador/publicaciones"
           element={<RutaProtegida rol="ADMINISTRADOR"><RevisionPublicacionesPage /></RutaProtegida>} />
+        <Route path="/administrador/usuarios"
+          element={<RutaProtegida rol="ADMINISTRADOR"><AdministracionUsuariosPage /></RutaProtegida>} />
         {ROLES_CON_PANEL.map(({ rol, ruta }) => (
           <Route key={ruta} path={ruta} element={<RutaProtegida rol={rol}><PanelRolPage /></RutaProtegida>} />
         ))}
