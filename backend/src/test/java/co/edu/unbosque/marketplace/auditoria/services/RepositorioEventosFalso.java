@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -30,6 +31,7 @@ public class RepositorioEventosFalso implements EventoAuditoriaRepository {
     @Override
     public Page<EventoAuditoria> findAll(Specification<EventoAuditoria> especificacion, Pageable paginacion) {
         consultas++;
-        throw new UnsupportedOperationException("El fake no ejecuta especificaciones");
+        // No evalúa la especificación: solo sirve para afirmar si se consultó o no.
+        return new PageImpl<>(guardados, paginacion, guardados.size());
     }
 }
