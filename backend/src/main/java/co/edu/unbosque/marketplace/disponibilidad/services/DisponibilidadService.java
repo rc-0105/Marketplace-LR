@@ -7,7 +7,9 @@ import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
+import co.edu.unbosque.marketplace.compartido.infraestructura.RestriccionesPostgres;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.CalendarioNoEncontradoException;
+import co.edu.unbosque.marketplace.disponibilidad.exceptions.EstanciaNoDisponibleException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.FechasPeriodoInvalidasException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoConReservaException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoNoEncontradoException;
@@ -17,7 +19,6 @@ import co.edu.unbosque.marketplace.disponibilidad.model.DisponibilidadRango;
 import co.edu.unbosque.marketplace.disponibilidad.model.MotivoNoDisponible;
 import co.edu.unbosque.marketplace.disponibilidad.model.PeriodoDisponible;
 import co.edu.unbosque.marketplace.disponibilidad.repository.PeriodoDisponibleRepository;
-import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -44,7 +45,6 @@ public class DisponibilidadService {
     // "Hoy" es el día en Colombia, donde están los alojamientos, no el del servidor.
     private static final ZoneId ZONA = ZoneId.of("America/Bogota");
     private static final String RESTRICCION_SIN_CRUCE = "periodo_disponible_sin_cruce";
-    private static final String VIOLACION_EXCLUSION = "23P01";
 
     private final PeriodoDisponibleRepository periodos;
     private final PublicacionService publicaciones;
@@ -119,6 +119,20 @@ public class DisponibilidadService {
     }
 
     /**
+     * Exige que la estancia {@code [llegada, salida)} esté disponible, con la misma regla de la búsqueda y de
+     * {@link #consultar}, pero sin las comprobaciones de acceso ni de rango de esa consulta: es para quien ya
+     * validó la publicación y las fechas (SOF-33). Lanza {@link EstanciaNoDisponibleException} con el motivo.
+     * Es una verificación temprana; la garantía contra el doble reservado sigue siendo la base de datos (ADR-3).
+     */
+    @Transactional(readOnly = true)
+    public void exigirDisponible(Long publicacionId, LocalDate llegada, LocalDate salida) {
+        MotivoNoDisponible motivo = evaluar(List.of(publicacionId), llegada, salida).get(publicacionId);
+        if (motivo != null) {
+            throw new EstanciaNoDisponibleException(motivo);
+        }
+    }
+
+    /**
      * Regla única de disponibilidad: por cada publicación NO disponible, el motivo. Una publicación
      * disponible no aparece en el mapa. Sin periodo que contenga la estancia gana FUERA_DE_PERIODO, y al
      * puerto de reservas solo se le pregunta por las que sí tienen periodo.
@@ -187,23 +201,11 @@ public class DisponibilidadService {
         try {
             return periodos.saveAndFlush(periodo);
         } catch (DataIntegrityViolationException error) {
-            if (violaRestriccion(error, RESTRICCION_SIN_CRUCE)) {
+            if (RestriccionesPostgres.violaExclusion(error, RESTRICCION_SIN_CRUCE)) {
                 throw new PeriodoSuperpuestoException();
             }
             throw error;
         }
-    }
-
-    // Hibernate no extrae el nombre de una restricción de exclusión (SQLState 23P01), así
-    // que se busca en el mensaje del error de PostgreSQL.
-    private static boolean violaRestriccion(Throwable error, String restriccion) {
-        for (Throwable causa = error; causa != null; causa = causa.getCause()) {
-            if (causa instanceof SQLException sql && VIOLACION_EXCLUSION.equals(sql.getSQLState())
-                    && sql.getMessage() != null && sql.getMessage().contains(restriccion)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private void exigirSinReserva(PeriodoDisponible periodo) {

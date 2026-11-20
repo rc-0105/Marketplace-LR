@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import co.edu.unbosque.marketplace.alojamientos.repository.PublicacionRepository;
 import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasCalendario;
+import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasPeriodo;
 import co.edu.unbosque.marketplace.compartido.consultas.ReservaOcupada;
 import co.edu.unbosque.marketplace.identidad.model.Rol;
 import co.edu.unbosque.marketplace.identidad.model.Usuario;
@@ -63,6 +64,11 @@ class CalendarioIntegracionTest {
     // Las reservas llegan con SOF-33: aquí se simula la ocupante que ocupa días.
     @MockBean
     private ConsultaReservasCalendario reservas;
+
+    // ConsultaOcupacionReservas (SOF-33) implementa los dos puertos: al reemplazarla por el doble del calendario,
+    // el de periodos también hay que darlo, o disponibilidad no arranca.
+    @MockBean
+    private ConsultaReservasPeriodo reservasPeriodo;
 
     private String duenoToken;
     private String huespedToken;

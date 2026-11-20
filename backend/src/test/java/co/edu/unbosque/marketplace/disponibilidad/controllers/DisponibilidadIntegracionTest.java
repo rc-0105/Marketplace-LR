@@ -13,7 +13,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import co.edu.unbosque.marketplace.alojamientos.repository.PublicacionRepository;
-import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasPeriodo;
 import co.edu.unbosque.marketplace.identidad.model.Rol;
 import co.edu.unbosque.marketplace.identidad.model.Usuario;
 import co.edu.unbosque.marketplace.identidad.repository.UsuarioRepository;
@@ -35,7 +34,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -70,12 +68,9 @@ class DisponibilidadIntegracionTest {
     @Autowired
     private ObjectMapper json;
 
-    // Las reservas llegan con SOF-33: aquí se simula la que bloquea un periodo.
-    @MockBean
-    private ConsultaReservasPeriodo reservas;
-
     @BeforeEach
     void preparar() {
+        jdbc.update("DELETE FROM reserva");
         publicaciones.deleteAll();
         usuarios.deleteAll();
         usuarios.save(Usuario.nuevo("Luis Pardo", "luis@correo.com", codificador.encode(CONTRASENA), Rol.ANFITRION));
@@ -88,6 +83,7 @@ class DisponibilidadIntegracionTest {
     // al usuario: si quedan, los tests de otros módulos no pueden borrar sus usuarios.
     @AfterEach
     void limpiar() {
+        jdbc.update("DELETE FROM reserva");
         publicaciones.deleteAll();
     }
 
@@ -231,12 +227,12 @@ class DisponibilidadIntegracionTest {
     }
 
     @Test
-    @DisplayName("Con una reserva confirmada en el periodo, modificar o eliminar responde 409 e indica la reserva")
+    @DisplayName("Con una reserva que ocupa noches del periodo, modificar o eliminar responde 409 e indica la reserva")
     void reservaConfirmadaBloqueaElPeriodo() throws Exception {
         String token = iniciarSesion("luis@correo.com");
         Long publicacionId = crearPublicacion(token);
         Long periodoId = idDe(registrar(token, publicacionId, HOY.plusDays(10), HOY.plusDays(15)));
-        when(reservas.reservaConfirmadaEn(eq(publicacionId), any(), any())).thenReturn(Optional.of(12L));
+        Long reservaId = reservaConfirmada(publicacionId, HOY.plusDays(11), HOY.plusDays(13));
 
         mvc.perform(put("/api/v1/disponibilidad/" + periodoId)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -244,11 +240,11 @@ class DisponibilidadIntegracionTest {
                         .content(cuerpo(HOY.plusDays(12), HOY.plusDays(20))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail")
-                        .value("El periodo tiene la reserva 12 confirmada; no se puede modificar ni eliminar."))
-                .andExpect(jsonPath("$.reservaId").value(12));
+                        .value("El periodo tiene la reserva %d; no se puede modificar ni eliminar.".formatted(reservaId)))
+                .andExpect(jsonPath("$.reservaId").value(reservaId));
         mvc.perform(delete("/api/v1/disponibilidad/" + periodoId).header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.reservaId").value(12));
+                .andExpect(jsonPath("$.reservaId").value(reservaId));
 
         assertThat(jdbc.queryForObject("SELECT fecha_inicio FROM periodo_disponible WHERE id = ?", LocalDate.class,
                 periodoId)).isEqualTo(HOY.plusDays(10));
@@ -365,5 +361,15 @@ class DisponibilidadIntegracionTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         return json.readTree(respuesta).get("token").asText();
+    }
+
+    // Una reserva real: la que bloquea el periodo es la de SOF-33, no un doble del puerto.
+    private Long reservaConfirmada(Long publicacionId, LocalDate llegada, LocalDate salida) {
+        Long huespedId = usuarios.findByCorreo("ana@correo.com").orElseThrow().getId();
+        return jdbc.queryForObject("""
+                INSERT INTO reserva (publicacion_id, huesped_id, llegada, salida, estado, noches, precio_base,
+                    tarifa_limpieza, tarifa_servicio, descuento, total_servicios_adicionales, total, vence_en)
+                VALUES (?, ?, ?, ?, 'CONFIRMADA', 2, 100, 0, 0, 0, 0, 100, now()) RETURNING id
+                """, Long.class, publicacionId, huespedId, llegada, salida);
     }
 }

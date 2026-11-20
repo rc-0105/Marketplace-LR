@@ -24,6 +24,7 @@ import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
 import co.edu.unbosque.marketplace.compartido.exceptions.AccesoDenegadoException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.CalendarioNoEncontradoException;
+import co.edu.unbosque.marketplace.disponibilidad.exceptions.EstanciaNoDisponibleException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.FechasPeriodoInvalidasException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoConReservaException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoNoEncontradoException;
@@ -236,7 +237,7 @@ class DisponibilidadServiceTest {
 
         assertThatThrownBy(() -> servicio.modificar(PERIODO_ID, ANFITRION_ID, HOY.plusDays(2), HOY.plusDays(9)))
                 .isInstanceOf(PeriodoConReservaException.class)
-                .hasMessage("El periodo tiene la reserva 12 confirmada; no se puede modificar ni eliminar.")
+                .hasMessage("El periodo tiene la reserva 12; no se puede modificar ni eliminar.")
                 .satisfies(error -> assertThat(((PeriodoConReservaException) error).getPropiedades())
                         .containsEntry("reservaId", 12L));
         assertThat(periodo.getFechaInicio()).isEqualTo(HOY.plusDays(1));
@@ -533,6 +534,44 @@ class DisponibilidadServiceTest {
                 LocalDate.of(2028, 1, 1));
 
         assertThat(rango.hasta()).isEqualTo(LocalDate.of(2028, 1, 1));
+    }
+
+    @Test
+    @DisplayName("exigirDisponible deja pasar una estancia dentro de un periodo y sin reservas, sin pedir acceso")
+    void exigirDisponibleDejaPasarLaEstanciaLibre() {
+        conPeriodo(PUBLICACION_ID);
+
+        servicio.exigirDisponible(PUBLICACION_ID, LLEGADA, SALIDA);
+
+        verify(publicaciones, never()).consultarAcceso(any());
+    }
+
+    @Test
+    @DisplayName("exigirDisponible rechaza con FUERA_DE_PERIODO la estancia que ningún periodo contiene")
+    void exigirDisponibleRechazaFueraDePeriodo() {
+        conPeriodo();
+
+        assertThatThrownBy(() -> servicio.exigirDisponible(PUBLICACION_ID, LLEGADA, SALIDA))
+                .isInstanceOfSatisfying(EstanciaNoDisponibleException.class, error -> {
+                    assertThat(error.getMotivo()).isEqualTo(MotivoNoDisponible.FUERA_DE_PERIODO);
+                    assertThat(error.getEstado()).isEqualTo(org.springframework.http.HttpStatus.CONFLICT);
+                    assertThat(error.getPropiedades()).containsEntry("motivo", "FUERA_DE_PERIODO");
+                    assertThat(error.getMessage()).isEqualTo(
+                            "Esas fechas no están dentro de un periodo en que el anfitrión ofrece el alojamiento.");
+                });
+    }
+
+    @Test
+    @DisplayName("exigirDisponible rechaza con RESERVADO la estancia que otra reserva ocupa")
+    void exigirDisponibleRechazaLoReservado() {
+        conPeriodo(PUBLICACION_ID);
+        ocupacion.ocupar(PUBLICACION_ID, "2026-12-05", "2026-12-08");
+
+        assertThatThrownBy(() -> servicio.exigirDisponible(PUBLICACION_ID, LLEGADA, SALIDA))
+                .isInstanceOfSatisfying(EstanciaNoDisponibleException.class, error -> {
+                    assertThat(error.getMotivo()).isEqualTo(MotivoNoDisponible.RESERVADO);
+                    assertThat(error.getMessage()).isEqualTo("Esas fechas ya no están disponibles: alguien más reservó primero.");
+                });
     }
 
     private void accesible() {

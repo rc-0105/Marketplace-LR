@@ -231,11 +231,27 @@ public class PublicacionService {
     /** Detalle público: solo una publicación ACTIVA; si no existe o no está activa responde 404. */
     @Transactional(readOnly = true)
     public DetalleAlojamiento consultarActiva(Long publicacionId) {
+        return DetalleAlojamiento.desde(buscarActiva(publicacionId));
+    }
+
+    /**
+     * Si una publicación ACTIVA confirma la reserva de una vez o exige aprobación del anfitrión
+     * (RF-21): SOF-33 solo soporta la confirmación inmediata. No expone {@link ModoReserva}
+     * fuera del módulo (ADR-2); misma regla de visibilidad que {@link #consultarActiva}.
+     */
+    @Transactional(readOnly = true)
+    public boolean esModoInmediato(Long publicacionId) {
+        return buscarActiva(publicacionId).getModoReserva() == ModoReserva.INMEDIATA;
+    }
+
+    // Una publicación inexistente o que no está ACTIVA responde el mismo 404: a quien reserva o
+    // cotiza no se le revela si existe en otro estado.
+    private Publicacion buscarActiva(Long publicacionId) {
         Optional<Publicacion> encontrada = publicaciones.findById(publicacionId);
         if (encontrada.isEmpty() || encontrada.get().getEstado() != EstadoPublicacion.ACTIVA) {
             throw new PublicacionNoEncontradaException();
         }
-        return DetalleAlojamiento.desde(encontrada.get());
+        return encontrada.get();
     }
 
     /**

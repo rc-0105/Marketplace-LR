@@ -52,6 +52,12 @@ jwt:
   expiracion-minutos: ${JWT_EXPIRACION_MINUTOS:60}
   emisor: ${spring.application.name}
 
+# Reservas (SOF-33, ADR-4): una reserva PENDIENTE aparta las noches solo este tiempo; si no se
+# confirma (el pago es aparte) pasa a VENCIDA y libera las noches.
+marketplace:
+  reservas:
+    minutos-apartado: ${RESERVAS_MINUTOS_APARTADO:15}
+
 # Envío del código de recuperación (RF-05). Con "log" el código se escribe en la
 # consola; con "smtp" se envía por correo usando spring.mail. Las credenciales
 # llegan solo por entorno (RNF-17).

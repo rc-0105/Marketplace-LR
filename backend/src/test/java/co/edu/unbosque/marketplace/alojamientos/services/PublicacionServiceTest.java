@@ -871,6 +871,32 @@ class PublicacionServiceTest {
     }
 
     @Test
+    @DisplayName("Una ACTIVA en modo INMEDIATA confirma de una vez; en APROBACION no")
+    void esModoInmediatoDependeDelModoConfigurado() {
+        Publicacion inmediata = publicacionEn(EstadoPublicacion.ACTIVA);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(inmediata));
+        assertThat(servicio.esModoInmediato(PUBLICACION_ID)).isTrue();
+
+        Publicacion conAprobacion = publicacionEn(EstadoPublicacion.ACTIVA);
+        ReflectionTestUtils.setField(conAprobacion, "modoReserva", ModoReserva.APROBACION);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(conAprobacion));
+        assertThat(servicio.esModoInmediato(PUBLICACION_ID)).isFalse();
+    }
+
+    @Test
+    @DisplayName("Si la publicación no existe o no está ACTIVA, preguntar el modo responde 404")
+    void esModoInmediatoRechazaLasQueNoEstanActivas() {
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> servicio.esModoInmediato(PUBLICACION_ID))
+                .isInstanceOf(PublicacionNoEncontradaException.class);
+
+        when(publicaciones.findById(PUBLICACION_ID))
+                .thenReturn(Optional.of(publicacionEn(EstadoPublicacion.PAUSADA)));
+        assertThatThrownBy(() -> servicio.esModoInmediato(PUBLICACION_ID))
+                .isInstanceOf(PublicacionNoEncontradaException.class);
+    }
+
+    @Test
     @DisplayName("Aprobar una pendiente la deja ACTIVA, la guarda y la audita como acción administrativa")
     void aprobarPendienteLaActiva() {
         Publicacion pendiente = publicacionEn(EstadoPublicacion.PENDIENTE_REVISION);
