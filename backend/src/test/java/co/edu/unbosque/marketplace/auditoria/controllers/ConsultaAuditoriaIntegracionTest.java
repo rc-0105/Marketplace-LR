@@ -1,61 +1,22 @@
 package co.edu.unbosque.marketplace.auditoria.controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import co.edu.unbosque.marketplace.alojamientos.repository.PublicacionRepository;
-import co.edu.unbosque.marketplace.auditoria.SemillaAuditoria;
-import co.edu.unbosque.marketplace.auditoria.SesionesAuditoria;
-import co.edu.unbosque.marketplace.identidad.repository.UsuarioRepository;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.HttpHeaders;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
 /** La lista de auditoría por HTTP: token, autorización, consulta y forma de la respuesta (REQ-CA1, CA2, CA4). */
-@SpringBootTest
-@AutoConfigureMockMvc
-class ConsultaAuditoriaIntegracionTest {
-
-    private final MockMvc mvc;
-    private final ObjectMapper json;
-    private final SemillaAuditoria semilla;
-    private final SesionesAuditoria sesiones;
-    private String token;
-
-    @Autowired
-    ConsultaAuditoriaIntegracionTest(MockMvc mvc, ObjectMapper json, JdbcTemplate jdbc, UsuarioRepository usuarios,
-            PublicacionRepository publicaciones, PasswordEncoder codificador) {
-        this.mvc = mvc;
-        this.json = json;
-        this.semilla = new SemillaAuditoria(jdbc);
-        this.sesiones = new SesionesAuditoria(mvc, json, usuarios, publicaciones, codificador);
-    }
-
-    @BeforeEach
-    void preparar() throws Exception {
-        sesiones.preparar();
-        token = sesiones.token(SesionesAuditoria.ADMINISTRADOR);
-        // Iniciar sesión también deja un evento de auditoría: se vacía después de obtener el token.
-        semilla.vaciar();
-    }
+class ConsultaAuditoriaIntegracionTest extends AuditoriaHttpIntegracionBase {
 
     @Test
     @DisplayName("Sin filtros devuelve la página 0 de tamaño 50 con las 7 filas de la más nueva a la más vieja")
@@ -142,8 +103,7 @@ class ConsultaAuditoriaIntegracionTest {
     }
 
     private ResultActions listar(String consulta) throws Exception {
-        return mvc.perform(get("/api/v1/admin/auditoria?" + consulta).header(HttpHeaders.AUTHORIZATION,
-                "Bearer " + token));
+        return consultar(RUTA + "?" + consulta);
     }
 
     private JsonNode listarJson(String consulta) throws Exception {
