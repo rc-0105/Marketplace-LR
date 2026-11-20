@@ -388,4 +388,77 @@ class ServicioIdempotenciaTest {
         logger.addAppender(eventos);
         return eventos;
     }
+
+    @Test
+    @DisplayName("La huella es SHA-256 en hexadecimal minúscula de 64 caracteres y es determinista")
+    void huellaTieneElFormatoEsperado() {
+        String huella = ServicioIdempotencia.huella(OPERACION, CONTENIDO);
+
+        assertThat(huella).hasSize(64).matches("[0-9a-f]{64}");
+        assertThat(ServicioIdempotencia.huella(OPERACION, CONTENIDO)).isEqualTo(huella);
+        assertThat(huella).isEqualTo("7ed4a12a546d817d74ba9d2c0850ac6e7e93c27f822882a99190c75c8db1a735");
+    }
+
+    @Test
+    @DisplayName("La operación forma parte de la huella: la misma clave en otra operación no coincide")
+    void laOperacionCambiaLaHuella() {
+        assertThat(ServicioIdempotencia.huella("POST /reservas", CONTENIDO))
+                .isNotEqualTo(ServicioIdempotencia.huella("POST /pagos", CONTENIDO));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"11|2026-12-10|2026-12-13|7,8", "10|2026-12-11|2026-12-13|7,8",
+            "10|2026-12-10|2026-12-14|7,8", "10|2026-12-10|2026-12-13|7", "10|2026-12-10|2026-12-13|7,8,9",
+            "10|2026-12-10|2026-12-13|"})
+    @DisplayName("Cualquier diferencia en el contenido canónico cambia la huella")
+    void elContenidoCambiaLaHuella(String otroContenido) {
+        assertThat(ServicioIdempotencia.huella(OPERACION, otroContenido))
+                .isNotEqualTo(ServicioIdempotencia.huella(OPERACION, CONTENIDO));
+    }
+
+    @Test
+    @DisplayName("Contenidos iguales dan la misma huella aunque sean objetos distintos")
+    void contenidosIgualesMismaHuella() {
+        assertThat(ServicioIdempotencia.huella(new String(OPERACION), new String(CONTENIDO)))
+                .isEqualTo(ServicioIdempotencia.huella(OPERACION, CONTENIDO));
+    }
+
+    @Test
+    @DisplayName("El reclamo se pide con el instante del reloj y el lease configurado")
+    void reclamoUsaElRelojYElLease() {
+        ServicioIdempotencia configurado = new ServicioIdempotencia(registro, Clock.fixed(AHORA, ZoneOffset.UTC),
+                new ObjectMapper(), 24, 30, 2);
+        reclamoOtorgado();
+        when(registro.completar(any(), any(), any(), anyInt(), anyString(), any())).thenReturn(true);
+
+        configurado.ejecutar(solicitud(), HttpStatus.CREATED, () -> "x");
+
+        verify(registro).reclamar(eq(2L), eq(CLAVE_UUID), eq(huellaEsperada()), eq(AHORA), eq(Duration.ofSeconds(30)));
+    }
+
+    @Test
+    @DisplayName("La vigencia en horas es configurable: con 1 hora se completa con una hora")
+    void vigenciaConfigurable() {
+        ServicioIdempotencia configurado = new ServicioIdempotencia(registro, Clock.fixed(AHORA, ZoneOffset.UTC),
+                new ObjectMapper(), 1, 120, 2);
+        reclamoOtorgado();
+        when(registro.completar(any(), any(), any(), anyInt(), anyString(), any())).thenReturn(true);
+
+        configurado.ejecutar(solicitud(), HttpStatus.CREATED, () -> "x");
+
+        verify(registro).completar(2L, CLAVE_UUID, reclamo, 201, "\"x\"", Duration.ofHours(1));
+    }
+
+    @Test
+    @DisplayName("El instante del reclamo sigue al reloj: 24 horas después se reclama con esa hora")
+    void elRelojAvanza() {
+        Instant manana = AHORA.plus(VIGENCIA);
+        ServicioIdempotencia adelantado = servicioConReloj(Clock.fixed(manana, ZoneOffset.UTC));
+        reclamoOtorgado();
+        when(registro.completar(any(), any(), any(), anyInt(), anyString(), any())).thenReturn(true);
+
+        adelantado.ejecutar(solicitud(), HttpStatus.CREATED, () -> "x");
+
+        verify(registro).reclamar(any(), any(), anyString(), eq(manana), eq(LEASE));
+    }
 }
