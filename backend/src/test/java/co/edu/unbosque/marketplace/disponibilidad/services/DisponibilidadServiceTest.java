@@ -9,9 +9,11 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import co.edu.unbosque.marketplace.alojamientos.exceptions.PublicacionNoEncontradaException;
+import co.edu.unbosque.marketplace.alojamientos.services.AccesoPublicacion;
 import co.edu.unbosque.marketplace.alojamientos.services.PublicacionService;
 import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasCalendario;
 import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasPeriodo;
@@ -21,10 +23,14 @@ import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
 import co.edu.unbosque.marketplace.compartido.exceptions.AccesoDenegadoException;
+import co.edu.unbosque.marketplace.disponibilidad.exceptions.CalendarioNoEncontradoException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.FechasPeriodoInvalidasException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoConReservaException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoNoEncontradoException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoSuperpuestoException;
+import co.edu.unbosque.marketplace.disponibilidad.exceptions.RangoConsultaInvalidoException;
+import co.edu.unbosque.marketplace.disponibilidad.model.DisponibilidadRango;
+import co.edu.unbosque.marketplace.disponibilidad.model.MotivoNoDisponible;
 import co.edu.unbosque.marketplace.disponibilidad.model.PeriodoDisponible;
 import co.edu.unbosque.marketplace.disponibilidad.repository.PeriodoDisponibleRepository;
 import java.sql.SQLException;
@@ -414,6 +420,113 @@ class DisponibilidadServiceTest {
         verify(periodos, never()).saveAndFlush(any());
         verify(periodos, never()).delete(any());
         verify(publicador, never()).publicar(any());
+    }
+
+    @Test
+    @DisplayName("Consultar una publicación inexistente o no visible responde el mismo 404 sin tocar repositorio ni puerto")
+    void consultarNoRevelaLaPublicacionQueNoSeVe() {
+        when(publicaciones.consultarAcceso(PUBLICACION_ID)).thenReturn(Optional.empty());
+        when(publicaciones.consultarAcceso(31L)).thenReturn(Optional.of(new AccesoPublicacion(ANFITRION_ID, false)));
+
+        assertThatThrownBy(() -> servicio.consultar(PUBLICACION_ID, OTRO_ANFITRION_ID, LLEGADA, SALIDA))
+                .isInstanceOf(CalendarioNoEncontradoException.class).hasMessage("No encontramos esa publicación.");
+        assertThatThrownBy(() -> servicio.consultar(31L, OTRO_ANFITRION_ID, LLEGADA, SALIDA))
+                .isInstanceOf(CalendarioNoEncontradoException.class).hasMessage("No encontramos esa publicación.");
+        verifyNoInteractions(periodos);
+        assertThat(ocupacion.consultadas()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("El dueño consulta su publicación en cualquier estado")
+    void elDuenoConsultaUnaPublicacionNoActiva() {
+        when(publicaciones.consultarAcceso(PUBLICACION_ID)).thenReturn(Optional.of(new AccesoPublicacion(ANFITRION_ID, false)));
+        conPeriodo(PUBLICACION_ID);
+
+        assertThat(servicio.consultar(PUBLICACION_ID, ANFITRION_ID, LLEGADA, SALIDA).disponible()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Una estancia que termina el día que empieza o antes da 400 sin tocar repositorio ni puerto")
+    void rechazaUnRangoInvalido() {
+        accesible();
+
+        assertThatThrownBy(() -> servicio.consultar(PUBLICACION_ID, OTRO_ANFITRION_ID, LLEGADA, LLEGADA))
+                .isInstanceOf(RangoConsultaInvalidoException.class);
+        assertThatThrownBy(() -> servicio.consultar(PUBLICACION_ID, OTRO_ANFITRION_ID, SALIDA, LLEGADA))
+                .isInstanceOf(RangoConsultaInvalidoException.class);
+        verifyNoInteractions(periodos);
+        assertThat(ocupacion.consultadas()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("El 404 va antes que el 400: a quien no ve la publicación no se le revela nada más")
+    void elNoEncontradoVaAntesQueElRangoInvalido() {
+        when(publicaciones.consultarAcceso(PUBLICACION_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.consultar(PUBLICACION_ID, OTRO_ANFITRION_ID, SALIDA, LLEGADA))
+                .isInstanceOf(CalendarioNoEncontradoException.class);
+    }
+
+    @Test
+    @DisplayName("Una estancia dentro de un periodo y sin reservas se consulta como disponible, sin motivo")
+    void consultarDisponible() {
+        accesible();
+        conPeriodo(PUBLICACION_ID);
+
+        DisponibilidadRango rango = servicio.consultar(PUBLICACION_ID, OTRO_ANFITRION_ID, LLEGADA, SALIDA);
+
+        assertThat(rango).isEqualTo(new DisponibilidadRango(PUBLICACION_ID, LLEGADA, SALIDA, null));
+        assertThat(rango.disponible()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Fuera de periodo, también sin ningún periodo, gana a una reserva y no consulta el puerto")
+    void consultarFueraDePeriodoGanaALaReserva() {
+        accesible();
+        conPeriodo();
+        ocupacion.ocupar(PUBLICACION_ID, "2026-12-03", "2026-12-06");
+
+        DisponibilidadRango rango = servicio.consultar(PUBLICACION_ID, OTRO_ANFITRION_ID, LLEGADA, SALIDA);
+
+        assertThat(rango.motivo()).isEqualTo(MotivoNoDisponible.FUERA_DE_PERIODO);
+        assertThat(rango.disponible()).isFalse();
+        assertThat(ocupacion.consultadas()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Con una reserva que cruza, el motivo es RESERVADO; adyacente no ocupa y liberarla devuelve la disponibilidad")
+    void consultarReservadoYLiberacion() {
+        accesible();
+        conPeriodo(PUBLICACION_ID);
+        ocupacion.ocupar(PUBLICACION_ID, "2026-12-01", "2026-12-03");
+        ocupacion.ocupar(PUBLICACION_ID, "2026-12-06", "2026-12-09");
+        assertThat(servicio.consultar(PUBLICACION_ID, OTRO_ANFITRION_ID, LLEGADA, SALIDA).motivo()).isNull();
+        ocupacion.ocupar(PUBLICACION_ID, "2026-12-05", "2026-12-08");
+
+        DisponibilidadRango reservado = servicio.consultar(PUBLICACION_ID, OTRO_ANFITRION_ID, LLEGADA, SALIDA);
+
+        assertThat(reservado.motivo()).isEqualTo(MotivoNoDisponible.RESERVADO);
+        assertThat(reservado.disponible()).isFalse();
+        ocupacion.liberar(PUBLICACION_ID);
+        assertThat(servicio.consultar(PUBLICACION_ID, OTRO_ANFITRION_ID, LLEGADA, SALIDA).motivo()).isNull();
+        verify(periodos, never()).saveAndFlush(any());
+        verify(publicador, never()).publicar(any());
+    }
+
+    @Test
+    @DisplayName("Consultar no tiene tope de días")
+    void consultarNoTieneTopeDeRango() {
+        accesible();
+        conPeriodo(PUBLICACION_ID);
+
+        DisponibilidadRango rango = servicio.consultar(PUBLICACION_ID, OTRO_ANFITRION_ID, LocalDate.of(2026, 1, 1),
+                LocalDate.of(2028, 1, 1));
+
+        assertThat(rango.hasta()).isEqualTo(LocalDate.of(2028, 1, 1));
+    }
+
+    private void accesible() {
+        when(publicaciones.consultarAcceso(PUBLICACION_ID)).thenReturn(Optional.of(new AccesoPublicacion(ANFITRION_ID, true)));
     }
 
     // Devuelve un periodo de la publicación solo para los ids pedidos que se declararon con periodo.

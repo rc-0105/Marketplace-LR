@@ -7,10 +7,13 @@ import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
+import co.edu.unbosque.marketplace.disponibilidad.exceptions.CalendarioNoEncontradoException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.FechasPeriodoInvalidasException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoConReservaException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoNoEncontradoException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoSuperpuestoException;
+import co.edu.unbosque.marketplace.disponibilidad.exceptions.RangoConsultaInvalidoException;
+import co.edu.unbosque.marketplace.disponibilidad.model.DisponibilidadRango;
 import co.edu.unbosque.marketplace.disponibilidad.model.MotivoNoDisponible;
 import co.edu.unbosque.marketplace.disponibilidad.model.PeriodoDisponible;
 import co.edu.unbosque.marketplace.disponibilidad.repository.PeriodoDisponibleRepository;
@@ -85,6 +88,23 @@ public class DisponibilidadService {
     public Set<Long> filtrarDisponibles(Collection<Long> publicacionIds, LocalDate llegada, LocalDate salida) {
         Set<Long> noDisponibles = evaluar(publicacionIds, llegada, salida).keySet();
         return publicacionIds.stream().filter(id -> !noDisponibles.contains(id)).collect(Collectors.toSet());
+    }
+
+    /**
+     * Si la estancia {@code [desde, hasta)} está disponible y, si no, por qué, con la misma regla de la
+     * búsqueda. El dueño consulta su publicación en cualquier estado; otro usuario, solo si es ACTIVA, y
+     * una inexistente o no visible responde lo mismo que el calendario. El acceso va antes que el rango: a
+     * quien no puede ver la publicación no se le revela nada más, ni siquiera un 400.
+     */
+    @Transactional(readOnly = true)
+    public DisponibilidadRango consultar(Long publicacionId, Long usuarioId, LocalDate desde, LocalDate hasta) {
+        publicaciones.consultarAcceso(publicacionId).filter(a -> a.esDe(usuarioId) || a.publica())
+                .orElseThrow(CalendarioNoEncontradoException::new);
+        if (!hasta.isAfter(desde)) {
+            throw new RangoConsultaInvalidoException("La fecha final debe ser posterior a la fecha inicial.");
+        }
+        MotivoNoDisponible motivo = evaluar(List.of(publicacionId), desde, hasta).get(publicacionId);
+        return new DisponibilidadRango(publicacionId, desde, hasta, motivo);
     }
 
     /**
