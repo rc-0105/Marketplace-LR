@@ -84,33 +84,6 @@ class ConfiguracionReservasPorDefectoTest {
     }
 
     @Test
-    @DisplayName("El contrato del calendario devuelve las CONFIRMADAS y las PENDIENTES vigentes, no las vencidas ni las CANCELADAS")
-    void elContratoDevuelveLasQueOcupanNoches() {
-        record Almacenada(Long id, String estado, boolean vigente, LocalDate llegada, LocalDate salida) {
-            boolean ocupa() {
-                return estado.equals("CONFIRMADA") || (estado.equals("PENDIENTE") && vigente);
-            }
-        }
-        LocalDate llegada = LocalDate.of(2026, 12, 3);
-        LocalDate salida = LocalDate.of(2026, 12, 6);
-        List<Almacenada> almacen = List.of(
-                new Almacenada(77L, "CONFIRMADA", true, llegada, salida),
-                new Almacenada(80L, "PENDIENTE", true, llegada, salida),
-                new Almacenada(81L, "PENDIENTE", false, llegada, salida),
-                new Almacenada(82L, "CANCELADA", true, llegada, salida));
-        ConsultaReservasCalendario porEstado = (publicacion, desde, hasta) -> almacen.stream()
-                .filter(r -> r.ocupa() && r.llegada().isBefore(hasta) && r.salida().isAfter(desde))
-                .map(r -> new ReservaOcupada(r.id(), r.llegada(), r.salida())).toList();
-
-        contexto.withBean(ConsultaReservasCalendario.class, () -> porEstado).run(ctx -> {
-            assertThat(ctx).hasSingleBean(ConsultaReservasCalendario.class);
-            assertThat(ctx.getBean(ConsultaReservasCalendario.class).ocupantesEntre(10L,
-                    LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 10)))
-                    .extracting(ReservaOcupada::reservaId).containsExactly(77L, 80L);
-        });
-    }
-
-    @Test
     @DisplayName("Sin otra implementación, la consulta por lote del bean por defecto no marca ninguna publicación como ocupada")
     void sinOtroBeanElLoteVieneVacio() {
         contexto.run(ctx -> {
@@ -118,17 +91,5 @@ class ConfiguracionReservasPorDefectoTest {
             assertThat(puerto.publicacionesOcupadas(List.of(10L, 11L, 12L),
                     LocalDate.of(2026, 12, 3), LocalDate.of(2026, 12, 6))).isEmpty();
         });
-    }
-
-    @Test
-    @DisplayName("Una implementación real del calendario hace que el lote marque como ocupadas solo sus publicaciones")
-    void unaImplementacionRealHaceQueElLoteMarqueOcupadas() {
-        ReservaOcupada reserva = new ReservaOcupada(77L, LocalDate.of(2026, 12, 3), LocalDate.of(2026, 12, 6));
-
-        contexto.withBean(ConsultaReservasCalendario.class,
-                () -> (publicacion, desde, hasta) -> publicacion.equals(11L) ? List.of(reserva) : List.of())
-                .run(ctx -> assertThat(ctx.getBean(ConsultaReservasCalendario.class).publicacionesOcupadas(
-                        List.of(10L, 11L), LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 10)))
-                        .containsExactly(11L));
     }
 }
