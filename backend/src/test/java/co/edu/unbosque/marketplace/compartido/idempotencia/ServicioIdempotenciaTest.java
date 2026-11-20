@@ -13,6 +13,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import co.edu.unbosque.marketplace.compartido.idempotencia.exceptions.ClaveIdempotenciaInvalidaException;
 import co.edu.unbosque.marketplace.compartido.idempotencia.exceptions.ClaveIdempotenciaReutilizadaException;
 import co.edu.unbosque.marketplace.compartido.idempotencia.exceptions.SolicitudEnProcesoException;
@@ -32,6 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 
 /** Orquestación de la idempotencia con el registro simulado y un reloj fijo (SOF-77). */
@@ -288,5 +293,99 @@ class ServicioIdempotenciaTest {
         verify(registro).reclamar(eq(2L), eq(UUID.fromString(otraClave)), anyString(), any(), any());
         verify(registro).reclamar(eq(4L), eq(CLAVE_UUID), anyString(), any(), any());
         verify(registro, never()).buscar(any(), any());
+    }
+
+    private void reclamoOtorgado() {
+        when(registro.reclamar(any(), any(), anyString(), any(), any())).thenReturn(Optional.of(reclamo));
+    }
+
+    @Test
+    @DisplayName("Si la operación lanza una excepción de negocio libera el reclamo y relanza la misma instancia")
+    void liberaAnteExcepcionDeNegocio() {
+        reclamoOtorgado();
+        SolicitudEnProcesoException fallo = new SolicitudEnProcesoException(3);
+
+        assertThatThrownBy(() -> servicio.ejecutar(solicitud(), HttpStatus.CREATED, () -> {
+            throw fallo;
+        })).isSameAs(fallo);
+
+        verify(registro).liberar(2L, CLAVE_UUID, reclamo);
+        verify(registro, never()).completar(any(), any(), any(), anyInt(), anyString(), any());
+    }
+
+    @Test
+    @DisplayName("Ante una RuntimeException inesperada libera el reclamo y la propaga intacta")
+    void liberaAnteExcepcionInesperada() {
+        reclamoOtorgado();
+        IllegalStateException fallo = new IllegalStateException("falló");
+
+        assertThatThrownBy(() -> servicio.ejecutar(solicitud(), HttpStatus.CREATED, () -> {
+            throw fallo;
+        })).isSameAs(fallo);
+
+        verify(registro).liberar(2L, CLAVE_UUID, reclamo);
+    }
+
+    @Test
+    @DisplayName("Si liberar también falla, se relanza el error original de la operación")
+    void falloAlLiberarNoOcultaElOriginal() {
+        reclamoOtorgado();
+        when(registro.liberar(any(), any(), any())).thenThrow(new IllegalStateException("base caída"));
+        IllegalArgumentException original = new IllegalArgumentException("original");
+
+        assertThatThrownBy(() -> servicio.ejecutar(solicitud(), HttpStatus.CREATED, () -> {
+            throw original;
+        })).isSameAs(original);
+    }
+
+    @Test
+    @DisplayName("Un código de éxito que no es 2xx se rechaza antes de reclamar")
+    void exitoNo2xx() {
+        assertThatThrownBy(() -> servicio.ejecutar(solicitud(), HttpStatus.BAD_REQUEST, () -> "x"))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verifyNoMoreInteractions(registro);
+    }
+
+    @Test
+    @DisplayName("Si completar lanza, registra ERROR y devuelve el resultado exitoso sin repetir la operación")
+    void completarLanza() {
+        reclamoOtorgado();
+        when(registro.completar(any(), any(), any(), anyInt(), anyString(), any()))
+                .thenThrow(new IllegalStateException("base caída"));
+        AtomicInteger ejecuciones = new AtomicInteger();
+
+        ListAppender<ILoggingEvent> log = capturarLog();
+        RespuestaIdempotente respuesta = servicio.ejecutar(solicitud(), HttpStatus.CREATED, () -> {
+            ejecuciones.incrementAndGet();
+            return Map.of("id", 7);
+        });
+
+        assertThat(respuesta.codigoEstado()).isEqualTo(201);
+        assertThat(respuesta.cuerpo()).isEqualTo("{\"id\":7}");
+        assertThat(ejecuciones).hasValue(1);
+        assertThat(log.list).extracting(ILoggingEvent::getLevel).contains(Level.ERROR);
+        verify(registro, never()).liberar(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Si completar devuelve false (reclamo perdido) registra ERROR y entrega el éxito")
+    void completarDevuelveFalse() {
+        reclamoOtorgado();
+        when(registro.completar(any(), any(), any(), anyInt(), anyString(), any())).thenReturn(false);
+
+        ListAppender<ILoggingEvent> log = capturarLog();
+        RespuestaIdempotente respuesta = servicio.ejecutar(solicitud(), HttpStatus.CREATED, () -> Map.of("id", 7));
+
+        assertThat(respuesta.replicada()).isFalse();
+        assertThat(log.list).extracting(ILoggingEvent::getLevel).contains(Level.ERROR);
+    }
+
+    private static ListAppender<ILoggingEvent> capturarLog() {
+        Logger logger = (Logger) LoggerFactory.getLogger(ServicioIdempotencia.class);
+        ListAppender<ILoggingEvent> eventos = new ListAppender<>();
+        eventos.start();
+        logger.addAppender(eventos);
+        return eventos;
     }
 }
