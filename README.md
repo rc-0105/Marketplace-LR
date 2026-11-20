@@ -97,7 +97,9 @@ complétenlo localmente.
 | `MAIL_HOST`, `MAIL_PORT` | Servidor SMTP. Por defecto `smtp.gmail.com` y `587` (STARTTLS) |
 | `MAIL_USERNAME`, `MAIL_PASSWORD` | Cuenta SMTP. Con Gmail, la contraseña es una [contraseña de aplicación](https://myaccount.google.com/apppasswords), no la de la cuenta |
 | `MAIL_FROM` | Remitente de los correos. Si se omite, se usa `MAIL_USERNAME` |
-| `STRIPE_CLAVE_PRUEBA` | Clave de la pasarela en modo prueba |
+| `PAGOS_MODO` | `simulado` (por defecto) cobra sin red, imitando a Stripe con sus tarjetas de prueba; `stripe` usa Stripe en modo prueba |
+| `STRIPE_CLAVE_PRUEBA` | Clave secreta de Stripe en modo prueba (`sk_test_...`). Obligatoria con `PAGOS_MODO=stripe`; con una clave que no sea de prueba la API no arranca |
+| `PAGOS_TIEMPO_ESPERA_SEGUNDOS` | Segundos que se espera a la pasarela antes de informar que no respondió (por defecto 10) |
 | `DB_HOST`, `DB_PORT`, `DB_NAME` | Solo en la imagen Docker: si falta `SPRING_DATASOURCE_URL`, se arma con estos tres (así los entrega Render) |
 | `VERSION_COMMIT` | Commit que informa `/api/estado`. En Render se usa `RENDER_GIT_COMMIT`; sin ninguno, `desarrollo` |
 

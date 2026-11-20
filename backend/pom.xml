@@ -23,6 +23,7 @@
     <springdoc.version>2.6.0</springdoc.version>
     <jacoco.version>0.8.12</jacoco.version>
     <logstash-encoder.version>8.0</logstash-encoder.version>
+    <stripe.version>33.4.2</stripe.version>
     <sonar-maven-plugin.version>5.8.0.7211</sonar-maven-plugin.version>
     <!-- Ruta que SonarCloud lee para la cobertura -->
     <sonar.coverage.jacoco.xmlReportPaths>
@@ -82,6 +83,12 @@
       <groupId>net.logstash.logback</groupId>
       <artifactId>logstash-logback-encoder</artifactId>
       <version>${logstash-encoder.version}</version>
+    </dependency>
+    <!-- Pasarela de pagos en modo prueba (SOF-34, RF-37): solo con claves sk_test_ -->
+    <dependency>
+      <groupId>com.stripe</groupId>
+      <artifactId>stripe-java</artifactId>
+      <version>${stripe.version}</version>
     </dependency>
 
     <dependency>

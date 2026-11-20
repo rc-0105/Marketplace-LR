@@ -64,6 +64,15 @@ marketplace:
   reservas:
     minutos-apartado: ${RESERVAS_MINUTOS_APARTADO:15}
 
+# Pago de la reserva (SOF-34, RF-37). "simulado" (por defecto) responde sin red como Stripe a sus
+# tarjetas de prueba; "stripe" usa Stripe en modo prueba y exige una clave sk_test_ (nunca pagos
+# reales). Si la pasarela no responde en tiempo-espera-segundos, la reserva sigue PENDIENTE.
+pagos:
+  modo: ${PAGOS_MODO:simulado}
+  tiempo-espera-segundos: ${PAGOS_TIEMPO_ESPERA_SEGUNDOS:10}
+  stripe:
+    clave-prueba: ${STRIPE_CLAVE_PRUEBA:}
+
 # Envío del código de recuperación (RF-05). Con "log" el código se escribe en la
 # consola; con "smtp" se envía por correo usando spring.mail. Las credenciales
 # llegan solo por entorno (RNF-17).
