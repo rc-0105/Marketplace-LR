@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -19,6 +21,9 @@ import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
 import co.edu.unbosque.marketplace.cotizacion.exceptions.CotizacionInvalidaException;
 import co.edu.unbosque.marketplace.cotizacion.services.Cotizacion;
 import co.edu.unbosque.marketplace.cotizacion.services.CotizacionService;
+import co.edu.unbosque.marketplace.disponibilidad.exceptions.EstanciaNoDisponibleException;
+import co.edu.unbosque.marketplace.disponibilidad.model.MotivoNoDisponible;
+import co.edu.unbosque.marketplace.disponibilidad.services.DisponibilidadService;
 import co.edu.unbosque.marketplace.reservas.exceptions.FechasReservaInvalidasException;
 import co.edu.unbosque.marketplace.reservas.exceptions.ModoReservaNoSoportadoException;
 import co.edu.unbosque.marketplace.reservas.exceptions.ReservaSuperpuestaException;
@@ -54,11 +59,12 @@ class ReservaServiceTest {
     private final ReservaRepository reservas = mock(ReservaRepository.class);
     private final CotizacionService cotizaciones = mock(CotizacionService.class);
     private final PublicacionService publicaciones = mock(PublicacionService.class);
+    private final DisponibilidadService disponibilidad = mock(DisponibilidadService.class);
     private final PublicadorEventos publicador = mock(PublicadorEventos.class);
     // Hoy en Bogotá es 2026-12-01: la llegada del 10 es futura.
     private final Clock reloj = Clock.fixed(Instant.parse("2026-12-01T15:00:00Z"), ZoneOffset.UTC);
-    private final ReservaService servicio = new ReservaService(reservas, cotizaciones, publicaciones, publicador,
-            reloj);
+    private final ReservaService servicio = new ReservaService(reservas, cotizaciones, publicaciones, disponibilidad,
+            publicador, reloj);
 
     @BeforeEach
     void preparar() {
@@ -158,6 +164,41 @@ class ReservaServiceTest {
     }
 
     @Test
+    @DisplayName("Una estancia fuera de los periodos disponibles se rechaza con 409 antes de guardar")
+    void estanciaFueraDePeriodoSeRechazaSinGuardar() {
+        doThrow(new EstanciaNoDisponibleException(MotivoNoDisponible.FUERA_DE_PERIODO)).when(disponibilidad)
+                .exigirDisponible(PUBLICACION_ID, LLEGADA, SALIDA);
+
+        assertThatThrownBy(() -> servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of()))
+                .isInstanceOf(EstanciaNoDisponibleException.class);
+        verify(reservas, never()).saveAndFlush(any());
+        verify(publicador, never()).publicar(any());
+    }
+
+    @Test
+    @DisplayName("Se valida la disponibilidad después de cotizar (rango válido) y antes de guardar")
+    void validaLaDisponibilidadDespuesDeCotizarYAntesDeGuardar() {
+        servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of());
+
+        var orden = inOrder(publicaciones, cotizaciones, disponibilidad, reservas);
+        orden.verify(publicaciones).esModoInmediato(PUBLICACION_ID);
+        orden.verify(cotizaciones).cotizar(eq(PUBLICACION_ID), eq(LLEGADA), eq(SALIDA), anySet());
+        orden.verify(disponibilidad).exigirDisponible(PUBLICACION_ID, LLEGADA, SALIDA);
+        orden.verify(reservas).saveAndFlush(any(Reserva.class));
+    }
+
+    @Test
+    @DisplayName("Un reintento idempotente no vuelve a exigir disponibilidad: la reserva propia ya ocupa las noches")
+    void elReintentoNoExigeDisponibilidad() {
+        when(reservas.findFirstByHuespedIdAndPublicacionIdAndLlegadaAndSalidaAndEstadoNot(HUESPED_ID, PUBLICACION_ID,
+                LLEGADA, SALIDA, EstadoReserva.CANCELADA)).thenReturn(Optional.of(reservaExistente()));
+
+        servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of());
+
+        verify(disponibilidad, never()).exigirDisponible(any(), any(), any());
+    }
+
+    @Test
     @DisplayName("No se reserva con llegada anterior a hoy (día de Bogotá): responde 400 sin tocar nada")
     void rechazaUnaLlegadaPasada() {
         LocalDate ayer = LocalDate.of(2026, 11, 30);
@@ -174,7 +215,8 @@ class ReservaServiceTest {
     void llegarHoyEsValidoSegunLaZonaDeBogota() {
         // 2026-12-02T03:00Z es todavía 2026-12-01 en Bogotá (UTC-5).
         Clock madrugadaUtc = Clock.fixed(Instant.parse("2026-12-02T03:00:00Z"), ZoneOffset.UTC);
-        ReservaService enMadrugada = new ReservaService(reservas, cotizaciones, publicaciones, publicador, madrugadaUtc);
+        ReservaService enMadrugada = new ReservaService(reservas, cotizaciones, publicaciones, disponibilidad, publicador,
+                madrugadaUtc);
         LocalDate hoy = LocalDate.of(2026, 12, 1);
         when(cotizaciones.cotizar(eq(PUBLICACION_ID), eq(hoy), eq(SALIDA), anySet())).thenReturn(cotizacion());
 

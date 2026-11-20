@@ -8,6 +8,7 @@ import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
 import co.edu.unbosque.marketplace.compartido.infraestructura.RestriccionesPostgres;
 import co.edu.unbosque.marketplace.cotizacion.services.Cotizacion;
 import co.edu.unbosque.marketplace.cotizacion.services.CotizacionService;
+import co.edu.unbosque.marketplace.disponibilidad.services.DisponibilidadService;
 import co.edu.unbosque.marketplace.reservas.exceptions.FechasReservaInvalidasException;
 import co.edu.unbosque.marketplace.reservas.exceptions.ModoReservaNoSoportadoException;
 import co.edu.unbosque.marketplace.reservas.exceptions.ReservaSuperpuestaException;
@@ -41,14 +42,17 @@ public class ReservaService {
     private final ReservaRepository reservas;
     private final CotizacionService cotizaciones;
     private final PublicacionService publicaciones;
+    private final DisponibilidadService disponibilidad;
     private final PublicadorEventos publicador;
     private final Clock reloj;
 
     public ReservaService(ReservaRepository reservas, CotizacionService cotizaciones,
-            PublicacionService publicaciones, PublicadorEventos publicador, Clock reloj) {
+            PublicacionService publicaciones, DisponibilidadService disponibilidad, PublicadorEventos publicador,
+            Clock reloj) {
         this.reservas = reservas;
         this.cotizaciones = cotizaciones;
         this.publicaciones = publicaciones;
+        this.disponibilidad = disponibilidad;
         this.publicador = publicador;
         this.reloj = reloj;
     }
@@ -78,6 +82,9 @@ public class ReservaService {
             throw new ModoReservaNoSoportadoException();
         }
         Cotizacion cotizacion = cotizaciones.cotizar(publicacionId, llegada, salida, adicionalesElegidos);
+        // Tras cotizar, que ya validó el rango. La estancia debe caber en un periodo y no estar ocupada (SOF-27);
+        // es una verificación temprana: la restricción de exclusión sigue siendo la última barrera ante carreras.
+        disponibilidad.exigirDisponible(publicacionId, llegada, salida);
 
         Reserva reserva = Reserva.nueva(publicacionId, huespedId, llegada, salida, (int) cotizacion.noches(),
                 cotizacion.precioBase(), cotizacion.tarifaLimpieza(), cotizacion.tarifaServicio(),

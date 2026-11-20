@@ -9,6 +9,7 @@ import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
 import co.edu.unbosque.marketplace.compartido.infraestructura.RestriccionesPostgres;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.CalendarioNoEncontradoException;
+import co.edu.unbosque.marketplace.disponibilidad.exceptions.EstanciaNoDisponibleException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.FechasPeriodoInvalidasException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoConReservaException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoNoEncontradoException;
@@ -115,6 +116,20 @@ public class DisponibilidadService {
         }
         MotivoNoDisponible motivo = evaluar(List.of(publicacionId), desde, hasta).get(publicacionId);
         return new DisponibilidadRango(publicacionId, desde, hasta, motivo);
+    }
+
+    /**
+     * Exige que la estancia {@code [llegada, salida)} esté disponible, con la misma regla de la búsqueda y de
+     * {@link #consultar}, pero sin las comprobaciones de acceso ni de rango de esa consulta: es para quien ya
+     * validó la publicación y las fechas (SOF-33). Lanza {@link EstanciaNoDisponibleException} con el motivo.
+     * Es una verificación temprana; la garantía contra el doble reservado sigue siendo la base de datos (ADR-3).
+     */
+    @Transactional(readOnly = true)
+    public void exigirDisponible(Long publicacionId, LocalDate llegada, LocalDate salida) {
+        MotivoNoDisponible motivo = evaluar(List.of(publicacionId), llegada, salida).get(publicacionId);
+        if (motivo != null) {
+            throw new EstanciaNoDisponibleException(motivo);
+        }
     }
 
     /**

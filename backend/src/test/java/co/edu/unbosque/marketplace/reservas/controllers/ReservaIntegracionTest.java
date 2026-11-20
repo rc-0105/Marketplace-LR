@@ -187,6 +187,41 @@ class ReservaIntegracionTest {
     }
 
     @Test
+    @DisplayName("Sin ningún periodo disponible, la reserva se rechaza con 409 y motivo FUERA_DE_PERIODO")
+    void sinPeriodoDisponibleSeRechaza() throws Exception {
+        Long id = publicacionSinPeriodo("ACTIVA");
+
+        reservar(iniciarSesion("ana@correo.com"), id, LLEGADA, SALIDA, "[]")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.motivo").value("FUERA_DE_PERIODO"));
+        assertThat(reservasGuardadas(id)).isZero();
+    }
+
+    @Test
+    @DisplayName("Una estancia que cruza dos periodos contiguos no cabe en UNO solo y se rechaza")
+    void estanciaQueCruzaDosPeriodosSeRechaza() throws Exception {
+        Long id = publicacionSinPeriodo("ACTIVA");
+        periodo(id, LLEGADA.minusDays(2), LLEGADA.plusDays(2));
+        periodo(id, LLEGADA.plusDays(2), LLEGADA.plusDays(10));
+
+        reservar(iniciarSesion("ana@correo.com"), id, LLEGADA, SALIDA, "[]")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.motivo").value("FUERA_DE_PERIODO"));
+        assertThat(reservasGuardadas(id)).isZero();
+    }
+
+    @Test
+    @DisplayName("Una llegada anterior a hoy responde 400 y no reserva")
+    void llegadaPasadaSeRechaza() throws Exception {
+        Long id = publicacion("ACTIVA");
+
+        reservar(iniciarSesion("ana@correo.com"), id, LocalDate.now().minusDays(3), LocalDate.now().plusDays(1), "[]")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("La fecha de llegada no puede ser anterior a hoy."));
+        assertThat(reservasGuardadas(id)).isZero();
+    }
+
+    @Test
     @DisplayName("Sin fechas ni publicación, responde 400 con el error de cada campo")
     void rechazaCamposFaltantes() throws Exception {
         mvc.perform(post("/api/v1/reservas")
@@ -223,9 +258,21 @@ class ReservaIntegracionTest {
                 """.formatted(id, llegada, salida, adicionales);
     }
 
+    // Con un periodo disponible que cubre todas las fechas de las pruebas (hoy + 60 días).
+    private Long publicacion(String estado) throws Exception {
+        Long id = publicacionSinPeriodo(estado);
+        periodo(id, LocalDate.now().minusDays(1), LocalDate.now().plusDays(60));
+        return id;
+    }
+
+    private void periodo(Long publicacionId, LocalDate inicio, LocalDate fin) {
+        jdbc.update("INSERT INTO periodo_disponible (publicacion_id, fecha_inicio, fecha_fin) VALUES (?, ?, ?)",
+                publicacionId, inicio, fin);
+    }
+
     // Crea la publicación por la API y fija estado, precio y limpieza directo: ACTIVA solo se
     // alcanza con la aprobación del administrador, que no es lo que se prueba aquí.
-    private Long publicacion(String estado) throws Exception {
+    private Long publicacionSinPeriodo(String estado) throws Exception {
         String respuesta = mvc.perform(post("/api/v1/publicaciones")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + iniciarSesion("luis@correo.com"))
                         .contentType(MediaType.APPLICATION_JSON)
