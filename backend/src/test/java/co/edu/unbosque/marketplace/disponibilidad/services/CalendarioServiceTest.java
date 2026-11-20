@@ -137,7 +137,7 @@ class CalendarioServiceTest {
         assertThatThrownBy(() -> servicio.consultar(PUBLICACION_ID, DUENO_ID, desde, hasta))
                 .isInstanceOf(RangoCalendarioInvalidoException.class)
                 .hasMessage("El calendario no puede abarcar más de 366 días.");
-        verify(reservas, never()).confirmadasEntre(PUBLICACION_ID, fecha("2026-01-01"), fecha("2027-01-03"));
+        verify(reservas, never()).ocupantesEntre(PUBLICACION_ID, fecha("2026-01-01"), fecha("2027-01-03"));
     }
 
     @Test
@@ -159,7 +159,7 @@ class CalendarioServiceTest {
 
         verify(periodos).findByPublicacionIdAndFechaInicioLessThanAndFechaFinGreaterThan(PUBLICACION_ID,
                 fecha("2026-12-10"), fecha("2026-12-01"));
-        verify(reservas).confirmadasEntre(PUBLICACION_ID, fecha("2026-12-01"), fecha("2026-12-10"));
+        verify(reservas).ocupantesEntre(PUBLICACION_ID, fecha("2026-12-01"), fecha("2026-12-10"));
     }
 
     @Test
@@ -192,7 +192,7 @@ class CalendarioServiceTest {
     void duenoVeSuPublicacionNoActivaConReservaId() {
         when(publicaciones.consultarAcceso(PUBLICACION_ID))
                 .thenReturn(Optional.of(new AccesoPublicacion(DUENO_ID, false)));
-        when(reservas.confirmadasEntre(PUBLICACION_ID, fecha("2026-12-01"), fecha("2026-12-10")))
+        when(reservas.ocupantesEntre(PUBLICACION_ID, fecha("2026-12-01"), fecha("2026-12-10")))
                 .thenReturn(List.of(new ReservaOcupada(77L, fecha("2026-12-03"), fecha("2026-12-06"))));
 
         Calendario calendario = servicio.consultar(PUBLICACION_ID, DUENO_ID, fecha("2026-12-01"),
@@ -205,7 +205,7 @@ class CalendarioServiceTest {
     @Test
     @DisplayName("Un huésped o un anfitrión que no es el dueño ve la publicación ACTIVA sin ids de reserva")
     void quienNoEsDuenoNoVeReservaId() {
-        when(reservas.confirmadasEntre(PUBLICACION_ID, fecha("2026-12-01"), fecha("2026-12-10")))
+        when(reservas.ocupantesEntre(PUBLICACION_ID, fecha("2026-12-01"), fecha("2026-12-10")))
                 .thenReturn(List.of(new ReservaOcupada(77L, fecha("2026-12-03"), fecha("2026-12-06"))));
 
         Calendario calendario = servicio.consultar(PUBLICACION_ID, HUESPED_ID, fecha("2026-12-01"),
@@ -234,7 +234,7 @@ class CalendarioServiceTest {
                 fecha("2026-12-10"), fecha("2026-12-01")))
                 .thenReturn(List.of(PeriodoDisponible.nuevo(PUBLICACION_ID, fecha("2026-12-01"),
                         fecha("2026-12-05"))));
-        when(reservas.confirmadasEntre(PUBLICACION_ID, fecha("2026-12-01"), fecha("2026-12-10")))
+        when(reservas.ocupantesEntre(PUBLICACION_ID, fecha("2026-12-01"), fecha("2026-12-10")))
                 .thenReturn(List.of(new ReservaOcupada(77L, fecha("2026-12-04"), fecha("2026-12-07"))));
 
         Calendario calendario = servicio.consultar(PUBLICACION_ID, DUENO_ID, fecha("2026-12-01"),
@@ -262,7 +262,7 @@ class CalendarioServiceTest {
     @DisplayName("Sin periodos tienePeriodos es false y solo una reserva libera un día del bloqueo")
     void sinPeriodosTodoBloqueadoSalvoReservas() {
         when(periodos.existsByPublicacionId(PUBLICACION_ID)).thenReturn(false);
-        when(reservas.confirmadasEntre(PUBLICACION_ID, fecha("2026-12-01"), fecha("2026-12-04")))
+        when(reservas.ocupantesEntre(PUBLICACION_ID, fecha("2026-12-01"), fecha("2026-12-04")))
                 .thenReturn(List.of(new ReservaOcupada(80L, fecha("2026-12-02"), fecha("2026-12-03"))));
 
         Calendario calendario = servicio.consultar(PUBLICACION_ID, DUENO_ID, fecha("2026-12-01"),

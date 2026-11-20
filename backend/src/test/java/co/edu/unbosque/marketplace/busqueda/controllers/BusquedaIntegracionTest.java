@@ -1,24 +1,32 @@
 package co.edu.unbosque.marketplace.busqueda.controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import co.edu.unbosque.marketplace.alojamientos.repository.PublicacionRepository;
+import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasCalendario;
+import co.edu.unbosque.marketplace.compartido.consultas.ReservaOcupada;
 import co.edu.unbosque.marketplace.identidad.model.Rol;
 import co.edu.unbosque.marketplace.identidad.model.Usuario;
 import co.edu.unbosque.marketplace.identidad.repository.UsuarioRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Answers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -47,6 +55,8 @@ class BusquedaIntegracionTest {
     private PasswordEncoder codificador;
     @Autowired
     private ObjectMapper json;
+    @MockBean(answer = Answers.CALLS_REAL_METHODS)
+    private ConsultaReservasCalendario reservas;
 
     @BeforeEach
     void preparar() {
@@ -78,6 +88,27 @@ class BusquedaIntegracionTest {
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(cubierta.intValue()))
                 .andExpect(jsonPath("$[0].ciudad").value("Santa Marta"));
+    }
+
+    // CALLS_REAL_METHODS deja vivo el método por lote default del puerto y solo se stubea ocupantesEntre.
+    @Test
+    @DisplayName("Una publicación cubierta por un periodo pero con una reserva que ocupa la estancia no aparece")
+    void excluyeLaCubiertaConUnaReservaOcupante() throws Exception {
+        String anfitrion = iniciarSesion("luis@correo.com");
+        Long ocupada = publicacion(anfitrion, "Santa Marta", "ACTIVA", LLEGADA.minusDays(2), SALIDA.plusDays(2));
+        Long libre = publicacion(anfitrion, "Santa Marta", "ACTIVA", LLEGADA.minusDays(2), SALIDA.plusDays(2));
+        Long adyacente = publicacion(anfitrion, "Santa Marta", "ACTIVA", LLEGADA.minusDays(2), SALIDA.plusDays(2));
+        doReturn(List.of(new ReservaOcupada(77L, LLEGADA.plusDays(1), SALIDA.minusDays(1))))
+                .when(reservas).ocupantesEntre(eq(ocupada), any(), any());
+        doReturn(List.of(new ReservaOcupada(78L, LLEGADA.minusDays(2), LLEGADA)))
+                .when(reservas).ocupantesEntre(eq(adyacente), any(), any());
+
+        buscar(iniciarSesion("ana@correo.com"), "Santa Marta", LLEGADA, SALIDA)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[?(@.id == %d)]", ocupada).isEmpty())
+                .andExpect(jsonPath("$[?(@.id == %d)]", libre).isNotEmpty())
+                .andExpect(jsonPath("$[?(@.id == %d)]", adyacente).isNotEmpty());
     }
 
     @Test
