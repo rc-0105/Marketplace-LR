@@ -19,6 +19,7 @@ import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
 import co.edu.unbosque.marketplace.cotizacion.exceptions.CotizacionInvalidaException;
 import co.edu.unbosque.marketplace.cotizacion.services.Cotizacion;
 import co.edu.unbosque.marketplace.cotizacion.services.CotizacionService;
+import co.edu.unbosque.marketplace.reservas.exceptions.FechasReservaInvalidasException;
 import co.edu.unbosque.marketplace.reservas.exceptions.ModoReservaNoSoportadoException;
 import co.edu.unbosque.marketplace.reservas.exceptions.ReservaSuperpuestaException;
 import co.edu.unbosque.marketplace.reservas.model.EstadoReserva;
@@ -26,7 +27,10 @@ import co.edu.unbosque.marketplace.reservas.model.Reserva;
 import co.edu.unbosque.marketplace.reservas.repository.ReservaRepository;
 import java.math.BigDecimal;
 import java.sql.SQLException;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -51,7 +55,10 @@ class ReservaServiceTest {
     private final CotizacionService cotizaciones = mock(CotizacionService.class);
     private final PublicacionService publicaciones = mock(PublicacionService.class);
     private final PublicadorEventos publicador = mock(PublicadorEventos.class);
-    private final ReservaService servicio = new ReservaService(reservas, cotizaciones, publicaciones, publicador);
+    // Hoy en Bogotá es 2026-12-01: la llegada del 10 es futura.
+    private final Clock reloj = Clock.fixed(Instant.parse("2026-12-01T15:00:00Z"), ZoneOffset.UTC);
+    private final ReservaService servicio = new ReservaService(reservas, cotizaciones, publicaciones, publicador,
+            reloj);
 
     @BeforeEach
     void preparar() {
@@ -99,17 +106,17 @@ class ReservaServiceTest {
 
         assertThatThrownBy(() -> servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of()))
                 .isInstanceOf(CotizacionInvalidaException.class);
-        verify(publicaciones, never()).esModoInmediato(any());
         verify(reservas, never()).saveAndFlush(any());
     }
 
     @Test
-    @DisplayName("Si la publicación exige aprobación, rechaza la reserva sin guardar nada")
+    @DisplayName("Si la publicación exige aprobación, rechaza la reserva sin cotizar ni guardar nada")
     void modoAprobacionRechazaLaReserva() {
         when(publicaciones.esModoInmediato(PUBLICACION_ID)).thenReturn(false);
 
         assertThatThrownBy(() -> servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of()))
                 .isInstanceOf(ModoReservaNoSoportadoException.class);
+        verify(cotizaciones, never()).cotizar(any(), any(), any(), any());
         verify(reservas, never()).saveAndFlush(any());
         verify(publicador, never()).publicar(any());
     }
@@ -148,6 +155,30 @@ class ReservaServiceTest {
 
         assertThatThrownBy(() -> servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of()))
                 .isSameAs(otra);
+    }
+
+    @Test
+    @DisplayName("No se reserva con llegada anterior a hoy (día de Bogotá): responde 400 sin tocar nada")
+    void rechazaUnaLlegadaPasada() {
+        LocalDate ayer = LocalDate.of(2026, 11, 30);
+
+        assertThatThrownBy(() -> servicio.crear(PUBLICACION_ID, HUESPED_ID, ayer, SALIDA, Set.of()))
+                .isInstanceOf(FechasReservaInvalidasException.class)
+                .hasMessage("La fecha de llegada no puede ser anterior a hoy.");
+        verify(cotizaciones, never()).cotizar(any(), any(), any(), any());
+        verify(reservas, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("Llegar hoy es válido, y 'hoy' se mide en Bogotá y no en UTC")
+    void llegarHoyEsValidoSegunLaZonaDeBogota() {
+        // 2026-12-02T03:00Z es todavía 2026-12-01 en Bogotá (UTC-5).
+        Clock madrugadaUtc = Clock.fixed(Instant.parse("2026-12-02T03:00:00Z"), ZoneOffset.UTC);
+        ReservaService enMadrugada = new ReservaService(reservas, cotizaciones, publicaciones, publicador, madrugadaUtc);
+        LocalDate hoy = LocalDate.of(2026, 12, 1);
+        when(cotizaciones.cotizar(eq(PUBLICACION_ID), eq(hoy), eq(SALIDA), anySet())).thenReturn(cotizacion());
+
+        assertThat(enMadrugada.crear(PUBLICACION_ID, HUESPED_ID, hoy, SALIDA, Set.of()).getLlegada()).isEqualTo(hoy);
     }
 
     private static Cotizacion cotizacion() {

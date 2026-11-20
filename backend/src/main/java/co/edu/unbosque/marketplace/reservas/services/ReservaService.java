@@ -8,13 +8,16 @@ import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
 import co.edu.unbosque.marketplace.compartido.infraestructura.RestriccionesPostgres;
 import co.edu.unbosque.marketplace.cotizacion.services.Cotizacion;
 import co.edu.unbosque.marketplace.cotizacion.services.CotizacionService;
+import co.edu.unbosque.marketplace.reservas.exceptions.FechasReservaInvalidasException;
 import co.edu.unbosque.marketplace.reservas.exceptions.ModoReservaNoSoportadoException;
 import co.edu.unbosque.marketplace.reservas.exceptions.ReservaSuperpuestaException;
 import co.edu.unbosque.marketplace.reservas.model.EstadoReserva;
 import co.edu.unbosque.marketplace.reservas.model.Reserva;
 import co.edu.unbosque.marketplace.reservas.repository.ReservaRepository;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -31,19 +34,23 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReservaService {
 
     private static final String ENTIDAD = "Reserva";
+    // "Hoy" es el día en Colombia, donde están los alojamientos, no el del servidor.
+    private static final ZoneId ZONA = ZoneId.of("America/Bogota");
     private static final String RESTRICCION_SIN_CRUCE = "reserva_sin_cruce";
 
     private final ReservaRepository reservas;
     private final CotizacionService cotizaciones;
     private final PublicacionService publicaciones;
     private final PublicadorEventos publicador;
+    private final Clock reloj;
 
     public ReservaService(ReservaRepository reservas, CotizacionService cotizaciones,
-            PublicacionService publicaciones, PublicadorEventos publicador) {
+            PublicacionService publicaciones, PublicadorEventos publicador, Clock reloj) {
         this.reservas = reservas;
         this.cotizaciones = cotizaciones;
         this.publicaciones = publicaciones;
         this.publicador = publicador;
+        this.reloj = reloj;
     }
 
     /**
@@ -57,16 +64,20 @@ public class ReservaService {
     @Transactional
     public Reserva crear(Long publicacionId, Long huespedId, LocalDate llegada, LocalDate salida,
             Set<Long> adicionalesElegidos) {
+        if (llegada.isBefore(LocalDate.now(reloj.withZone(ZONA)))) {
+            throw new FechasReservaInvalidasException("La fecha de llegada no puede ser anterior a hoy.");
+        }
         Optional<Reserva> existente = reservas.findFirstByHuespedIdAndPublicacionIdAndLlegadaAndSalidaAndEstadoNot(
                 huespedId, publicacionId, llegada, salida, EstadoReserva.CANCELADA);
         if (existente.isPresent()) {
             return existente.get();
         }
 
-        Cotizacion cotizacion = cotizaciones.cotizar(publicacionId, llegada, salida, adicionalesElegidos);
+        // El modo se mira antes de cotizar: una publicación que exige aprobación no necesita el cálculo.
         if (!publicaciones.esModoInmediato(publicacionId)) {
             throw new ModoReservaNoSoportadoException();
         }
+        Cotizacion cotizacion = cotizaciones.cotizar(publicacionId, llegada, salida, adicionalesElegidos);
 
         Reserva reserva = Reserva.nueva(publicacionId, huespedId, llegada, salida, (int) cotizacion.noches(),
                 cotizacion.precioBase(), cotizacion.tarifaLimpieza(), cotizacion.tarifaServicio(),
