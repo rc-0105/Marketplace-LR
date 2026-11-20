@@ -1,0 +1,75 @@
+import { useState } from 'react';
+import PropTypes from 'prop-types';
+import { pagarReserva } from '../services/reservaService.js';
+import estilos from './PagoReserva.module.css';
+
+const MENSAJE_ERROR = 'No pudimos procesar el pago. Intenta de nuevo.';
+const FORMATO_PESOS = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+
+// Tarjetas de prueba de Stripe: ninguna hace un cobro real (SOF-34).
+const TARJETAS = [
+  { valor: 'pm_card_visa', etiqueta: 'Visa de prueba (aprobada)' },
+  { valor: 'pm_card_mastercard', etiqueta: 'Mastercard de prueba (aprobada)' },
+  { valor: 'pm_card_chargeDeclined', etiqueta: 'Tarjeta de prueba rechazada' },
+  { valor: 'pm_card_chargeDeclinedInsufficientFunds', etiqueta: 'Tarjeta de prueba sin fondos' },
+];
+
+/**
+ * Pago de una reserva PENDIENTE con la pasarela en modo prueba (SOF-34). Aprobado o rechazado, el
+ * resultado es definitivo y el botón desaparece; si la pasarela no respondió o falló (5xx), la reserva
+ * sigue apartada y se puede reintentar.
+ */
+export default function PagoReserva({ reservaId, total }) {
+  const [tarjeta, setTarjeta] = useState(TARJETAS[0].valor);
+  const [pagando, setPagando] = useState(false);
+  const [aprobada, setAprobada] = useState(null);
+  const [error, setError] = useState(null);
+  const [terminado, setTerminado] = useState(false);
+
+  async function pagar() {
+    setError(null);
+    setPagando(true);
+    try {
+      setAprobada(await pagarReserva(reservaId, tarjeta));
+      setTerminado(true);
+    } catch (falla) {
+      const conMensaje = falla.estado >= 400 && falla.estado !== 500;
+      setError(conMensaje ? falla.message : MENSAJE_ERROR);
+      // 402 (rechazado) y 409 (ya no se puede pagar) no se arreglan reintentando.
+      setTerminado(falla.estado === 402 || falla.estado === 409);
+    } finally {
+      setPagando(false);
+    }
+  }
+
+  return (
+    <section className={estilos.pago} aria-label="Pago de la reserva">
+      {!terminado && (
+        <div className={estilos.formulario}>
+          <label className={estilos.campo}>
+            Tarjeta de prueba
+            <select value={tarjeta} onChange={(evento) => setTarjeta(evento.target.value)} disabled={pagando}>
+              {TARJETAS.map((opcion) => (
+                <option key={opcion.valor} value={opcion.valor}>{opcion.etiqueta}</option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className={estilos.pagar} onClick={pagar} disabled={pagando}>
+            {pagando ? 'Procesando pago…' : `Pagar ${FORMATO_PESOS.format(total)}`}
+          </button>
+        </div>
+      )}
+      {aprobada && (
+        <output className={estilos.exito}>
+          Pago aprobado: tu reserva está confirmada. Transacción {aprobada.transaccionId}.
+        </output>
+      )}
+      {error && <p role="alert" className={estilos.error}>{error}</p>}
+    </section>
+  );
+}
+
+PagoReserva.propTypes = {
+  reservaId: PropTypes.number.isRequired,
+  total: PropTypes.number.isRequired,
+};

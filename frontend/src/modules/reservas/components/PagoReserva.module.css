@@ -1,0 +1,65 @@
+.pago {
+  display: grid;
+  gap: var(--espacio-3);
+  margin-top: var(--espacio-4);
+}
+
+.formulario {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--espacio-3);
+}
+
+.campo {
+  display: grid;
+  gap: var(--espacio-2);
+  flex: 1 1 14rem;
+}
+
+.campo select {
+  min-height: 2.75rem;
+  padding: 0 var(--espacio-3);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  background: var(--color-superficie);
+  color: inherit;
+  font: inherit;
+}
+
+.pagar {
+  min-height: 2.75rem;
+  padding: 0 var(--espacio-4);
+  border: 0;
+  border-radius: var(--radio);
+  background: var(--color-terracota);
+  color: var(--color-sobre-terracota);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transicion);
+}
+
+.pagar:hover:not(:disabled) {
+  background: var(--color-terracota-oscuro);
+}
+
+.pagar:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.exito {
+  display: block;
+  padding: var(--espacio-3) var(--espacio-4);
+  border-radius: var(--radio);
+  background: var(--color-exito-fondo);
+  color: var(--color-exito);
+}
+
+.error {
+  margin: 0;
+  padding: var(--espacio-3) var(--espacio-4);
+  border-radius: var(--radio);
+  background: var(--color-error-fondo);
+  color: var(--color-error);
+}
