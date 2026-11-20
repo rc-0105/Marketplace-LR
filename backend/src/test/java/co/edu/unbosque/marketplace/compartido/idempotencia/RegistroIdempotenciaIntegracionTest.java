@@ -236,4 +236,96 @@ class RegistroIdempotenciaIntegracionTest {
 
         assertThat(contar(clave)).isEqualTo(1L);
     }
+
+    @Test
+    @DisplayName("Buscar una clave inexistente devuelve vacío")
+    void buscarInexistente() {
+        assertThat(registro.buscar(2L, UUID.randomUUID())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Buscar devuelve el estado, la huella y el vencimiento de una fila EN_PROCESO")
+    void buscarEnProceso() {
+        UUID clave = UUID.randomUUID();
+        registro.reclamar(2L, clave, HUELLA, AHORA, LEASE);
+
+        RegistroClave encontrado = registro.buscar(2L, clave).orElseThrow();
+
+        assertThat(encontrado.estado()).isEqualTo(RegistroClave.Estado.EN_PROCESO);
+        assertThat(encontrado.huella()).isEqualTo(HUELLA);
+        assertThat(encontrado.codigoEstado()).isNull();
+        assertThat(encontrado.cuerpo()).isNull();
+        assertThat(encontrado.creadaEn()).isEqualTo(AHORA);
+        assertThat(encontrado.venceEn()).isEqualTo(AHORA.plus(LEASE));
+    }
+
+    @Test
+    @DisplayName("Buscar no ve las claves de otro usuario")
+    void buscarEsPorUsuario() {
+        UUID clave = UUID.randomUUID();
+        registro.reclamar(2L, clave, HUELLA, AHORA, LEASE);
+
+        assertThat(registro.buscar(4L, clave)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Completar con el reclamo propio guarda código y cuerpo, y vence a creada_en más la vigencia")
+    void completarConReclamoPropio() {
+        UUID clave = UUID.randomUUID();
+        UUID reclamo = registro.reclamar(2L, clave, HUELLA, AHORA, LEASE).orElseThrow();
+
+        boolean completada = registro.completar(2L, clave, reclamo, 201, "{\"id\": 7}", Duration.ofHours(24));
+
+        assertThat(completada).isTrue();
+        RegistroClave encontrado = registro.buscar(2L, clave).orElseThrow();
+        assertThat(encontrado.estado()).isEqualTo(RegistroClave.Estado.COMPLETADA);
+        assertThat(encontrado.codigoEstado()).isEqualTo(201);
+        assertThat(encontrado.cuerpo()).isEqualTo("{\"id\": 7}");
+        assertThat(encontrado.venceEn()).isEqualTo(AHORA.plus(Duration.ofHours(24)));
+    }
+
+    @Test
+    @DisplayName("Completar con un reclamo ajeno devuelve false y no modifica la fila")
+    void completarConReclamoAjeno() {
+        UUID clave = UUID.randomUUID();
+        registro.reclamar(2L, clave, HUELLA, AHORA, LEASE);
+        Map<String, Object> antes = fila(2L, clave);
+
+        boolean completada = registro.completar(2L, clave, UUID.randomUUID(), 201, "{}", Duration.ofHours(24));
+
+        assertThat(completada).isFalse();
+        assertThat(fila(2L, clave)).isEqualTo(antes);
+    }
+
+    @Test
+    @DisplayName("El cuerpo se guarda y se lee idéntico: espacios y orden de claves intactos")
+    void cuerpoIdenticoByteAByte() {
+        UUID clave = UUID.randomUUID();
+        UUID reclamo = registro.reclamar(2L, clave, HUELLA, AHORA, LEASE).orElseThrow();
+        String cuerpo = "{ \"zeta\": 1,  \"alfa\" :[3, 1,2],\n \"ñandú\":\"árbol\" }";
+
+        registro.completar(2L, clave, reclamo, 201, cuerpo, Duration.ofHours(24));
+
+        assertThat(registro.buscar(2L, clave).orElseThrow().cuerpo()).isEqualTo(cuerpo);
+    }
+
+    @Test
+    @DisplayName("Liberar con el reclamo propio elimina la fila")
+    void liberarConReclamoPropio() {
+        UUID clave = UUID.randomUUID();
+        UUID reclamo = registro.reclamar(2L, clave, HUELLA, AHORA, LEASE).orElseThrow();
+
+        assertThat(registro.liberar(2L, clave, reclamo)).isTrue();
+        assertThat(contar(clave)).isZero();
+    }
+
+    @Test
+    @DisplayName("Liberar con un reclamo ajeno no elimina la fila")
+    void liberarConReclamoAjeno() {
+        UUID clave = UUID.randomUUID();
+        registro.reclamar(2L, clave, HUELLA, AHORA, LEASE);
+
+        assertThat(registro.liberar(2L, clave, UUID.randomUUID())).isFalse();
+        assertThat(contar(clave)).isEqualTo(1L);
+    }
 }
