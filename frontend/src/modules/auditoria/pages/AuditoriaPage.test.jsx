@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi } from '../../../shared/services/http.js';
@@ -17,9 +17,9 @@ function pagina(contenido, extra = {}) {
   return { contenido, pagina: 0, tamano: 50, totalElementos: contenido.length, totalPaginas: contenido.length ? 1 : 0, ...extra };
 }
 
-function renderizar() {
+function renderizar(ruta = '/') {
   render(
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={[ruta]}>
       <AuditoriaPage />
     </MemoryRouter>,
   );
@@ -81,4 +81,92 @@ describe('AuditoriaPage', () => {
       expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos cargar los eventos de auditoría. Intenta de nuevo.');
     },
   );
+
+  it('al aplicar usuario y evento consulta con esos filtros y vuelve a la página 0', async () => {
+    vi.mocked(listar).mockResolvedValue(pagina([EVENTO]));
+    renderizar('/?pagina=2');
+    await screen.findByRole('table');
+    expect(listar).toHaveBeenLastCalledWith({}, 2, 50);
+
+    fireEvent.change(screen.getByLabelText('Usuario'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('Evento'), { target: { value: 'RESERVA' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar filtros' }));
+
+    await screen.findByRole('table');
+    expect(listar).toHaveBeenLastCalledWith({ usuario: '2', evento: 'RESERVA' }, 0, 50);
+  });
+
+  it('lee los filtros y la página de la dirección', async () => {
+    vi.mocked(listar).mockResolvedValue(pagina([EVENTO], { pagina: 1, totalPaginas: 3 }));
+
+    renderizar('/?entidad=Reserva&entidadId=55&desde=2026-11-01&hasta=2026-11-30&pagina=1&otro=x');
+
+    await screen.findByRole('table');
+    expect(listar).toHaveBeenCalledWith(
+      { entidad: 'Reserva', entidadId: '55', desde: '2026-11-01', hasta: '2026-11-30' }, 1, 50);
+    expect(screen.getByLabelText('Id de la entidad')).toHaveValue('55');
+  });
+
+  it.each(['abc', '-3', '1.5'])('una página inválida (%s) en la dirección se trata como la 0', async (invalida) => {
+    vi.mocked(listar).mockResolvedValue(pagina([EVENTO]));
+
+    renderizar(`/?pagina=${invalida}`);
+
+    await screen.findByRole('table');
+    expect(listar).toHaveBeenCalledWith({}, 0, 50);
+  });
+
+  it('con fechas incoherentes no llama a la API', async () => {
+    vi.mocked(listar).mockResolvedValue(pagina([EVENTO]));
+    renderizar();
+    await screen.findByRole('table');
+    vi.mocked(listar).mockClear();
+
+    fireEvent.change(screen.getByLabelText('Desde'), { target: { value: '2026-11-20' } });
+    fireEvent.change(screen.getByLabelText('Hasta'), { target: { value: '2026-11-10' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar filtros' }));
+
+    expect(screen.getByText('La fecha inicial no puede ser posterior a la final.')).toBeInTheDocument();
+    expect(listar).not.toHaveBeenCalled();
+  });
+
+  describe('paginación', () => {
+    function navegacion() {
+      return screen.getByRole('navigation', { name: 'Paginación' });
+    }
+
+    it('en la página 0 de 3 deshabilita "Anterior" y "Siguiente" pide la página 1', async () => {
+      vi.mocked(listar).mockResolvedValue(pagina([EVENTO], { totalPaginas: 3 }));
+      renderizar();
+      await screen.findByRole('table');
+
+      expect(within(navegacion()).getByText('Página 1 de 3')).toBeInTheDocument();
+      expect(within(navegacion()).getByRole('button', { name: 'Anterior' })).toBeDisabled();
+      fireEvent.click(within(navegacion()).getByRole('button', { name: 'Siguiente' }));
+
+      await screen.findByRole('table');
+      expect(listar).toHaveBeenLastCalledWith({}, 1, 50);
+    });
+
+    it('en la última página deshabilita "Siguiente" y "Anterior" conserva los filtros', async () => {
+      vi.mocked(listar).mockResolvedValue(pagina([EVENTO], { pagina: 2, totalPaginas: 3 }));
+      renderizar('/?usuario=2&pagina=2');
+      await screen.findByRole('table');
+
+      expect(within(navegacion()).getByRole('button', { name: 'Siguiente' })).toBeDisabled();
+      fireEvent.click(within(navegacion()).getByRole('button', { name: 'Anterior' }));
+
+      await screen.findByRole('table');
+      expect(listar).toHaveBeenLastCalledWith({ usuario: '2' }, 1, 50);
+    });
+
+    it('con la lista vacía ambos controles quedan deshabilitados', async () => {
+      vi.mocked(listar).mockResolvedValue(pagina([]));
+      renderizar();
+      await screen.findByText(/^Sin resultados/);
+
+      expect(within(navegacion()).getByRole('button', { name: 'Anterior' })).toBeDisabled();
+      expect(within(navegacion()).getByRole('button', { name: 'Siguiente' })).toBeDisabled();
+    });
+  });
 });

@@ -1,13 +1,30 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import FiltrosAuditoria from '../components/FiltrosAuditoria.jsx';
 import { formatearFechaBogota } from '../models/eventoAuditoria.js';
 import { listar } from '../services/auditoriaService.js';
 import estilos from './AuditoriaPage.module.css';
 
 const MENSAJE_ERROR = 'No pudimos cargar los eventos de auditoría. Intenta de nuevo.';
+const NOMBRES_FILTRO = ['usuario', 'evento', 'entidad', 'entidadId', 'desde', 'hasta'];
 const NOMBRE_RESULTADO = { EXITO: 'Éxito', FALLO: 'Fallo' };
+
+function filtrosDe(parametros) {
+  return Object.fromEntries(NOMBRES_FILTRO.filter((nombre) => parametros.get(nombre)).map((nombre) => [nombre, parametros.get(nombre)]));
+}
+
+function paginaDe(parametros) {
+  const numero = Number(parametros.get('pagina'));
+  return Number.isInteger(numero) && numero > 0 ? numero : 0;
+}
 
 /** Consulta de solo lectura del registro de auditoría para el administrador (RF-59). */
 export default function AuditoriaPage() {
+  // Filtros y página viven en la dirección: se puede compartir y el detalle vuelve con la misma búsqueda.
+  const [parametros, setParametros] = useSearchParams();
+  const filtros = filtrosDe(parametros);
+  const clave = parametros.toString();
+  const pagina = paginaDe(parametros);
   const [resultado, setResultado] = useState(null);
   const [error, setError] = useState(null);
 
@@ -16,15 +33,17 @@ export default function AuditoriaPage() {
 
   const cargar = useCallback(async () => {
     const numero = ++ultimaCarga.current;
+    const consulta = new URLSearchParams(clave);
     setError(null);
+    setResultado(null);
     try {
-      const datos = await listar({}, 0, 50);
+      const datos = await listar(filtrosDe(consulta), paginaDe(consulta), 50);
       if (numero === ultimaCarga.current) setResultado(datos);
     } catch (fallo) {
       // Solo un 400 trae un mensaje pensado para el administrador; el resto va con el genérico.
       if (numero === ultimaCarga.current) setError(fallo.estado === 400 ? fallo.message : MENSAJE_ERROR);
     }
-  }, []);
+  }, [clave]);
 
   useEffect(() => {
     cargar();
@@ -34,11 +53,21 @@ export default function AuditoriaPage() {
   }, [cargar]);
 
   const eventos = resultado?.contenido ?? [];
+  const totalPaginas = resultado?.totalPaginas ?? 0;
+
+  function aplicar(nuevos) {
+    setParametros(new URLSearchParams(nuevos));
+  }
+
+  function irAPagina(destino) {
+    setParametros(new URLSearchParams({ ...filtros, ...(destino > 0 && { pagina: destino }) }));
+  }
 
   return (
     <main className={estilos.pagina}>
       <h1 className={estilos.titulo}>Auditoría</h1>
       <p className={estilos.nota}>Eventos críticos registrados en la plataforma, del más reciente al más antiguo.</p>
+      <FiltrosAuditoria key={JSON.stringify(filtros)} valores={filtros} alAplicar={aplicar} />
       {error && <p role="alert" className={estilos.error}>{error}</p>}
       {!error && resultado === null && <output className={estilos.nota}>Cargando eventos…</output>}
       {!error && resultado !== null && eventos.length === 0 && (
@@ -73,6 +102,17 @@ export default function AuditoriaPage() {
           </table>
         </div>
       )}
+      <nav className={estilos.paginacion} aria-label="Paginación">
+        <button type="button" className={estilos.secundario} disabled={pagina <= 0 || !!error}
+          onClick={() => irAPagina(pagina - 1)}>
+          Anterior
+        </button>
+        <span>{totalPaginas > 0 ? `Página ${pagina + 1} de ${totalPaginas}` : 'Sin páginas'}</span>
+        <button type="button" className={estilos.secundario} disabled={pagina + 1 >= totalPaginas || !!error}
+          onClick={() => irAPagina(pagina + 1)}>
+          Siguiente
+        </button>
+      </nav>
     </main>
   );
 }
