@@ -33,8 +33,8 @@ import org.springframework.stereotype.Service;
  *
  * <p>Aprobado: CONFIRMADA con la transacción. Rechazado: CANCELADA, lo que libera las noches. Sin respuesta o
  * falla de la pasarela: sigue PENDIENTE con el pago en ERROR, que es un estado conocido (vence con su
- * apartado como cualquier otra), y se puede reintentar; la clave de idempotencia por reserva y método evita
- * cobrar dos veces si el primer intento sí llegó a cobrarse.
+ * apartado como cualquier otra), y se puede reintentar; la clave de idempotencia por reserva evita cobrar dos
+ * veces si el primer intento sí llegó a cobrarse.
  */
 @Service
 public class PagoReservaService {
@@ -71,8 +71,10 @@ public class PagoReservaService {
             throw new ReservaNoPagableException("Esta reserva ya no se puede pagar: su apartado venció o fue cancelada.");
         }
 
-        SolicitudCobro solicitud = new SolicitudCobro(reservaId, reserva.getTotal(), metodoPago,
-                "reserva-" + reservaId + "-" + metodoPago);
+        // Una sola clave por reserva: si un cobro se completó en la pasarela después de agotarse la espera, el
+        // reintento recibe ese mismo cobro y no abre otro. Con otra tarjeta la pasarela rechaza la clave en vez
+        // de cobrar dos veces, por eso la pantalla deja fija la tarjeta tras un 504 o un 502.
+        SolicitudCobro solicitud = new SolicitudCobro(reservaId, reserva.getTotal(), metodoPago, "reserva-" + reservaId);
         ResultadoCobro resultado;
         try {
             resultado = pasarela.cobrar(solicitud);
@@ -122,7 +124,13 @@ public class PagoReservaService {
     }
 
     private Reserva rechazar(Long reservaId, Long huespedId, String motivo) {
-        registro.rechazarPago(reservaId);
+        if (!registro.rechazarPago(reservaId)) {
+            // Otro intento ya la resolvió mientras este se rechazaba: no se informa que las fechas quedaron libres.
+            Reserva actual = reservas.findById(reservaId).orElseThrow(ReservaNoEncontradaException::new);
+            throw new ReservaNoPagableException(actual.getEstado() == EstadoReserva.CONFIRMADA
+                    ? "Esta reserva ya está pagada."
+                    : "Esta reserva ya no se puede pagar: su apartado venció o fue cancelada.");
+        }
         auditar(reservaId, huespedId, ResultadoEvento.FALLO, Map.of("resultado", "rechazado", "motivo", motivo));
         throw new PagoRechazadoException(motivo);
     }

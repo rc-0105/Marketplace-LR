@@ -42,10 +42,10 @@ public class RegistroReservas {
         return reservas.confirmarPago(reservaId, transaccionId) == 1;
     }
 
-    /** Pago rechazado: la PENDIENTE pasa a CANCELADA y libera sus noches. */
+    /** Pago rechazado: la PENDIENTE pasa a CANCELADA y libera sus noches; {@code false} si ya no lo estaba. */
     @Transactional
-    public void rechazarPago(Long reservaId) {
-        reservas.rechazarPago(reservaId);
+    public boolean rechazarPago(Long reservaId) {
+        return reservas.rechazarPago(reservaId) == 1;
     }
 
     /** La pasarela no dio resultado: la reserva sigue PENDIENTE con el pago en ERROR. */

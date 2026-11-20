@@ -60,6 +60,20 @@ describe('PagoReserva', () => {
     expect(screen.getByRole('button', { name: /Pagar/ })).toBeEnabled();
   });
 
+  it('tras un tiempo agotado deja fija la tarjeta: el reintento va con la misma para no abrir otro cobro', async () => {
+    vi.mocked(pagarReserva).mockRejectedValueOnce(new ErrorApi(504, 'La pasarela de pagos no respondió a tiempo.'))
+      .mockResolvedValueOnce({ id: 7, estado: 'CONFIRMADA', estadoPago: 'APROBADO', transaccionId: 'pi_1' });
+    abrir();
+    pagar('pm_card_mastercard');
+    await screen.findByRole('alert');
+
+    expect(screen.getByLabelText('Tarjeta de prueba')).toBeDisabled();
+    pagar();
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Transacción pi_1.');
+    expect(pagarReserva).toHaveBeenNthCalledWith(2, 7, 'pm_card_mastercard');
+  });
+
   it('ante un error inesperado muestra un aviso genérico y deja reintentar', async () => {
     vi.mocked(pagarReserva).mockRejectedValue(new ErrorApi(500, 'Error'));
     abrir();

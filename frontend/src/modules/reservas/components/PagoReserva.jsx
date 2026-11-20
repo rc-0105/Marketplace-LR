@@ -25,6 +25,9 @@ export default function PagoReserva({ reservaId, total }) {
   const [aprobada, setAprobada] = useState(null);
   const [error, setError] = useState(null);
   const [terminado, setTerminado] = useState(false);
+  // Si la pasarela no dio resultado, el cobro pudo completarse igual: el reintento va con la misma tarjeta
+  // para que la pasarela devuelva ese cobro y no abra otro.
+  const [tarjetaFija, setTarjetaFija] = useState(false);
 
   async function pagar() {
     setError(null);
@@ -37,6 +40,7 @@ export default function PagoReserva({ reservaId, total }) {
       setError(conMensaje ? falla.message : MENSAJE_ERROR);
       // 402 (rechazado) y 409 (ya no se puede pagar) no se arreglan reintentando.
       setTerminado(falla.estado === 402 || falla.estado === 409);
+      if (falla.estado === 502 || falla.estado === 504) setTarjetaFija(true);
     } finally {
       setPagando(false);
     }
@@ -48,7 +52,7 @@ export default function PagoReserva({ reservaId, total }) {
         <div className={estilos.formulario}>
           <label className={estilos.campo}>
             Tarjeta de prueba
-            <select value={tarjeta} onChange={(evento) => setTarjeta(evento.target.value)} disabled={pagando}>
+            <select value={tarjeta} onChange={(evento) => setTarjeta(evento.target.value)} disabled={pagando || tarjetaFija}>
               {TARJETAS.map((opcion) => (
                 <option key={opcion.valor} value={opcion.valor}>{opcion.etiqueta}</option>
               ))}

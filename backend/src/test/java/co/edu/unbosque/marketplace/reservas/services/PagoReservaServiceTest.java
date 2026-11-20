@@ -20,6 +20,7 @@ import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
 import co.edu.unbosque.marketplace.reservas.exceptions.ApartadoPerdidoDuranteElPagoException;
 import co.edu.unbosque.marketplace.reservas.exceptions.FalloPasarelaPagoException;
+import co.edu.unbosque.marketplace.reservas.exceptions.ReservaNoPagableException;
 import co.edu.unbosque.marketplace.reservas.model.EstadoPago;
 import co.edu.unbosque.marketplace.reservas.model.EstadoReserva;
 import co.edu.unbosque.marketplace.reservas.model.Reserva;
@@ -126,8 +127,38 @@ class PagoReservaServiceTest {
         ArgumentCaptor<PasarelaPagos.SolicitudCobro> solicitudes = ArgumentCaptor.forClass(PasarelaPagos.SolicitudCobro.class);
         verify(pasarela, times(2)).cobrar(solicitudes.capture());
         assertThat(solicitudes.getAllValues()).extracting(PasarelaPagos.SolicitudCobro::claveIdempotencia)
-                .containsExactly("reserva-42-pm_card_visa", "reserva-42-pm_card_visa");
+                .containsExactly("reserva-42", "reserva-42");
         verify(registro).confirmarPago(RESERVA_ID, "pi_1");
+    }
+
+    @Test
+    @DisplayName("Tras un tiempo agotado, reintentar con otra tarjeta usa la misma clave: la pasarela no abre un segundo cobro")
+    void elReintentoConOtraTarjetaUsaLaMismaClave() {
+        when(pasarela.cobrar(any())).thenThrow(new FallaPasarelaException(true, "Stripe no respondió", null))
+                .thenReturn(new CobroAprobado("pi_1"));
+        when(registro.confirmarPago(RESERVA_ID, "pi_1")).thenReturn(true);
+
+        assertThatThrownBy(() -> servicio.pagar(RESERVA_ID, HUESPED_ID, "pm_card_visa"))
+                .isInstanceOf(FalloPasarelaPagoException.class);
+        servicio.pagar(RESERVA_ID, HUESPED_ID, "pm_card_mastercard");
+
+        ArgumentCaptor<PasarelaPagos.SolicitudCobro> solicitudes = ArgumentCaptor.forClass(PasarelaPagos.SolicitudCobro.class);
+        verify(pasarela, times(2)).cobrar(solicitudes.capture());
+        assertThat(solicitudes.getAllValues()).extracting(PasarelaPagos.SolicitudCobro::claveIdempotencia)
+                .containsOnly("reserva-42");
+    }
+
+    @Test
+    @DisplayName("Un rechazo que llega cuando otro intento ya confirmó responde 409 sin decir que las fechas quedaron libres")
+    void unRechazoTardioNoAnunciaFechasLibres() {
+        when(pasarela.cobrar(any())).thenReturn(new PasarelaPagos.CobroRechazado("card_declined"));
+        when(registro.rechazarPago(RESERVA_ID)).thenReturn(false);
+        when(reservas.findById(RESERVA_ID)).thenReturn(Optional.of(pendiente()),
+                Optional.of(con(EstadoReserva.CONFIRMADA, EstadoPago.APROBADO, "pi_otro")));
+
+        assertThatThrownBy(() -> servicio.pagar(RESERVA_ID, HUESPED_ID, "pm_card_chargeDeclined"))
+                .isInstanceOf(ReservaNoPagableException.class)
+                .hasMessage("Esta reserva ya está pagada.");
     }
 
     @Test
