@@ -73,7 +73,8 @@ class AuditoriaServiceTest {
         FiltroAuditoria filtro = new FiltroAuditoria(null, evento, null, null, null, null);
 
         assertThatThrownBy(() -> servicio.consultar(filtro, 0, 50))
-                .isInstanceOf(FiltroAuditoriaInvalidoException.class);
+                .isInstanceOf(FiltroAuditoriaInvalidoException.class)
+                .hasMessage("El evento no es una acción de auditoría válida.");
 
         assertThat(repositorio.consultas).isZero();
     }

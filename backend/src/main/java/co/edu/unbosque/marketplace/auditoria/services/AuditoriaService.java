@@ -54,8 +54,7 @@ public class AuditoriaService {
         }
         if (filtro.evento() != null && Arrays.stream(AccionCritica.values())
                 .noneMatch(accion -> accion.name().equals(filtro.evento()))) {
-            throw new FiltroAuditoriaInvalidoException("El evento \"" + filtro.evento()
-                    + "\" no es una acción de auditoría válida.");
+            throw new FiltroAuditoriaInvalidoException("El evento no es una acción de auditoría válida.");
         }
     }
 }
