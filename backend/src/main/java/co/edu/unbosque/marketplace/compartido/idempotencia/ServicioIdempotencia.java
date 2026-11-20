@@ -1,6 +1,7 @@
 package co.edu.unbosque.marketplace.compartido.idempotencia;
 
 import co.edu.unbosque.marketplace.compartido.idempotencia.exceptions.ClaveIdempotenciaInvalidaException;
+import co.edu.unbosque.marketplace.compartido.idempotencia.exceptions.ClaveIdempotenciaReutilizadaException;
 import co.edu.unbosque.marketplace.compartido.idempotencia.exceptions.SolicitudEnProcesoException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -83,8 +84,12 @@ public class ServicioIdempotencia {
         return new RespuestaIdempotente(exito.value(), cuerpo, false);
     }
 
+    // La huella distinta se evalúa antes que el estado: es un error del cliente, no una espera (D12).
     private RespuestaIdempotente resolver(RegistroClave existente, String huella) {
-        if (existente.estado() == RegistroClave.Estado.COMPLETADA && existente.huella().equals(huella)) {
+        if (!existente.huella().equals(huella)) {
+            throw new ClaveIdempotenciaReutilizadaException();
+        }
+        if (existente.estado() == RegistroClave.Estado.COMPLETADA) {
             return new RespuestaIdempotente(existente.codigoEstado(), existente.cuerpo(), true);
         }
         throw new SolicitudEnProcesoException(segundosReintento);

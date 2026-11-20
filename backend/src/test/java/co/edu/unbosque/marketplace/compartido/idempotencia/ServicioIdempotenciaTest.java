@@ -14,6 +14,8 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import co.edu.unbosque.marketplace.compartido.idempotencia.exceptions.ClaveIdempotenciaInvalidaException;
+import co.edu.unbosque.marketplace.compartido.idempotencia.exceptions.ClaveIdempotenciaReutilizadaException;
+import co.edu.unbosque.marketplace.compartido.idempotencia.exceptions.SolicitudEnProcesoException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Duration;
@@ -215,5 +217,76 @@ class ServicioIdempotenciaTest {
         assertThat(respuesta.replicada()).isFalse();
         assertThat(respuesta.cuerpo()).isEqualTo("{\"id\":9}");
         verify(registro, times(2)).reclamar(any(), any(), anyString(), any(), any());
+    }
+
+    private RegistroClave enProceso(String huella) {
+        return new RegistroClave(RegistroClave.Estado.EN_PROCESO, huella, null, null, AHORA.minusSeconds(10),
+                AHORA.plusSeconds(110));
+    }
+
+    @Test
+    @DisplayName("Huella distinta sobre una fila COMPLETADA: 422, sin ejecutar ni tocar la fila")
+    void huellaDistintaCompletada() {
+        claveTomada();
+        when(registro.buscar(2L, CLAVE_UUID))
+                .thenReturn(Optional.of(completada("f".repeat(64), AHORA.plus(VIGENCIA))));
+        AtomicInteger ejecuciones = new AtomicInteger();
+
+        assertThatThrownBy(() -> servicio.ejecutar(solicitud(), HttpStatus.CREATED, ejecuciones::incrementAndGet))
+                .isInstanceOf(ClaveIdempotenciaReutilizadaException.class);
+
+        assertThat(ejecuciones).hasValue(0);
+        verify(registro, never()).completar(any(), any(), any(), anyInt(), anyString(), any());
+        verify(registro, never()).liberar(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Huella distinta sobre una fila EN_PROCESO: 422 y no 409 (la huella se evalúa primero)")
+    void huellaDistintaEnProceso() {
+        claveTomada();
+        when(registro.buscar(2L, CLAVE_UUID)).thenReturn(Optional.of(enProceso("f".repeat(64))));
+
+        assertThatThrownBy(() -> servicio.ejecutar(solicitud(), HttpStatus.CREATED, () -> "x"))
+                .isInstanceOf(ClaveIdempotenciaReutilizadaException.class);
+    }
+
+    @Test
+    @DisplayName("Misma huella con la fila EN_PROCESO: 409 con los segundos de reintento, sin ejecutar")
+    void enProceso() {
+        claveTomada();
+        when(registro.buscar(2L, CLAVE_UUID)).thenReturn(Optional.of(enProceso(huellaEsperada())));
+        AtomicInteger ejecuciones = new AtomicInteger();
+
+        assertThatThrownBy(() -> servicio.ejecutar(solicitud(), HttpStatus.CREATED, ejecuciones::incrementAndGet))
+                .isInstanceOfSatisfying(SolicitudEnProcesoException.class,
+                        error -> assertThat(error.getSegundosReintento()).isEqualTo(2));
+        assertThat(ejecuciones).hasValue(0);
+    }
+
+    @Test
+    @DisplayName("Si tras reintentar sigue sin fila ni reclamo, responde 409 en proceso")
+    void dosVueltasSinExito() {
+        claveTomada();
+        when(registro.buscar(2L, CLAVE_UUID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.ejecutar(solicitud(), HttpStatus.CREATED, () -> "x"))
+                .isInstanceOf(SolicitudEnProcesoException.class);
+        verify(registro, times(2)).reclamar(any(), any(), anyString(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Otra clave del mismo usuario y la misma clave de otro usuario se reclaman como primera vez")
+    void alcancePorUsuarioYClave() {
+        when(registro.reclamar(any(), any(), anyString(), any(), any())).thenReturn(Optional.of(reclamo));
+        when(registro.completar(any(), any(), any(), anyInt(), anyString(), any())).thenReturn(true);
+        String otraClave = "11111111-2222-4333-8444-555555555555";
+
+        servicio.ejecutar(new SolicitudIdempotente(2L, otraClave, OPERACION, CONTENIDO), HttpStatus.CREATED,
+                () -> "a");
+        servicio.ejecutar(new SolicitudIdempotente(4L, CLAVE, OPERACION, CONTENIDO), HttpStatus.CREATED, () -> "b");
+
+        verify(registro).reclamar(eq(2L), eq(UUID.fromString(otraClave)), anyString(), any(), any());
+        verify(registro).reclamar(eq(4L), eq(CLAVE_UUID), anyString(), any(), any());
+        verify(registro, never()).buscar(any(), any());
     }
 }
