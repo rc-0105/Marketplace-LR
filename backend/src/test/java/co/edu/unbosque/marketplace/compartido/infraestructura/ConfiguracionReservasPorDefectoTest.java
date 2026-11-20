@@ -84,22 +84,12 @@ class ConfiguracionReservasPorDefectoTest {
     }
 
     @Test
-    @DisplayName("El contrato del calendario devuelve solo las CONFIRMADAS y quien lo consume no reinterpreta estados")
-    void elContratoDevuelveSoloLasConfirmadas() {
-        record Almacenada(Long id, String estado, LocalDate llegada, LocalDate salida) {
-        }
-        List<Almacenada> almacen = List.of(
-                new Almacenada(77L, "CONFIRMADA", LocalDate.of(2026, 12, 3), LocalDate.of(2026, 12, 6)),
-                new Almacenada(80L, "PENDIENTE", LocalDate.of(2026, 12, 3), LocalDate.of(2026, 12, 6)));
-        ConsultaReservasCalendario porEstado = (publicacion, desde, hasta) -> almacen.stream()
-                .filter(r -> r.estado().equals("CONFIRMADA") && r.llegada().isBefore(hasta) && r.salida().isAfter(desde))
-                .map(r -> new ReservaOcupada(r.id(), r.llegada(), r.salida())).toList();
-
-        contexto.withBean(ConsultaReservasCalendario.class, () -> porEstado).run(ctx -> {
-            assertThat(ctx).hasSingleBean(ConsultaReservasCalendario.class);
-            assertThat(ctx.getBean(ConsultaReservasCalendario.class).ocupantesEntre(10L,
-                    LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 10)))
-                    .extracting(ReservaOcupada::reservaId).containsExactly(77L);
+    @DisplayName("Sin otra implementación, la consulta por lote del bean por defecto no marca ninguna publicación como ocupada")
+    void sinOtroBeanElLoteVieneVacio() {
+        contexto.run(ctx -> {
+            ConsultaReservasCalendario puerto = ctx.getBean(ConsultaReservasCalendario.class);
+            assertThat(puerto.publicacionesOcupadas(List.of(10L, 11L, 12L),
+                    LocalDate.of(2026, 12, 3), LocalDate.of(2026, 12, 6))).isEmpty();
         });
     }
 }

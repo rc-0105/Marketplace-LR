@@ -60,7 +60,7 @@ class CalendarioIntegracionTest {
     @Autowired
     private ObjectMapper json;
 
-    // Las reservas llegan con SOF-33: aquí se simula la confirmada que ocupa días.
+    // Las reservas llegan con SOF-33: aquí se simula la ocupante que ocupa días.
     @MockBean
     private ConsultaReservasCalendario reservas;
 

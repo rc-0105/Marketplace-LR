@@ -5,7 +5,7 @@ package co.edu.unbosque.marketplace.disponibilidad.model;
  * RESERVADO, luego DISPONIBLE y, si ninguno, BLOQUEADO.
  */
 public enum EstadoDia {
-    /** Una reserva confirmada ocupa el día. */
+    /** Una reserva ocupante (confirmada o pendiente vigente) ocupa el día. */
     RESERVADO,
     /** Un periodo del anfitrión lo cubre y ninguna reserva lo ocupa. */
     DISPONIBLE,
