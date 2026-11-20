@@ -11,7 +11,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import co.edu.unbosque.marketplace.alojamientos.exceptions.PublicacionNoEncontradaException;
-import co.edu.unbosque.marketplace.alojamientos.model.ModoReserva;
 import co.edu.unbosque.marketplace.alojamientos.services.PublicacionService;
 import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
@@ -60,7 +59,7 @@ class ReservaServiceTest {
                 eq(EstadoReserva.CANCELADA))).thenReturn(Optional.empty());
         when(reservas.saveAndFlush(any(Reserva.class))).then(AdditionalAnswers.returnsFirstArg());
         when(cotizaciones.cotizar(eq(PUBLICACION_ID), eq(LLEGADA), eq(SALIDA), anySet())).thenReturn(cotizacion());
-        when(publicaciones.consultarModoReserva(PUBLICACION_ID)).thenReturn(ModoReserva.INMEDIATA);
+        when(publicaciones.esModoInmediato(PUBLICACION_ID)).thenReturn(true);
     }
 
     @Test
@@ -100,14 +99,14 @@ class ReservaServiceTest {
 
         assertThatThrownBy(() -> servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of()))
                 .isInstanceOf(CotizacionInvalidaException.class);
-        verify(publicaciones, never()).consultarModoReserva(any());
+        verify(publicaciones, never()).esModoInmediato(any());
         verify(reservas, never()).saveAndFlush(any());
     }
 
     @Test
     @DisplayName("Si la publicación exige aprobación, rechaza la reserva sin guardar nada")
     void modoAprobacionRechazaLaReserva() {
-        when(publicaciones.consultarModoReserva(PUBLICACION_ID)).thenReturn(ModoReserva.APROBACION);
+        when(publicaciones.esModoInmediato(PUBLICACION_ID)).thenReturn(false);
 
         assertThatThrownBy(() -> servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of()))
                 .isInstanceOf(ModoReservaNoSoportadoException.class);
@@ -126,7 +125,7 @@ class ReservaServiceTest {
 
         assertThat(resultado).isSameAs(existente);
         verify(cotizaciones, never()).cotizar(any(), any(), any(), any());
-        verify(publicaciones, never()).consultarModoReserva(any());
+        verify(publicaciones, never()).esModoInmediato(any());
         verify(reservas, never()).saveAndFlush(any());
         verify(publicador, never()).publicar(any());
     }

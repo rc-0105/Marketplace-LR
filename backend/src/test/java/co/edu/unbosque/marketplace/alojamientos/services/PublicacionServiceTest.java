@@ -871,25 +871,28 @@ class PublicacionServiceTest {
     }
 
     @Test
-    @DisplayName("El modo de reserva de una ACTIVA es el que tiene configurado")
-    void consultarModoReservaDevuelveElModoConfigurado() {
-        Publicacion publicacion = publicacionEn(EstadoPublicacion.ACTIVA);
-        ReflectionTestUtils.setField(publicacion, "modoReserva", ModoReserva.APROBACION);
-        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(publicacion));
+    @DisplayName("Una ACTIVA en modo INMEDIATA confirma de una vez; en APROBACION no")
+    void esModoInmediatoDependeDelModoConfigurado() {
+        Publicacion inmediata = publicacionEn(EstadoPublicacion.ACTIVA);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(inmediata));
+        assertThat(servicio.esModoInmediato(PUBLICACION_ID)).isTrue();
 
-        assertThat(servicio.consultarModoReserva(PUBLICACION_ID)).isEqualTo(ModoReserva.APROBACION);
+        Publicacion conAprobacion = publicacionEn(EstadoPublicacion.ACTIVA);
+        ReflectionTestUtils.setField(conAprobacion, "modoReserva", ModoReserva.APROBACION);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(conAprobacion));
+        assertThat(servicio.esModoInmediato(PUBLICACION_ID)).isFalse();
     }
 
     @Test
-    @DisplayName("El modo de reserva responde 404 si la publicación no existe o no está ACTIVA")
-    void consultarModoReservaRechazaLasQueNoEstanActivas() {
+    @DisplayName("Si la publicación no existe o no está ACTIVA, preguntar el modo responde 404")
+    void esModoInmediatoRechazaLasQueNoEstanActivas() {
         when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> servicio.consultarModoReserva(PUBLICACION_ID))
+        assertThatThrownBy(() -> servicio.esModoInmediato(PUBLICACION_ID))
                 .isInstanceOf(PublicacionNoEncontradaException.class);
 
         when(publicaciones.findById(PUBLICACION_ID))
                 .thenReturn(Optional.of(publicacionEn(EstadoPublicacion.PAUSADA)));
-        assertThatThrownBy(() -> servicio.consultarModoReserva(PUBLICACION_ID))
+        assertThatThrownBy(() -> servicio.esModoInmediato(PUBLICACION_ID))
                 .isInstanceOf(PublicacionNoEncontradaException.class);
     }
 

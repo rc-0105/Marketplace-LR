@@ -1,6 +1,5 @@
 package co.edu.unbosque.marketplace.reservas.services;
 
-import co.edu.unbosque.marketplace.alojamientos.model.ModoReserva;
 import co.edu.unbosque.marketplace.alojamientos.services.PublicacionService;
 import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
@@ -24,9 +23,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Confirmación de una reserva sobre una cotización vigente (SOF-33). Solo cubre
- * {@link ModoReserva#INMEDIATA}: una publicación que exige aprobación del anfitrión se
- * rechaza, ese flujo queda para una historia futura.
+ * Confirmación de una reserva sobre una cotización vigente (SOF-33). Solo cubre la
+ * confirmación inmediata: una publicación que exige aprobación del anfitrión se rechaza, ese
+ * flujo queda para una historia futura.
  */
 @Service
 public class ReservaService {
@@ -66,7 +65,7 @@ public class ReservaService {
         }
 
         Cotizacion cotizacion = cotizaciones.cotizar(publicacionId, llegada, salida, adicionalesElegidos);
-        if (publicaciones.consultarModoReserva(publicacionId) != ModoReserva.INMEDIATA) {
+        if (!publicaciones.esModoInmediato(publicacionId)) {
             throw new ModoReservaNoSoportadoException();
         }
 

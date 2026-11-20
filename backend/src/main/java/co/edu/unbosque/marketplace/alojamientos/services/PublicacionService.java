@@ -235,12 +235,13 @@ public class PublicacionService {
     }
 
     /**
-     * Modo de reserva de una publicación ACTIVA (RF-21): si es {@code APROBACION}, reservas
-     * todavía no lo soporta (SOF-33). Misma regla de visibilidad que {@link #consultarActiva}.
+     * Si una publicación ACTIVA confirma la reserva de una vez o exige aprobación del anfitrión
+     * (RF-21): SOF-33 solo soporta la confirmación inmediata. No expone {@link ModoReserva}
+     * fuera del módulo (ADR-2); misma regla de visibilidad que {@link #consultarActiva}.
      */
     @Transactional(readOnly = true)
-    public ModoReserva consultarModoReserva(Long publicacionId) {
-        return buscarActiva(publicacionId).getModoReserva();
+    public boolean esModoInmediato(Long publicacionId) {
+        return buscarActiva(publicacionId).getModoReserva() == ModoReserva.INMEDIATA;
     }
 
     // Una publicación inexistente o que no está ACTIVA responde el mismo 404: a quien reserva o
