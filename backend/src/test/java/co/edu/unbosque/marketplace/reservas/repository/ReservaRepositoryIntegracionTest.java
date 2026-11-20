@@ -191,6 +191,21 @@ class ReservaRepositoryIntegracionTest {
                 .isEqualTo(EstadoReserva.PENDIENTE);
     }
 
+    @Test
+    @DisplayName("Los servicios adicionales elegidos se guardan y se leen de vuelta, también vacíos")
+    void guardaLosServiciosAdicionalesElegidos() {
+        Reserva sin = guardar(publicacionId, "2026-12-01", "2026-12-03", EstadoReserva.PENDIENTE);
+        Reserva con = reservas.saveAndFlush(Reserva.nueva(publicacionId, huespedId, LocalDate.of(2026, 12, 3),
+                LocalDate.of(2026, 12, 5), 2, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ZERO,
+                BigDecimal.ZERO, BigDecimal.ONE, Set.of(11L, 7L), AHORA.plusSeconds(900)));
+        entidades.clear();
+
+        assertThat(reservas.findById(sin.getId())).get().extracting(Reserva::getServiciosAdicionalesIds)
+                .isEqualTo(Set.of());
+        assertThat(reservas.findById(con.getId())).get().extracting(Reserva::getServiciosAdicionalesIds)
+                .isEqualTo(Set.of(7L, 11L));
+    }
+
     private List<Reserva> ocupantesDe(Long id) {
         return reservas.findOcupantes(id, DESDE, HASTA, AHORA);
     }
@@ -208,7 +223,7 @@ class ReservaRepositoryIntegracionTest {
             Instant venceEn) {
         Reserva reserva = Reserva.nueva(publicacionId, huespedId, LocalDate.parse(llegada), LocalDate.parse(salida),
                 4, new BigDecimal("400000"), BigDecimal.ZERO, new BigDecimal("40000"), BigDecimal.ZERO,
-                BigDecimal.ZERO, new BigDecimal("440000"), venceEn);
+                BigDecimal.ZERO, new BigDecimal("440000"), Set.of(), venceEn);
         if (estado != EstadoReserva.PENDIENTE) {
             ReflectionTestUtils.setField(reserva, "estado", estado);
         }

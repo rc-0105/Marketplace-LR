@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -21,7 +22,7 @@ class ReservaTest {
     void unaReservaNuevaQuedaPendienteConElDesglose() {
         Reserva reserva = Reserva.nueva(30L, 7L, LLEGADA, SALIDA, 4, new BigDecimal("400000"),
                 new BigDecimal("30000"), new BigDecimal("40000"), BigDecimal.ZERO, new BigDecimal("15000"),
-                new BigDecimal("485000"), VENCE);
+                new BigDecimal("485000"), Set.of(9L, 4L), VENCE);
 
         assertThat(reserva.getPublicacionId()).isEqualTo(30L);
         assertThat(reserva.getHuespedId()).isEqualTo(7L);
@@ -35,6 +36,7 @@ class ReservaTest {
         assertThat(reserva.getDescuento()).isEqualByComparingTo("0");
         assertThat(reserva.getTotalServiciosAdicionales()).isEqualByComparingTo("15000");
         assertThat(reserva.getTotal()).isEqualByComparingTo("485000");
+        assertThat(reserva.getServiciosAdicionalesIds()).containsExactlyInAnyOrder(4L, 9L);
     }
 
     @Test
@@ -64,6 +66,6 @@ class ReservaTest {
 
     private static Reserva nueva() {
         return Reserva.nueva(30L, 7L, LLEGADA, SALIDA, 4, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE,
-                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ONE, VENCE);
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ONE, Set.of(), VENCE);
     }
 }

@@ -86,7 +86,7 @@ class ConsultaOcupacionReservasTest {
 
     private static Reserva reservaDe(Long id, LocalDate llegada, LocalDate salida) {
         Reserva reserva = Reserva.nueva(PUBLICACION_ID, 1L, llegada, salida, 4, null, null, null, null, null, null,
-                AHORA.plusSeconds(600));
+                Set.of(), AHORA.plusSeconds(600));
         ReflectionTestUtils.setField(reserva, "id", id);
         return reserva;
     }

@@ -269,6 +269,25 @@ class ReservaIntegracionTest {
     }
 
     @Test
+    @DisplayName("Reintentar las mismas fechas con otros servicios adicionales responde 409 y no duplica ni cambia la reserva")
+    void reintentarConOtrosServiciosResponde409() throws Exception {
+        Long id = publicacion("ACTIVA");
+        Long desayuno = servicioAdicional(id, "Desayuno", 15000);
+        String token = iniciarSesion("ana@correo.com");
+
+        int primera = idDe(reservar(token, id, LLEGADA, SALIDA, "[" + desayuno + "]"));
+        reservar(token, id, LLEGADA, SALIDA, "[" + desayuno + "]")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(primera));
+        reservar(token, id, LLEGADA, SALIDA, "[]")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value(
+                        "Ya tienes una reserva vigente para esas fechas con otros servicios adicionales."));
+
+        assertThat(reservasGuardadas(id)).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("Sin fechas ni publicación, responde 400 con el error de cada campo")
     void rechazaCamposFaltantes() throws Exception {
         mvc.perform(post("/api/v1/reservas")

@@ -26,6 +26,7 @@ import co.edu.unbosque.marketplace.disponibilidad.model.MotivoNoDisponible;
 import co.edu.unbosque.marketplace.disponibilidad.services.DisponibilidadService;
 import co.edu.unbosque.marketplace.reservas.exceptions.FechasReservaInvalidasException;
 import co.edu.unbosque.marketplace.reservas.exceptions.ModoReservaNoSoportadoException;
+import co.edu.unbosque.marketplace.reservas.exceptions.ReservaConOtrosServiciosException;
 import co.edu.unbosque.marketplace.reservas.exceptions.ReservaSuperpuestaException;
 import co.edu.unbosque.marketplace.reservas.model.EstadoReserva;
 import co.edu.unbosque.marketplace.reservas.model.Reserva;
@@ -229,10 +230,58 @@ class ReservaServiceTest {
                 new BigDecimal("15000"), new BigDecimal("485000"));
     }
 
+    @Test
+    @DisplayName("Un reintento con otros servicios adicionales no devuelve la reserva anterior: responde 409 sin guardar")
+    void reintentoConOtrosServiciosNoDevuelveLaReservaAnterior() {
+        when(reservas.findVigentesIdenticas(HUESPED_ID, PUBLICACION_ID, LLEGADA, SALIDA, AHORA))
+                .thenReturn(List.of(reservaExistente(Set.of(5L))));
+
+        assertThatThrownBy(() -> servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of(6L)))
+                .isInstanceOf(ReservaConOtrosServiciosException.class)
+                .hasMessage("Ya tienes una reserva vigente para esas fechas con otros servicios adicionales.");
+        verify(cotizaciones, never()).cotizar(any(), any(), any(), any());
+        verify(registro, never()).registrar(any());
+    }
+
+    @Test
+    @DisplayName("Un reintento con los mismos servicios adicionales, en cualquier orden, devuelve la reserva existente")
+    void reintentoConLosMismosServiciosDevuelveLaExistente() {
+        Reserva existente = reservaExistente(Set.of(5L, 6L));
+        when(reservas.findVigentesIdenticas(HUESPED_ID, PUBLICACION_ID, LLEGADA, SALIDA, AHORA))
+                .thenReturn(List.of(existente));
+
+        assertThat(servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of(6L, 5L))).isSameAs(existente);
+    }
+
+    @Test
+    @DisplayName("Sin servicios adicionales (nulo o vacío) el reintento coincide con una reserva sin servicios")
+    void serviciosNulosSeTratanComoVacios() {
+        Reserva existente = reservaExistente(Set.of());
+        when(reservas.findVigentesIdenticas(HUESPED_ID, PUBLICACION_ID, LLEGADA, SALIDA, AHORA))
+                .thenReturn(List.of(existente));
+
+        assertThat(servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, null)).isSameAs(existente);
+    }
+
+    @Test
+    @DisplayName("La reserva nueva guarda los servicios adicionales elegidos para poder comparar el reintento")
+    void laReservaNuevaGuardaLosServiciosElegidos() {
+        when(cotizaciones.cotizar(eq(PUBLICACION_ID), eq(LLEGADA), eq(SALIDA), eq(Set.of(5L))))
+                .thenReturn(cotizacion());
+
+        Reserva reserva = servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of(5L));
+
+        assertThat(reserva.getServiciosAdicionalesIds()).containsExactly(5L);
+    }
+
     private static Reserva reservaExistente() {
+        return reservaExistente(Set.of());
+    }
+
+    private static Reserva reservaExistente(Set<Long> servicios) {
         Reserva reserva = Reserva.nueva(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, 4, new BigDecimal("400000"),
                 new BigDecimal("30000"), new BigDecimal("40000"), BigDecimal.ZERO, new BigDecimal("15000"),
-                new BigDecimal("485000"), AHORA.plusSeconds(600));
+                new BigDecimal("485000"), servicios, AHORA.plusSeconds(600));
         ReflectionTestUtils.setField(reserva, "id", 99L);
         return reserva;
     }

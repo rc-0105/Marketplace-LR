@@ -21,6 +21,9 @@ CREATE TABLE reserva (
     descuento                   NUMERIC(12, 2) NOT NULL,
     total_servicios_adicionales NUMERIC(12, 2) NOT NULL,
     total                       NUMERIC(12, 2) NOT NULL,
+    -- Servicios adicionales elegidos: sin ellos un reintento con otros extras se confundiría con la
+    -- misma reserva (ADR-4). Se guardan los ids, sin llave foránea: un servicio puede borrarse luego.
+    servicios_adicionales_ids   BIGINT[]       NOT NULL DEFAULT '{}',
     vence_en                    TIMESTAMPTZ    NOT NULL,
     creado_en                   TIMESTAMPTZ    NOT NULL DEFAULT now(),
     CONSTRAINT reserva_fechas_check CHECK (salida > llegada)

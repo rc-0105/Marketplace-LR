@@ -11,6 +11,9 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Set;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * Reserva sobre una cotización vigente (SOF-33, RF-35, RF-36). El desglose del precio queda
@@ -65,6 +68,13 @@ public class Reserva {
     @Column(nullable = false, updatable = false, precision = 12, scale = 2)
     private BigDecimal total;
 
+    // Ids de los servicios adicionales elegidos, para distinguir un reintento idéntico de otro con extras
+    // distintos. Sin llave foránea: son los que se cotizaron, aunque el anfitrión borre el servicio después.
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "servicios_adicionales_ids", nullable = false, updatable = false,
+            columnDefinition = "bigint[]")
+    private Set<Long> serviciosAdicionalesIds;
+
     // Hasta cuándo una PENDIENTE aparta las noches (ADR-4); la hora la fija el reloj de la aplicación.
     @Column(name = "vence_en", nullable = false, updatable = false)
     private Instant venceEn;
@@ -78,7 +88,8 @@ public class Reserva {
 
     private Reserva(Long publicacionId, Long huespedId, LocalDate llegada, LocalDate salida, int noches,
             BigDecimal precioBase, BigDecimal tarifaLimpieza, BigDecimal tarifaServicio, BigDecimal descuento,
-            BigDecimal totalServiciosAdicionales, BigDecimal total, Instant venceEn) {
+            BigDecimal totalServiciosAdicionales, BigDecimal total, Set<Long> serviciosAdicionalesIds,
+            Instant venceEn) {
         this.publicacionId = publicacionId;
         this.huespedId = huespedId;
         this.llegada = llegada;
@@ -91,18 +102,20 @@ public class Reserva {
         this.descuento = descuento;
         this.totalServiciosAdicionales = totalServiciosAdicionales;
         this.total = total;
+        this.serviciosAdicionalesIds = Set.copyOf(serviciosAdicionalesIds);
         this.venceEn = venceEn;
     }
 
     /**
-     * El desglose llega ya calculado por la cotización vigente que originó la reserva, y {@code venceEn} es el
+     * El desglose llega ya calculado por la cotización vigente que originó la reserva, los servicios adicionales que eligió el huésped y {@code venceEn} es el
      * instante hasta el que la PENDIENTE aparta las noches.
      */
     public static Reserva nueva(Long publicacionId, Long huespedId, LocalDate llegada, LocalDate salida, int noches,
             BigDecimal precioBase, BigDecimal tarifaLimpieza, BigDecimal tarifaServicio, BigDecimal descuento,
-            BigDecimal totalServiciosAdicionales, BigDecimal total, Instant venceEn) {
+            BigDecimal totalServiciosAdicionales, BigDecimal total, Set<Long> serviciosAdicionalesIds,
+            Instant venceEn) {
         return new Reserva(publicacionId, huespedId, llegada, salida, noches, precioBase, tarifaLimpieza,
-                tarifaServicio, descuento, totalServiciosAdicionales, total, venceEn);
+                tarifaServicio, descuento, totalServiciosAdicionales, total, serviciosAdicionalesIds, venceEn);
     }
 
     /**
@@ -169,6 +182,10 @@ public class Reserva {
 
     public BigDecimal getTotal() {
         return total;
+    }
+
+    public Set<Long> getServiciosAdicionalesIds() {
+        return serviciosAdicionalesIds;
     }
 
     public Instant getVenceEn() {

@@ -16,6 +16,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.AdditionalAnswers;
@@ -64,6 +65,6 @@ class RegistroReservasTest {
 
     private static Reserva nueva() {
         return Reserva.nueva(30L, 7L, LLEGADA, SALIDA, 4, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE,
-                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ONE, AHORA.plusSeconds(900));
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ONE, Set.of(), AHORA.plusSeconds(900));
     }
 }

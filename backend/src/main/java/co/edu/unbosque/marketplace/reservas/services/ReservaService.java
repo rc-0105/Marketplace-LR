@@ -11,6 +11,7 @@ import co.edu.unbosque.marketplace.cotizacion.services.CotizacionService;
 import co.edu.unbosque.marketplace.disponibilidad.services.DisponibilidadService;
 import co.edu.unbosque.marketplace.reservas.exceptions.FechasReservaInvalidasException;
 import co.edu.unbosque.marketplace.reservas.exceptions.ModoReservaNoSoportadoException;
+import co.edu.unbosque.marketplace.reservas.exceptions.ReservaConOtrosServiciosException;
 import co.edu.unbosque.marketplace.reservas.exceptions.ReservaSuperpuestaException;
 import co.edu.unbosque.marketplace.reservas.model.Reserva;
 import co.edu.unbosque.marketplace.reservas.repository.ReservaRepository;
@@ -20,6 +21,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
@@ -69,7 +71,8 @@ public class ReservaService {
 
     /**
      * Si ya existe una reserva vigente (CONFIRMADA o PENDIENTE sin vencer) del mismo huésped con las mismas
-     * fechas exactas, la devuelve tal cual (reintento idempotente, ADR-4) sin recotizar ni guardar de nuevo.
+     * fechas exactas y los mismos servicios adicionales, la devuelve tal cual (reintento idempotente, ADR-4)
+     * sin recotizar ni guardar de nuevo; con las mismas fechas pero otros servicios responde 409.
      * Si no, valida que la llegada no sea pasada, que la publicación esté en modo {@code INMEDIATA}
      * ({@code APROBACION} se rechaza), vuelve a cotizar para fijar el precio y revalidar que la cotización
      * sigue vigente (AC4) y que la publicación sigue ACTIVA (AC5), y exige que la estancia quepa en un
@@ -83,7 +86,8 @@ public class ReservaService {
         if (llegada.isBefore(LocalDate.now(reloj.withZone(ZONA)))) {
             throw new FechasReservaInvalidasException("La fecha de llegada no puede ser anterior a hoy.");
         }
-        Optional<Reserva> existente = buscarIdentica(huespedId, publicacionId, llegada, salida, ahora);
+        Set<Long> servicios = adicionalesElegidos == null ? Set.of() : Set.copyOf(adicionalesElegidos);
+        Optional<Reserva> existente = buscarIdentica(huespedId, publicacionId, llegada, salida, servicios, ahora);
         if (existente.isPresent()) {
             return existente.get();
         }
@@ -92,24 +96,32 @@ public class ReservaService {
         if (!publicaciones.esModoInmediato(publicacionId)) {
             throw new ModoReservaNoSoportadoException();
         }
-        Cotizacion cotizacion = cotizaciones.cotizar(publicacionId, llegada, salida, adicionalesElegidos);
+        Cotizacion cotizacion = cotizaciones.cotizar(publicacionId, llegada, salida, servicios);
         // Tras cotizar, que ya validó el rango. La estancia debe caber en un periodo y no estar ocupada (SOF-27);
         // es una verificación temprana: la restricción de exclusión sigue siendo la última barrera ante carreras.
         disponibilidad.exigirDisponible(publicacionId, llegada, salida);
 
         Reserva reserva = Reserva.nueva(publicacionId, huespedId, llegada, salida, (int) cotizacion.noches(),
                 cotizacion.precioBase(), cotizacion.tarifaLimpieza(), cotizacion.tarifaServicio(),
-                cotizacion.descuento(), cotizacion.totalServiciosAdicionales(), cotizacion.total(),
+                cotizacion.descuento(), cotizacion.totalServiciosAdicionales(), cotizacion.total(), servicios,
                 ahora.plus(apartado));
         Reserva guardada = guardar(reserva);
         auditar(guardada, huespedId);
         return guardada;
     }
 
+    // Idéntica es la del mismo huésped, publicación, fechas y servicios adicionales. Si hay una vigente con las
+    // mismas fechas pero otros servicios, no se devuelve en silencio: se avisa con un 409.
     private Optional<Reserva> buscarIdentica(Long huespedId, Long publicacionId, LocalDate llegada,
-            LocalDate salida, Instant ahora) {
-        return reservas.findVigentesIdenticas(huespedId, publicacionId, llegada, salida, ahora).stream()
-                .findFirst();
+            LocalDate salida, Set<Long> servicios, Instant ahora) {
+        List<Reserva> mismasFechas = reservas.findVigentesIdenticas(huespedId, publicacionId, llegada, salida,
+                ahora);
+        Optional<Reserva> identica = mismasFechas.stream()
+                .filter(reserva -> reserva.getServiciosAdicionalesIds().equals(servicios)).findFirst();
+        if (identica.isEmpty() && !mismasFechas.isEmpty()) {
+            throw new ReservaConOtrosServiciosException();
+        }
+        return identica;
     }
 
     // El cruce lo decide la restricción de exclusión de PostgreSQL, la única que no deja pasar
