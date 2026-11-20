@@ -1,15 +1,20 @@
 package co.edu.unbosque.marketplace.disponibilidad.services;
 
 import co.edu.unbosque.marketplace.alojamientos.services.PublicacionService;
+import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasCalendario;
 import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasPeriodo;
 import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
+import co.edu.unbosque.marketplace.disponibilidad.exceptions.CalendarioNoEncontradoException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.FechasPeriodoInvalidasException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoConReservaException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoNoEncontradoException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoSuperpuestoException;
+import co.edu.unbosque.marketplace.disponibilidad.exceptions.RangoConsultaInvalidoException;
+import co.edu.unbosque.marketplace.disponibilidad.model.DisponibilidadRango;
+import co.edu.unbosque.marketplace.disponibilidad.model.MotivoNoDisponible;
 import co.edu.unbosque.marketplace.disponibilidad.model.PeriodoDisponible;
 import co.edu.unbosque.marketplace.disponibilidad.repository.PeriodoDisponibleRepository;
 import java.sql.SQLException;
@@ -18,6 +23,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,14 +48,17 @@ public class DisponibilidadService {
     private final PeriodoDisponibleRepository periodos;
     private final PublicacionService publicaciones;
     private final ConsultaReservasPeriodo reservas;
+    private final ConsultaReservasCalendario ocupacion;
     private final PublicadorEventos publicador;
     private final Clock reloj;
 
     public DisponibilidadService(PeriodoDisponibleRepository periodos, PublicacionService publicaciones,
-            ConsultaReservasPeriodo reservas, PublicadorEventos publicador, Clock reloj) {
+            ConsultaReservasPeriodo reservas, ConsultaReservasCalendario ocupacion, PublicadorEventos publicador,
+            Clock reloj) {
         this.periodos = periodos;
         this.publicaciones = publicaciones;
         this.reservas = reservas;
+        this.ocupacion = ocupacion;
         this.publicador = publicador;
         this.reloj = reloj;
     }
@@ -71,20 +80,57 @@ public class DisponibilidadService {
     }
 
     /**
-     * De las publicaciones dadas, las que ofrecen toda la estancia {@code [llegada, salida)},
-     * Es el único punto donde la búsqueda pregunta por disponibilidad: cuando existan las
-     * reservas confirmadas, aquí se descuentan sin cambiar a quien llama.
+     * De las publicaciones dadas, las que ofrecen toda la estancia {@code [llegada, salida)}: un periodo la
+     * contiene y ninguna reserva que ocupa noches la cruza. Es el único punto donde la búsqueda pregunta por
+     * disponibilidad, y es informativo: la garantía contra el doble reservado la da la base de datos (ADR-3).
      */
     @Transactional(readOnly = true)
     public Set<Long> filtrarDisponibles(Collection<Long> publicacionIds, LocalDate llegada, LocalDate salida) {
-        if (publicacionIds.isEmpty()) {
-            return Set.of();
+        Set<Long> noDisponibles = evaluar(publicacionIds, llegada, salida).keySet();
+        return publicacionIds.stream().filter(id -> !noDisponibles.contains(id)).collect(Collectors.toSet());
+    }
+
+    /**
+     * Si la estancia {@code [desde, hasta)} está disponible y, si no, por qué, con la misma regla de la
+     * búsqueda. El dueño consulta su publicación en cualquier estado; otro usuario, solo si es ACTIVA, y
+     * una inexistente o no visible responde lo mismo que el calendario. El acceso va antes que el rango: a
+     * quien no puede ver la publicación no se le revela nada más, ni siquiera un 400.
+     */
+    @Transactional(readOnly = true)
+    public DisponibilidadRango consultar(Long publicacionId, Long usuarioId, LocalDate desde, LocalDate hasta) {
+        publicaciones.consultarAcceso(publicacionId).filter(a -> a.esDe(usuarioId) || a.publica())
+                .orElseThrow(CalendarioNoEncontradoException::new);
+        if (!hasta.isAfter(desde)) {
+            throw new RangoConsultaInvalidoException("La fecha final debe ser posterior a la fecha inicial.");
         }
-        return periodos
-                .findByPublicacionIdInAndFechaInicioLessThanEqualAndFechaFinGreaterThanEqual(publicacionIds, llegada, salida)
+        MotivoNoDisponible motivo = evaluar(List.of(publicacionId), desde, hasta).get(publicacionId);
+        return new DisponibilidadRango(publicacionId, desde, hasta, motivo);
+    }
+
+    /**
+     * Regla única de disponibilidad: por cada publicación NO disponible, el motivo. Una publicación
+     * disponible no aparece en el mapa. Sin periodo que contenga la estancia gana FUERA_DE_PERIODO, y al
+     * puerto de reservas solo se le pregunta por las que sí tienen periodo.
+     */
+    private Map<Long, MotivoNoDisponible> evaluar(Collection<Long> publicacionIds, LocalDate desde, LocalDate hasta) {
+        if (publicacionIds.isEmpty()) {
+            return Map.of();
+        }
+        Set<Long> conPeriodo = periodos
+                .findByPublicacionIdInAndFechaInicioLessThanEqualAndFechaFinGreaterThanEqual(publicacionIds, desde, hasta)
                 .stream()
                 .map(PeriodoDisponible::getPublicacionId)
                 .collect(Collectors.toSet());
+        Set<Long> ocupadas = ocupacion.publicacionesOcupadas(conPeriodo, desde, hasta);
+        Map<Long, MotivoNoDisponible> motivos = new HashMap<>();
+        for (Long id : publicacionIds) {
+            if (!conPeriodo.contains(id)) {
+                motivos.put(id, MotivoNoDisponible.FUERA_DE_PERIODO);
+            } else if (ocupadas.contains(id)) {
+                motivos.put(id, MotivoNoDisponible.RESERVADO);
+            }
+        }
+        return motivos;
     }
 
     @Transactional
