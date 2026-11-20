@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { listarServicios, listarTiposAlojamiento } from '../../alojamientos/services/alojamientosService.js';
 import Campo from '../../../shared/components/Campo.jsx';
 import { buscarAlojamientos } from '../services/busquedaService.js';
 import estilos from './BusquedaPage.module.css';
@@ -17,16 +18,45 @@ function erroresDeFormulario({ ciudad, llegada, salida }) {
   return errores;
 }
 
+const CRITERIOS_INICIALES = {
+  ciudad: '', llegada: '', salida: '', capacidad: '', tipo: '', precioMin: '', precioMax: '', servicios: [],
+};
+
 export default function BusquedaPage() {
-  const [criterios, setCriterios] = useState({ ciudad: '', llegada: '', salida: '' });
+  const [criterios, setCriterios] = useState(CRITERIOS_INICIALES);
+  const [tipos, setTipos] = useState([]);
+  const [servicios, setServicios] = useState([]);
   const [errores, setErrores] = useState({});
   const [resultados, setResultados] = useState(null);
+  // Las fechas con que se obtuvieron los resultados: viajan al detalle para precargar la cotización.
+  const [fechasBuscadas, setFechasBuscadas] = useState({ llegada: '', salida: '' });
   const [errorBusqueda, setErrorBusqueda] = useState(null);
   const [buscando, setBuscando] = useState(false);
+
+  // Los catálogos solo alimentan los filtros: si no cargan, la búsqueda por ciudad y fechas sigue funcionando.
+  useEffect(() => {
+    listarTiposAlojamiento().then(setTipos).catch(() => setTipos([]));
+    listarServicios().then(setServicios).catch(() => setServicios([]));
+  }, []);
 
   function cambiar(evento) {
     const { name, value } = evento.target;
     setCriterios((actuales) => ({ ...actuales, [name]: value }));
+  }
+
+  function alternarServicio(id) {
+    setCriterios((actuales) => ({
+      ...actuales,
+      servicios: actuales.servicios.includes(id)
+        ? actuales.servicios.filter((actual) => actual !== id)
+        : [...actuales.servicios, id],
+    }));
+  }
+
+  function limpiarFiltros() {
+    setCriterios((actuales) => ({
+      ...CRITERIOS_INICIALES, ciudad: actuales.ciudad, llegada: actuales.llegada, salida: actuales.salida,
+    }));
   }
 
   async function buscar(evento) {
@@ -38,6 +68,7 @@ export default function BusquedaPage() {
     setBuscando(true);
     try {
       setResultados(await buscarAlojamientos({ ...criterios, ciudad: criterios.ciudad.trim() }));
+      setFechasBuscadas({ llegada: criterios.llegada, salida: criterios.salida });
     } catch (error) {
       setResultados(null);
       setErrorBusqueda(error.estado === 400 ? error.message : MENSAJE_ERROR);
@@ -55,6 +86,35 @@ export default function BusquedaPage() {
           error={errores.llegada} />
         <Campo id="salida" etiqueta="Salida" type="date" value={criterios.salida} onChange={cambiar}
           error={errores.salida} />
+        <fieldset className={estilos.filtros}>
+          <legend>Filtros</legend>
+          <Campo id="capacidad" etiqueta="Huéspedes (mínimo)" type="number" min="1" value={criterios.capacidad}
+            onChange={cambiar} />
+          <div className={estilos.selector}>
+            <label htmlFor="tipo">Tipo de alojamiento</label>
+            <select id="tipo" name="tipo" value={criterios.tipo} onChange={cambiar}>
+              <option value="">Todos</option>
+              {tipos.map((tipo) => <option key={tipo.id} value={tipo.nombre}>{tipo.nombre}</option>)}
+            </select>
+          </div>
+          <Campo id="precioMin" etiqueta="Precio mínimo por noche" type="number" min="0" value={criterios.precioMin}
+            onChange={cambiar} />
+          <Campo id="precioMax" etiqueta="Precio máximo por noche" type="number" min="0" value={criterios.precioMax}
+            onChange={cambiar} />
+          {servicios.length > 0 && (
+            <fieldset className={estilos.servicios}>
+              <legend>Servicios</legend>
+              {servicios.map((servicio) => (
+                <label key={servicio.id} className={estilos.servicio}>
+                  <input type="checkbox" checked={criterios.servicios.includes(servicio.id)}
+                    onChange={() => alternarServicio(servicio.id)} />
+                  {servicio.nombre}
+                </label>
+              ))}
+            </fieldset>
+          )}
+          <button type="button" className={estilos.limpiar} onClick={limpiarFiltros}>Limpiar filtros</button>
+        </fieldset>
         <button type="submit" className={estilos.buscar} disabled={buscando}>
           {buscando ? 'Buscando…' : 'Buscar'}
         </button>
@@ -72,7 +132,11 @@ export default function BusquedaPage() {
               {resultado.imagenPrincipal && (
                 <img src={resultado.imagenPrincipal} alt={`Foto de ${resultado.titulo}`} className={estilos.imagen} />
               )}
-              <h2 className={estilos.nombre}>{resultado.titulo}</h2>
+              <h2 className={estilos.nombre}>
+                <Link to={`/huesped/busqueda/${resultado.id}?${new URLSearchParams(fechasBuscadas)}`}>
+                  {resultado.titulo}
+                </Link>
+              </h2>
               <p className={estilos.detalle}>
                 {[resultado.tipo, resultado.ciudad].filter(Boolean).join(' · ')}
                 {resultado.capacidad != null && ` · Hasta ${resultado.capacidad} huéspedes`}

@@ -186,6 +186,16 @@ class DisponibilidadServiceTest {
     }
 
     @Test
+    @DisplayName("El calendario público devuelve solo las fechas de cada periodo, sin pedir ser el dueño")
+    void listarLibresDevuelveLasFechas() {
+        when(periodos.findByPublicacionIdOrderByFechaInicioAsc(PUBLICACION_ID))
+                .thenReturn(List.of(periodo(HOY, HOY.plusDays(3))));
+
+        assertThat(servicio.listarLibres(PUBLICACION_ID)).containsExactly(new PeriodoLibre(HOY, HOY.plusDays(3)));
+        verifyNoInteractions(publicaciones);
+    }
+
+    @Test
     @DisplayName("Sin reservas, modificar cambia las fechas del periodo y lo audita")
     void modificarSinReservasCambiaFechas() {
         PeriodoDisponible periodo = periodo(HOY.plusDays(1), HOY.plusDays(4));
