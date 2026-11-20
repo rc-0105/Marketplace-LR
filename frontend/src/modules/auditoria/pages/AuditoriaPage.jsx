@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import FiltrosAuditoria from '../components/FiltrosAuditoria.jsx';
 import { formatearFechaBogota } from '../models/eventoAuditoria.js';
 import { listar } from '../services/auditoriaService.js';
@@ -90,7 +90,12 @@ export default function AuditoriaPage() {
             <tbody>
               {eventos.map((evento) => (
                 <tr key={evento.id}>
-                  <td>{formatearFechaBogota(evento.fecha)}</td>
+                  <td>
+                    <Link to={`/administrador/auditoria/${evento.id}${clave && `?${clave}`}`}
+                      aria-label={`${formatearFechaBogota(evento.fecha)}, evento ${evento.id}`}>
+                      {formatearFechaBogota(evento.fecha)}
+                    </Link>
+                  </td>
                   <td>{evento.usuario ?? 'Sin usuario'}</td>
                   <td>{evento.accion}</td>
                   <td>{evento.entidad}</td>
