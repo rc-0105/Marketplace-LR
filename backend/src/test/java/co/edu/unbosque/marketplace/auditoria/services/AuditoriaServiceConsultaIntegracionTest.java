@@ -2,6 +2,7 @@ package co.edu.unbosque.marketplace.auditoria.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import co.edu.unbosque.marketplace.auditoria.SemillaAuditoria;
 import co.edu.unbosque.marketplace.auditoria.model.EventoAuditoria;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -21,19 +22,18 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @SpringBootTest
 class AuditoriaServiceConsultaIntegracionTest {
 
-    private static final String INSERTAR = "INSERT INTO evento_auditoria "
-            + "(fecha, usuario, accion, entidad, entidad_id, resultado, datos, correlacion) "
-            + "VALUES (?::timestamptz, ?, ?, ?, ?, ?, jsonb_build_object('operacion', ?::text), ?)";
+    private final SemillaAuditoria semilla;
+    private final AuditoriaService servicio;
 
     @Autowired
-    private AuditoriaService servicio;
-
-    @Autowired
-    private JdbcTemplate jdbc;
+    AuditoriaServiceConsultaIntegracionTest(AuditoriaService servicio, JdbcTemplate jdbc) {
+        this.servicio = servicio;
+        this.semilla = new SemillaAuditoria(jdbc);
+    }
 
     @BeforeEach
     void vaciar() {
-        jdbc.execute("TRUNCATE evento_auditoria RESTART IDENTITY");
+        semilla.vaciar();
     }
 
     @ParameterizedTest(name = "{0}")
@@ -181,17 +181,11 @@ class AuditoriaServiceConsultaIntegracionTest {
     }
 
     private void sembrarBase() {
-        sembrar("2026-11-10T15:00:00Z", "2", "RESERVA", "Reserva", "55", "EXITO", "CREAR", "c-1");
-        sembrar("2026-11-11T15:00:00Z", "2", "RESERVA", "Reserva", "55", "EXITO", "PAGAR", "c-2");
-        sembrar("2026-11-12T15:00:00Z", "2", "CANCELACION", "Reserva", "55", "EXITO", "CANCELAR", "c-3");
-        sembrar("2026-11-13T15:00:00Z", "2", "CANCELACION", "Reserva", "55", "EXITO", "DEVOLVER", "c-3");
-        sembrar("2026-11-14T15:00:00Z", "1", "PUBLICACION", "Publicacion", "10", "EXITO", "CREAR", "c-4");
-        sembrar("2026-11-15T15:00:00Z", null, "AUTENTICACION", "Usuario", null, "FALLO", "LOGIN", null);
-        sembrar("2026-11-16T15:00:00Z", "2", "RESERVA", "Reserva", "77", "FALLO", "CREAR", "c-5");
+        semilla.sembrarBase();
     }
 
     private void sembrar(String fecha, String usuario, String accion, String entidad, String entidadId,
             String resultado, String operacion, String correlacion) {
-        jdbc.update(INSERTAR, fecha, usuario, accion, entidad, entidadId, resultado, operacion, correlacion);
+        semilla.sembrar(fecha, usuario, accion, entidad, entidadId, resultado, operacion, correlacion);
     }
 }
