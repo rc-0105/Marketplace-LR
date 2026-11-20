@@ -72,6 +72,12 @@ pagos:
   tiempo-espera-segundos: ${PAGOS_TIEMPO_ESPERA_SEGUNDOS:10}
   stripe:
     clave-prueba: ${STRIPE_CLAVE_PRUEBA:}
+  # Cada intervalo, la conciliación le pregunta a la pasarela por los pagos en ERROR: confirma la
+  # reserva si cobró y sigue PENDIENTE, o reembolsa si ya no lo está. Sin cobro tras el apartado más
+  # la gracia, cierra el pago como NO_COBRADO.
+  conciliacion:
+    intervalo-minutos: ${PAGOS_CONCILIACION_INTERVALO_MINUTOS:5}
+    gracia-minutos: ${PAGOS_CONCILIACION_GRACIA_MINUTOS:60}
 
 # Envío del código de recuperación (RF-05). Con "log" el código se escribe en la
 # consola; con "smtp" se envía por correo usando spring.mail. Las credenciales

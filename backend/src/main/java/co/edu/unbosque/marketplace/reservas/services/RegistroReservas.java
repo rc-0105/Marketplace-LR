@@ -54,6 +54,24 @@ public class RegistroReservas {
         reservas.registrarErrorPago(reservaId);
     }
 
+    /** Conciliación: el cobro de una reserva que ya no estaba PENDIENTE se devolvió. */
+    @Transactional
+    public void marcarReembolsado(Long reservaId, String transaccionId) {
+        reservas.marcarReembolsado(reservaId, transaccionId);
+    }
+
+    /** Conciliación: la pasarela nunca cobró ese pago en ERROR. */
+    @Transactional
+    public void marcarNoCobrado(Long reservaId) {
+        reservas.marcarNoCobrado(reservaId);
+    }
+
+    /** Un reembolso inmediato falló: el pago pasa a ERROR para que la conciliación lo reintente. */
+    @Transactional
+    public void marcarReembolsoPendiente(Long reservaId) {
+        reservas.marcarReembolsoPendiente(reservaId);
+    }
+
     /** Pasa a VENCIDA todos los apartados agotados y devuelve cuántos fueron (tarea programada). */
     @Transactional
     public int vencerCaducados() {

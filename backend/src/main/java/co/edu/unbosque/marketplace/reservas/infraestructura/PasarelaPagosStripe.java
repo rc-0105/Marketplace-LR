@@ -9,9 +9,11 @@ import com.stripe.exception.StripeException;
 import com.stripe.model.PaymentIntent;
 import com.stripe.net.RequestOptions;
 import com.stripe.param.PaymentIntentCreateParams;
+import com.stripe.param.PaymentIntentSearchParams;
 import com.stripe.param.RefundCreateParams;
 import java.math.RoundingMode;
 import java.time.Duration;
+import java.util.Optional;
 
 /**
  * Stripe en modo prueba ({@code pagos.modo=stripe}). Crea y confirma en una sola llamada un PaymentIntent con
@@ -71,6 +73,23 @@ public class PasarelaPagosStripe implements PasarelaPagos {
                     RequestOptions.builder().setIdempotencyKey("reembolso-" + transaccionId).build());
         } catch (StripeException error) {
             throw traducir("reembolsar la transacción " + transaccionId, error);
+        }
+    }
+
+    // La búsqueda de Stripe puede tardar alrededor de un minuto en reflejar un cobro nuevo: la conciliación le da
+    // un margen de gracia antes de cerrar un pago como no cobrado.
+    @Override
+    public Optional<String> buscarCobroAprobado(Long reservaId) {
+        PaymentIntentSearchParams parametros = PaymentIntentSearchParams.builder()
+                .setQuery("metadata['reservaId']:'" + reservaId + "' AND status:'succeeded'")
+                .setLimit(1L)
+                .build();
+        try {
+            return cliente.v1().paymentIntents().search(parametros).getData().stream()
+                    .map(PaymentIntent::getId)
+                    .findFirst();
+        } catch (StripeException error) {
+            throw traducir("buscar el cobro de la reserva " + reservaId, error);
         }
     }
 

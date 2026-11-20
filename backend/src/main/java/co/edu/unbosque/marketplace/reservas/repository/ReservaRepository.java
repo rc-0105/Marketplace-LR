@@ -1,5 +1,6 @@
 package co.edu.unbosque.marketplace.reservas.repository;
 
+import co.edu.unbosque.marketplace.reservas.model.EstadoPago;
 import co.edu.unbosque.marketplace.reservas.model.Reserva;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -83,4 +84,30 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
             + " where r.id = :id"
             + " and r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE")
     int registrarErrorPago(@Param("id") Long id);
+
+    // Conciliación (SOF-34): los pagos que quedaron en ERROR, en el orden en que se crearon las reservas.
+    List<Reserva> findByEstadoPagoOrderById(EstadoPago estadoPago);
+
+    // La pasarela cobró una reserva que ya no estaba PENDIENTE y el cobro se devolvió.
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Reserva r set r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.REEMBOLSADO,"
+            + " r.transaccionId = :transaccionId where r.id = :id"
+            + " and r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.ERROR"
+            + " and r.estado <> co.edu.unbosque.marketplace.reservas.model.EstadoReserva.CONFIRMADA")
+    int marcarReembolsado(@Param("id") Long id, @Param("transaccionId") String transaccionId);
+
+    // La pasarela nunca cobró ese pago en ERROR.
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Reserva r set r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.NO_COBRADO"
+            + " where r.id = :id"
+            + " and r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.ERROR"
+            + " and r.estado <> co.edu.unbosque.marketplace.reservas.model.EstadoReserva.CONFIRMADA")
+    int marcarNoCobrado(@Param("id") Long id);
+
+    // Un reembolso inmediato falló: sea cual sea el estado de la reserva, la conciliación debe reintentarlo.
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Reserva r set r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.ERROR"
+            + " where r.id = :id"
+            + " and r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.SIN_PAGO")
+    int marcarReembolsoPendiente(@Param("id") Long id);
 }

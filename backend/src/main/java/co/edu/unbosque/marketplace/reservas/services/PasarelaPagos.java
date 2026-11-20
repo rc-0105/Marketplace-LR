@@ -1,6 +1,7 @@
 package co.edu.unbosque.marketplace.reservas.services;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 
 /**
  * Puerto hacia la pasarela de pagos (SOF-34, RF-37). El adaptador lo elige {@code pagos.modo}: "simulado"
@@ -17,6 +18,12 @@ public interface PasarelaPagos {
 
     /** Devuelve por completo un cobro aprobado que no pudo confirmar ninguna reserva. */
     void reembolsar(String transaccionId);
+
+    /**
+     * Conciliación: la transacción de un cobro aprobado de la reserva, si la pasarela tiene uno, aunque su
+     * respuesta nunca haya llegado. Lanza {@link FallaPasarelaException} si la pasarela no responde.
+     */
+    Optional<String> buscarCobroAprobado(Long reservaId);
 
     record SolicitudCobro(Long reservaId, BigDecimal monto, String metodoPago, String claveIdempotencia) {
     }

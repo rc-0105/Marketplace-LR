@@ -274,6 +274,77 @@ class ReservaRepositoryIntegracionTest {
                 .isEqualTo(EstadoPago.SIN_PAGO);
     }
 
+    @Test
+    @DisplayName("Conciliación: lista solo las reservas con el pago en ERROR, en orden")
+    @Transactional
+    void listaLasReservasConElPagoEnError() {
+        Reserva primera = guardar(publicacionId, "2026-12-10", "2026-12-12", EstadoReserva.PENDIENTE);
+        Reserva sinError = guardar(publicacionId, "2026-12-12", "2026-12-14", EstadoReserva.PENDIENTE);
+        Reserva segunda = guardar(publicacionId, "2026-12-14", "2026-12-16", EstadoReserva.PENDIENTE);
+        reservas.registrarErrorPago(primera.getId());
+        reservas.registrarErrorPago(segunda.getId());
+        entidades.clear();
+
+        assertThat(reservas.findByEstadoPagoOrderById(EstadoPago.ERROR)).extracting(Reserva::getId)
+                .containsExactly(primera.getId(), segunda.getId())
+                .doesNotContain(sinError.getId());
+    }
+
+    @Test
+    @DisplayName("Conciliación: marcarReembolsado guarda la transacción de una reserva no confirmada con el pago en ERROR")
+    @Transactional
+    void marcarReembolsadoGuardaLaTransaccion() {
+        Reserva vencida = guardar(publicacionId, "2026-12-10", "2026-12-12", EstadoReserva.VENCIDA);
+        Reserva sinError = guardar(publicacionId, "2026-12-12", "2026-12-14", EstadoReserva.VENCIDA);
+        assertThat(reservas.marcarReembolsoPendiente(vencida.getId())).isEqualTo(1);
+
+        assertThat(reservas.marcarReembolsado(vencida.getId(), "pi_9")).isEqualTo(1);
+        assertThat(reservas.marcarReembolsado(sinError.getId(), "pi_10")).isZero();
+
+        entidades.clear();
+        Reserva reembolsada = reservas.findById(vencida.getId()).orElseThrow();
+        assertThat(reembolsada.getEstado()).isEqualTo(EstadoReserva.VENCIDA);
+        assertThat(reembolsada.getEstadoPago()).isEqualTo(EstadoPago.REEMBOLSADO);
+        assertThat(reembolsada.getTransaccionId()).isEqualTo("pi_9");
+        assertThat(reservas.findById(sinError.getId())).get().extracting(Reserva::getEstadoPago)
+                .isEqualTo(EstadoPago.SIN_PAGO);
+    }
+
+    @Test
+    @DisplayName("Conciliación: marcarNoCobrado cierra un pago en ERROR sin transacción y no toca una confirmada")
+    @Transactional
+    void marcarNoCobradoCierraElError() {
+        Reserva pendiente = guardar(publicacionId, "2026-12-10", "2026-12-12", EstadoReserva.PENDIENTE);
+        Reserva confirmada = guardar(publicacionId, "2026-12-12", "2026-12-14", EstadoReserva.PENDIENTE);
+        reservas.registrarErrorPago(pendiente.getId());
+        reservas.confirmarPago(confirmada.getId(), "pi_1");
+
+        assertThat(reservas.marcarNoCobrado(pendiente.getId())).isEqualTo(1);
+        assertThat(reservas.marcarNoCobrado(confirmada.getId())).isZero();
+
+        entidades.clear();
+        assertThat(reservas.findById(pendiente.getId())).get().extracting(Reserva::getEstadoPago)
+                .isEqualTo(EstadoPago.NO_COBRADO);
+        assertThat(reservas.findById(confirmada.getId())).get().extracting(Reserva::getEstadoPago)
+                .isEqualTo(EstadoPago.APROBADO);
+    }
+
+    @Test
+    @DisplayName("marcarReembolsoPendiente pasa a ERROR un pago sin registrar, aunque la reserva ya no esté PENDIENTE")
+    @Transactional
+    void marcarReembolsoPendienteDejaElPagoEnError() {
+        Reserva vencida = guardar(publicacionId, "2026-12-10", "2026-12-12", EstadoReserva.VENCIDA);
+        Reserva confirmada = guardar(publicacionId, "2026-12-12", "2026-12-14", EstadoReserva.PENDIENTE);
+        reservas.confirmarPago(confirmada.getId(), "pi_1");
+
+        assertThat(reservas.marcarReembolsoPendiente(vencida.getId())).isEqualTo(1);
+        assertThat(reservas.marcarReembolsoPendiente(confirmada.getId())).isZero();
+
+        entidades.clear();
+        assertThat(reservas.findById(vencida.getId())).get().extracting(Reserva::getEstadoPago)
+                .isEqualTo(EstadoPago.ERROR);
+    }
+
     private List<Reserva> ocupantesDe(Long id) {
         return reservas.findOcupantes(id, DESDE, HASTA, AHORA);
     }

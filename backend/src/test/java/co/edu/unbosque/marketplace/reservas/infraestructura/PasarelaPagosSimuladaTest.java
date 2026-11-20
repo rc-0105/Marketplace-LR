@@ -37,6 +37,17 @@ class PasarelaPagosSimuladaTest {
                 .isEqualTo(new CobroRechazado("insufficient_funds"));
     }
 
+    @Test
+    @DisplayName("La conciliación encuentra el cobro aprobado de la reserva, y nada si se rechazó o no se cobró")
+    void encuentraElCobroAprobadoDeLaReserva() {
+        ResultadoCobro aprobado = pasarela.cobrar(new SolicitudCobro(5L, BigDecimal.TEN, "pm_card_visa", "reserva-5"));
+        pasarela.cobrar(new SolicitudCobro(6L, BigDecimal.TEN, "pm_card_chargeDeclined", "reserva-6"));
+
+        assertThat(pasarela.buscarCobroAprobado(5L)).contains(((CobroAprobado) aprobado).transaccionId());
+        assertThat(pasarela.buscarCobroAprobado(6L)).isEmpty();
+        assertThat(pasarela.buscarCobroAprobado(7L)).isEmpty();
+    }
+
     private static SolicitudCobro solicitud(String metodo, String clave) {
         return new SolicitudCobro(1L, new BigDecimal("100000"), metodo, clave);
     }

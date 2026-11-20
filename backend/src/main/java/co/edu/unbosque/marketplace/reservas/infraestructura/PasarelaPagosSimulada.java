@@ -2,6 +2,7 @@ package co.edu.unbosque.marketplace.reservas.infraestructura;
 
 import co.edu.unbosque.marketplace.reservas.services.PasarelaPagos;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
@@ -17,6 +18,7 @@ public class PasarelaPagosSimulada implements PasarelaPagos {
     private static final Logger LOG = LoggerFactory.getLogger(PasarelaPagosSimulada.class);
 
     private final Map<String, String> transacciones = new ConcurrentHashMap<>();
+    private final Map<Long, String> aprobadasPorReserva = new ConcurrentHashMap<>();
 
     @Override
     public ResultadoCobro cobrar(SolicitudCobro solicitud) {
@@ -26,6 +28,7 @@ public class PasarelaPagosSimulada implements PasarelaPagos {
         }
         String transaccion = transacciones.computeIfAbsent(solicitud.claveIdempotencia(),
                 clave -> "sim_" + UUID.randomUUID());
+        aprobadasPorReserva.put(solicitud.reservaId(), transaccion);
         LOG.info("Pago simulado aprobado para la reserva {} con la transacción {}", solicitud.reservaId(),
                 transaccion);
         return new CobroAprobado(transaccion);
@@ -34,5 +37,10 @@ public class PasarelaPagosSimulada implements PasarelaPagos {
     @Override
     public void reembolsar(String transaccionId) {
         LOG.info("Reembolso simulado de la transacción {}", transaccionId);
+    }
+
+    @Override
+    public Optional<String> buscarCobroAprobado(Long reservaId) {
+        return Optional.ofNullable(aprobadasPorReserva.get(reservaId));
     }
 }

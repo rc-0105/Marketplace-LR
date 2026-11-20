@@ -189,12 +189,14 @@ class PagoReservaServiceTest {
         assertThatThrownBy(() -> servicio.pagar(RESERVA_ID, HUESPED_ID, "pm_card_visa"))
                 .isInstanceOf(ApartadoPerdidoDuranteElPagoException.class)
                 .hasMessage("El apartado de la reserva venció mientras se procesaba el pago: "
-                        + "el reembolso del cobro quedó pendiente y será revisado.");
+                        + "el reembolso del cobro quedó pendiente y se completará automáticamente.");
 
         assertThat(eventos.list).anySatisfy(evento -> {
             assertThat(evento.getLevel()).isEqualTo(Level.ERROR);
-            assertThat(evento.getFormattedMessage()).contains("pi_tarde", "revisión manual");
+            assertThat(evento.getFormattedMessage()).contains("pi_tarde", "conciliación");
         });
+        // Queda en ERROR para que la conciliación vuelva a intentar el reembolso.
+        verify(registro).marcarReembolsoPendiente(RESERVA_ID);
     }
 
     @Test

@@ -6,7 +6,7 @@
  * @property {string} llegada fecha en formato AAAA-MM-DD
  * @property {string} salida fecha en formato AAAA-MM-DD
  * @property {'PENDIENTE'|'CONFIRMADA'|'CANCELADA'|'VENCIDA'} estado
- * @property {'SIN_PAGO'|'APROBADO'|'RECHAZADO'|'ERROR'} estadoPago
+ * @property {'SIN_PAGO'|'APROBADO'|'RECHAZADO'|'ERROR'|'REEMBOLSADO'|'NO_COBRADO'} estadoPago
  * @property {string|null} transaccionId identificador de la transacción en la pasarela, si se aprobó
  * @property {number} noches
  * @property {number} precioBase

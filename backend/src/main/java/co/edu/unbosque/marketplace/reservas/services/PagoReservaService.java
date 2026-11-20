@@ -117,7 +117,9 @@ public class PagoReservaService {
                     transaccionId, reservaId);
             return true;
         } catch (FallaPasarelaException falla) {
-            LOG.error("No se pudo reembolsar la transacción {} de la reserva {}: requiere revisión manual",
+            // En ERROR, la conciliación vuelve a intentar el reembolso hasta lograrlo.
+            registro.marcarReembolsoPendiente(reservaId);
+            LOG.error("No se pudo reembolsar la transacción {} de la reserva {}: queda para la conciliación",
                     transaccionId, reservaId, falla);
             return false;
         }

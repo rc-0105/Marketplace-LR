@@ -33,6 +33,7 @@ class PasarelaPagosStripeTest {
     private HttpServer servidor;
     private final AtomicReference<String> cuerpo = new AtomicReference<>();
     private final AtomicReference<String> ruta = new AtomicReference<>();
+    private final AtomicReference<String> consulta = new AtomicReference<>();
     private final AtomicReference<String> idempotencia = new AtomicReference<>();
     private volatile int estado;
     private volatile String respuesta;
@@ -113,6 +114,38 @@ class PasarelaPagosStripeTest {
         assertThat(idempotencia.get()).isEqualTo("reembolso-pi_123");
     }
 
+    @Test
+    @DisplayName("La conciliación busca por la reserva un PaymentIntent succeeded y devuelve su id")
+    void buscaElCobroAprobadoDeLaReserva() {
+        responderCon(200, "{\"object\":\"search_result\",\"url\":\"/v1/payment_intents/search\",\"has_more\":false,"
+                + "\"data\":[{\"id\":\"pi_77\",\"object\":\"payment_intent\",\"status\":\"succeeded\"}]}");
+
+        assertThat(pasarela(Duration.ofSeconds(5)).buscarCobroAprobado(42L)).contains("pi_77");
+
+        assertThat(ruta.get()).isEqualTo("/v1/payment_intents/search");
+        assertThat(consulta.get()).contains("query=metadata['reservaId']:'42' AND status:'succeeded'");
+    }
+
+    @Test
+    @DisplayName("Sin PaymentIntent succeeded de la reserva, la búsqueda queda vacía")
+    void sinCobroLaBusquedaQuedaVacia() {
+        responderCon(200, "{\"object\":\"search_result\",\"url\":\"/v1/payment_intents/search\",\"has_more\":false,"
+                + "\"data\":[]}");
+
+        assertThat(pasarela(Duration.ofSeconds(5)).buscarCobroAprobado(42L)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Si la búsqueda no responde a tiempo, falla como sin respuesta")
+    void laBusquedaSinRespuestaFalla() {
+        demoraMs = 3000;
+        responderCon(200, "{\"object\":\"search_result\",\"data\":[]}");
+
+        assertThatThrownBy(() -> pasarela(Duration.ofSeconds(1)).buscarCobroAprobado(42L))
+                .isInstanceOfSatisfying(FallaPasarelaException.class,
+                        falla -> assertThat(falla.isSinRespuesta()).isTrue());
+    }
+
     private PasarelaPagosStripe pasarela(Duration espera) {
         return new PasarelaPagosStripe("sk_test_falsa", espera, "http://localhost:" + servidor.getAddress().getPort());
     }
@@ -124,6 +157,8 @@ class PasarelaPagosStripeTest {
 
     private void responder(HttpExchange intercambio) throws IOException {
         ruta.set(intercambio.getRequestURI().getPath());
+        String crudo = intercambio.getRequestURI().getRawQuery();
+        consulta.set(crudo == null ? "" : URLDecoder.decode(crudo, StandardCharsets.UTF_8));
         idempotencia.set(intercambio.getRequestHeaders().getFirst("Idempotency-Key"));
         cuerpo.set(URLDecoder.decode(new String(intercambio.getRequestBody().readAllBytes(), StandardCharsets.UTF_8),
                 StandardCharsets.UTF_8));
