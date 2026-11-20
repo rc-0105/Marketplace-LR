@@ -871,6 +871,29 @@ class PublicacionServiceTest {
     }
 
     @Test
+    @DisplayName("El modo de reserva de una ACTIVA es el que tiene configurado")
+    void consultarModoReservaDevuelveElModoConfigurado() {
+        Publicacion publicacion = publicacionEn(EstadoPublicacion.ACTIVA);
+        ReflectionTestUtils.setField(publicacion, "modoReserva", ModoReserva.APROBACION);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(publicacion));
+
+        assertThat(servicio.consultarModoReserva(PUBLICACION_ID)).isEqualTo(ModoReserva.APROBACION);
+    }
+
+    @Test
+    @DisplayName("El modo de reserva responde 404 si la publicación no existe o no está ACTIVA")
+    void consultarModoReservaRechazaLasQueNoEstanActivas() {
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> servicio.consultarModoReserva(PUBLICACION_ID))
+                .isInstanceOf(PublicacionNoEncontradaException.class);
+
+        when(publicaciones.findById(PUBLICACION_ID))
+                .thenReturn(Optional.of(publicacionEn(EstadoPublicacion.PAUSADA)));
+        assertThatThrownBy(() -> servicio.consultarModoReserva(PUBLICACION_ID))
+                .isInstanceOf(PublicacionNoEncontradaException.class);
+    }
+
+    @Test
     @DisplayName("Aprobar una pendiente la deja ACTIVA, la guarda y la audita como acción administrativa")
     void aprobarPendienteLaActiva() {
         Publicacion pendiente = publicacionEn(EstadoPublicacion.PENDIENTE_REVISION);
