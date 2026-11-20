@@ -328,4 +328,41 @@ class RegistroIdempotenciaIntegracionTest {
         assertThat(registro.liberar(2L, clave, UUID.randomUUID())).isFalse();
         assertThat(contar(clave)).isEqualTo(1L);
     }
+
+    @Test
+    @DisplayName("Elimina las filas con vence_en en el pasado o igual a ahora y conserva las futuras")
+    void eliminaSoloLasVencidas() {
+        UUID pasada = UUID.randomUUID();
+        UUID limite = UUID.randomUUID();
+        UUID futura = UUID.randomUUID();
+        sembrar(2L, pasada, "COMPLETADA", AHORA.minus(Duration.ofHours(25)), AHORA.minus(Duration.ofHours(1)));
+        sembrar(2L, limite, "COMPLETADA", AHORA.minus(Duration.ofHours(24)), AHORA);
+        sembrar(2L, futura, "COMPLETADA", AHORA.minusSeconds(10), AHORA.plus(Duration.ofHours(1)));
+
+        int eliminadas = registro.eliminarVencidas(AHORA);
+
+        assertThat(eliminadas).isEqualTo(2);
+        assertThat(contar(pasada) + contar(limite)).isZero();
+        assertThat(contar(futura)).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("Una fila EN_PROCESO huérfana y vencida también se elimina")
+    void eliminaEnProcesoHuerfana() {
+        UUID clave = UUID.randomUUID();
+        sembrar(2L, clave, "EN_PROCESO", AHORA.minusSeconds(300), AHORA.minusSeconds(180));
+
+        assertThat(registro.eliminarVencidas(AHORA)).isEqualTo(1);
+        assertThat(contar(clave)).isZero();
+    }
+
+    @Test
+    @DisplayName("Con solo filas vigentes no elimina nada")
+    void noTocaLasVigentes() {
+        sembrar(2L, UUID.randomUUID(), "COMPLETADA", AHORA.minusSeconds(10), AHORA.plusSeconds(60));
+        sembrar(2L, UUID.randomUUID(), "EN_PROCESO", AHORA.minusSeconds(10), AHORA.plusSeconds(60));
+
+        assertThat(registro.eliminarVencidas(AHORA)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM clave_idempotencia", Long.class)).isEqualTo(2L);
+    }
 }

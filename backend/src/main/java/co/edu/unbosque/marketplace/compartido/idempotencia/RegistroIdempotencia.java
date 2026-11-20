@@ -49,6 +49,8 @@ public class RegistroIdempotencia {
             DELETE FROM clave_idempotencia WHERE usuario_id = :usuario AND clave = :clave AND reclamo = :reclamo
             """;
 
+    private static final String ELIMINAR_VENCIDAS = "DELETE FROM clave_idempotencia WHERE vence_en <= :ahora";
+
     private final NamedParameterJdbcTemplate jdbc;
 
     public RegistroIdempotencia(NamedParameterJdbcTemplate jdbc) {
@@ -110,6 +112,12 @@ public class RegistroIdempotencia {
                 .addValue("clave", clave)
                 .addValue("reclamo", reclamo);
         return jdbc.update(LIBERAR, parametros) > 0;
+    }
+
+    /** Borra las filas vencidas (incluidas las EN_PROCESO huérfanas) y devuelve cuántas eliminó. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int eliminarVencidas(Instant ahora) {
+        return jdbc.update(ELIMINAR_VENCIDAS, new MapSqlParameterSource("ahora", utc(ahora)));
     }
 
     private static OffsetDateTime utc(Instant instante) {
