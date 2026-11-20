@@ -8,6 +8,7 @@ import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
 import co.edu.unbosque.marketplace.compartido.infraestructura.RestriccionesPostgres;
 import co.edu.unbosque.marketplace.cotizacion.services.Cotizacion;
 import co.edu.unbosque.marketplace.cotizacion.services.CotizacionService;
+import co.edu.unbosque.marketplace.disponibilidad.exceptions.EstanciaNoDisponibleException;
 import co.edu.unbosque.marketplace.disponibilidad.services.DisponibilidadService;
 import co.edu.unbosque.marketplace.reservas.exceptions.FechasReservaInvalidasException;
 import co.edu.unbosque.marketplace.reservas.exceptions.ModoReservaNoSoportadoException;
@@ -87,7 +88,7 @@ public class ReservaService {
             throw new FechasReservaInvalidasException("La fecha de llegada no puede ser anterior a hoy.");
         }
         Set<Long> servicios = adicionalesElegidos == null ? Set.of() : Set.copyOf(adicionalesElegidos);
-        Optional<Reserva> existente = buscarIdentica(huespedId, publicacionId, llegada, salida, servicios, ahora);
+        Optional<Reserva> existente = buscarIdentica(huespedId, publicacionId, llegada, salida, servicios);
         if (existente.isPresent()) {
             return existente.get();
         }
@@ -97,15 +98,27 @@ public class ReservaService {
             throw new ModoReservaNoSoportadoException();
         }
         Cotizacion cotizacion = cotizaciones.cotizar(publicacionId, llegada, salida, servicios);
-        // Tras cotizar, que ya validó el rango. La estancia debe caber en un periodo y no estar ocupada (SOF-27);
-        // es una verificación temprana: la restricción de exclusión sigue siendo la última barrera ante carreras.
-        disponibilidad.exigirDisponible(publicacionId, llegada, salida);
-
         Reserva reserva = Reserva.nueva(publicacionId, huespedId, llegada, salida, (int) cotizacion.noches(),
                 cotizacion.precioBase(), cotizacion.tarifaLimpieza(), cotizacion.tarifaServicio(),
                 cotizacion.descuento(), cotizacion.totalServiciosAdicionales(), cotizacion.total(), servicios,
                 ahora.plus(apartado));
-        Reserva guardada = guardar(reserva);
+
+        Reserva guardada;
+        try {
+            // Tras cotizar, que ya validó el rango. La estancia debe caber en un periodo y no estar ocupada
+            // (SOF-27); es una verificación temprana: la restricción de exclusión sigue siendo la última
+            // barrera ante carreras, y el flush dentro de RegistroReservas la evalúa.
+            disponibilidad.exigirDisponible(publicacionId, llegada, salida);
+            guardada = registro.registrar(reserva);
+        } catch (EstanciaNoDisponibleException error) {
+            return perdioLaCarrera(error, huespedId, publicacionId, llegada, salida, servicios);
+        } catch (DataIntegrityViolationException error) {
+            if (!RestriccionesPostgres.violaExclusion(error, RESTRICCION_SIN_CRUCE)) {
+                throw error;
+            }
+            return perdioLaCarrera(new ReservaSuperpuestaException(), huespedId, publicacionId, llegada, salida,
+                    servicios);
+        }
         auditar(guardada, huespedId);
         return guardada;
     }
@@ -113,9 +126,9 @@ public class ReservaService {
     // Idéntica es la del mismo huésped, publicación, fechas y servicios adicionales. Si hay una vigente con las
     // mismas fechas pero otros servicios, no se devuelve en silencio: se avisa con un 409.
     private Optional<Reserva> buscarIdentica(Long huespedId, Long publicacionId, LocalDate llegada,
-            LocalDate salida, Set<Long> servicios, Instant ahora) {
+            LocalDate salida, Set<Long> servicios) {
         List<Reserva> mismasFechas = reservas.findVigentesIdenticas(huespedId, publicacionId, llegada, salida,
-                ahora);
+                Instant.now(reloj));
         Optional<Reserva> identica = mismasFechas.stream()
                 .filter(reserva -> reserva.getServiciosAdicionalesIds().equals(servicios)).findFirst();
         if (identica.isEmpty() && !mismasFechas.isEmpty()) {
@@ -124,17 +137,14 @@ public class ReservaService {
         return identica;
     }
 
-    // El cruce lo decide la restricción de exclusión de PostgreSQL, la única que no deja pasar
-    // dos solicitudes simultáneas (ADR-3). El flush la evalúa dentro de RegistroReservas, no al confirmar.
-    private Reserva guardar(Reserva reserva) {
-        try {
-            return registro.registrar(reserva);
-        } catch (DataIntegrityViolationException error) {
-            if (RestriccionesPostgres.violaExclusion(error, RESTRICCION_SIN_CRUCE)) {
-                throw new ReservaSuperpuestaException();
-            }
-            throw error;
-        }
+    // Dos reintentos idénticos y simultáneos del mismo huésped: uno inserta y el otro choca con la reserva del
+    // primero, ya sea contra la restricción de exclusión o en la verificación de disponibilidad. Quien choca
+    // contra su propia reserva idéntica debe recibirla (idempotencia), no un 409. La consulta va después de
+    // que la transacción de la inserción terminó, así que ve lo que el ganador ya confirmó; si no hay
+    // ninguna idéntica, el cruce es con otra reserva y el error original se mantiene.
+    private Reserva perdioLaCarrera(RuntimeException error, Long huespedId, Long publicacionId, LocalDate llegada,
+            LocalDate salida, Set<Long> servicios) {
+        return buscarIdentica(huespedId, publicacionId, llegada, salida, servicios).orElseThrow(() -> error);
     }
 
     private void auditar(Reserva reserva, Long huespedId) {

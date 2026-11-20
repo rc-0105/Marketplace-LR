@@ -139,6 +139,37 @@ class ReservaIntegracionTest {
     }
 
     @Test
+    @DisplayName("Reintentos idénticos y simultáneos del mismo huésped reciben todos la misma reserva, sin 409")
+    void reintentosIdenticosSimultaneosDevuelvenLaMismaReserva() throws Exception {
+        Long id = publicacion("ACTIVA");
+        String token = iniciarSesion("ana@correo.com");
+        int solicitudes = 6;
+        CountDownLatch salida = new CountDownLatch(1);
+        ExecutorService hilos = Executors.newFixedThreadPool(solicitudes);
+        try {
+            List<Future<String>> respuestas = new ArrayList<>();
+            for (int i = 0; i < solicitudes; i++) {
+                respuestas.add(hilos.submit(() -> {
+                    salida.await();
+                    var respuesta = reservar(token, id, LLEGADA, SALIDA, "[]").andReturn().getResponse();
+                    return respuesta.getStatus() + ":" + json.readTree(respuesta.getContentAsString()).path("id");
+                }));
+            }
+            salida.countDown();
+            List<String> obtenidas = new ArrayList<>();
+            for (Future<String> respuesta : respuestas) {
+                obtenidas.add(respuesta.get(30, TimeUnit.SECONDS));
+            }
+
+            assertThat(obtenidas).allMatch(respuesta -> respuesta.startsWith("201:"));
+            assertThat(obtenidas).containsOnly(obtenidas.get(0));
+        } finally {
+            hilos.shutdownNow();
+        }
+        assertThat(reservasGuardadas(id)).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("AC4: si un servicio adicional elegido ya no existe, pide recalcular la cotización y no reserva")
     void servicioAdicionalInexistenteExigeRecotizar() throws Exception {
         Long id = publicacion("ACTIVA");

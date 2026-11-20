@@ -155,6 +155,40 @@ class ReservaServiceTest {
     }
 
     @Test
+    @DisplayName("Un reintento idéntico que pierde la carrera contra la restricción recibe la reserva ganadora, no un 409")
+    void elReintentoSimultaneoRecibeLaReservaGanadora() {
+        Reserva ganadora = reservaExistente();
+        when(reservas.findVigentesIdenticas(HUESPED_ID, PUBLICACION_ID, LLEGADA, SALIDA, AHORA))
+                .thenReturn(List.of()).thenReturn(List.of(ganadora));
+        when(registro.registrar(any(Reserva.class))).thenThrow(violacion("reserva_sin_cruce", "23P01"));
+
+        assertThat(servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of())).isSameAs(ganadora);
+        verify(publicador, never()).publicar(any());
+    }
+
+    @Test
+    @DisplayName("Si la carrera la gana la reserva de otro huésped, la restricción responde 409 como siempre")
+    void perderLaCarreraContraOtroHuespedSigueSiendo409() {
+        when(registro.registrar(any(Reserva.class))).thenThrow(violacion("reserva_sin_cruce", "23P01"));
+
+        assertThatThrownBy(() -> servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of()))
+                .isInstanceOf(ReservaSuperpuestaException.class);
+    }
+
+    @Test
+    @DisplayName("Si la reserva idéntica se confirma entre la primera consulta y la verificación de disponibilidad, se devuelve")
+    void elReintentoQueVeLaReservaPropiaComoOcupadaRecibeLaExistente() {
+        Reserva ganadora = reservaExistente();
+        when(reservas.findVigentesIdenticas(HUESPED_ID, PUBLICACION_ID, LLEGADA, SALIDA, AHORA))
+                .thenReturn(List.of()).thenReturn(List.of(ganadora));
+        doThrow(new EstanciaNoDisponibleException(MotivoNoDisponible.RESERVADO)).when(disponibilidad)
+                .exigirDisponible(PUBLICACION_ID, LLEGADA, SALIDA);
+
+        assertThat(servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of())).isSameAs(ganadora);
+        verify(registro, never()).registrar(any());
+    }
+
+    @Test
     @DisplayName("Otra violación de integridad no se disfraza de solapamiento")
     void otraViolacionSePropagaSinCambios() {
         DataIntegrityViolationException otra = violacion("reserva_fechas_check", "23514");
