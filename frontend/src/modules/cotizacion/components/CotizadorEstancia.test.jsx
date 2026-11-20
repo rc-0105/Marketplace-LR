@@ -199,4 +199,66 @@ describe('CotizadorEstancia', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos confirmar la reserva');
   });
+  it('al editar una fecha después de cotizar descarta la cotización y oculta Confirmar reserva', async () => {
+    vi.mocked(cotizarEstancia).mockResolvedValue(SIN_SERVICIOS);
+    abrir();
+    cotizar();
+    await desglose();
+    expect(screen.getByRole('button', { name: 'Confirmar reserva' })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Salida'), { target: { value: '2026-12-20' } });
+
+    expect(screen.queryByLabelText('Desglose de la cotización')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Confirmar reserva' })).not.toBeInTheDocument();
+    expect(crearReserva).not.toHaveBeenCalled();
+  });
+
+  it('al editar una fecha limpia el resultado de la reserva anterior', async () => {
+    vi.mocked(cotizarEstancia).mockResolvedValue(SIN_SERVICIOS);
+    vi.mocked(crearReserva).mockResolvedValue({ id: 1, estado: 'PENDIENTE' });
+    abrir();
+    cotizar();
+    await desglose();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar reserva' }));
+    await screen.findByRole('status');
+
+    fireEvent.change(screen.getByLabelText('Llegada'), { target: { value: '2026-12-11' } });
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('al cambiar un servicio no deja confirmar la cotización anterior mientras recalcula y luego envía los nuevos', async () => {
+    let resolverRecalculo;
+    vi.mocked(cotizarEstancia).mockResolvedValueOnce(SIN_SERVICIOS)
+      .mockReturnValueOnce(new Promise((resolver) => { resolverRecalculo = resolver; }));
+    vi.mocked(crearReserva).mockResolvedValue({ id: 1, estado: 'PENDIENTE' });
+    abrir();
+    cotizar();
+    await desglose();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /Desayuno/ }));
+
+    expect(screen.queryByLabelText('Desglose de la cotización')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Confirmar reserva' })).not.toBeInTheDocument();
+    resolverRecalculo(CON_DESAYUNO);
+    await desglose();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar reserva' }));
+    await waitFor(() => expect(crearReserva).toHaveBeenCalledWith({
+      publicacionId: 5, llegada: '2026-12-10', salida: '2026-12-14', serviciosAdicionalesIds: [1],
+    }));
+  });
+
+  it('una respuesta tardía de una cotización anterior no reaparece si ya se editaron las fechas', async () => {
+    let resolverTardia;
+    vi.mocked(cotizarEstancia).mockReturnValueOnce(new Promise((resolver) => { resolverTardia = resolver; }));
+    abrir();
+    cotizar();
+
+    fireEvent.change(screen.getByLabelText('Salida'), { target: { value: '2026-12-20' } });
+    resolverTardia(SIN_SERVICIOS);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Cotizar' })).toBeEnabled());
+    expect(screen.queryByLabelText('Desglose de la cotización')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Confirmar reserva' })).not.toBeInTheDocument();
+  });
 });

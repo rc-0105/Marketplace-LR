@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import Campo from '../../../shared/components/Campo.jsx';
 import { crearReserva } from '../../reservas/services/reservaService.js';
@@ -13,6 +13,10 @@ const FORMATO_PESOS = new Intl.NumberFormat('es-CO', { style: 'currency', curren
 /**
  * Cotizador de una estancia: con las fechas muestra el desglose del precio, y cada servicio
  * adicional que se agrega o se quita lo recalcula (RF-32, RF-33).
+ *
+ * La cotización mostrada guarda las fechas y los servicios con que se calculó: "Confirmar reserva"
+ * reserva exactamente eso. Si luego se edita una fecha o un servicio, la cotización se descarta
+ * (y con ella el botón) hasta volver a cotizar, para no reservar algo distinto de lo que se ve.
  */
 export default function CotizadorEstancia({
   publicacionId, serviciosAdicionales = [], llegadaInicial = '', salidaInicial = '',
@@ -20,30 +24,45 @@ export default function CotizadorEstancia({
   const [fechas, setFechas] = useState({ llegada: llegadaInicial, salida: salidaInicial });
   const [elegidos, setElegidos] = useState([]);
   const [errores, setErrores] = useState({});
-  const [cotizacion, setCotizacion] = useState(null);
+  // La cotización a la vista y los datos con que se calculó, que son los que confirma la reserva.
+  const [cotizada, setCotizada] = useState(null);
   const [errorCotizacion, setErrorCotizacion] = useState(null);
   const [calculando, setCalculando] = useState(false);
   const [reservando, setReservando] = useState(false);
   const [mensajeReserva, setMensajeReserva] = useState(null);
   const [errorReserva, setErrorReserva] = useState(null);
+  // Cada edición o cálculo invalida las respuestas en vuelo: una cotización tardía no debe reaparecer.
+  const solicitud = useRef(0);
+
+  function descartarCotizacion() {
+    solicitud.current += 1;
+    setCotizada(null);
+    setCalculando(false);
+    setMensajeReserva(null);
+    setErrorReserva(null);
+  }
 
   function cambiarFecha(evento) {
     const { name, value } = evento.target;
     setFechas((actuales) => ({ ...actuales, [name]: value }));
+    descartarCotizacion();
   }
 
   async function calcular(servicios) {
+    descartarCotizacion();
+    const actual = solicitud.current;
+    const { llegada, salida } = fechas;
     setErrorCotizacion(null);
-    setMensajeReserva(null);
-    setErrorReserva(null);
     setCalculando(true);
     try {
-      setCotizacion(await cotizarEstancia({ publicacionId, ...fechas, serviciosAdicionales: servicios }));
+      const resultado = await cotizarEstancia({ publicacionId, llegada, salida, serviciosAdicionales: servicios });
+      if (actual === solicitud.current) setCotizada({ cotizacion: resultado, llegada, salida, servicios });
     } catch (error) {
-      setCotizacion(null);
-      setErrorCotizacion(error.estado === 400 ? error.message : MENSAJE_ERROR);
+      if (actual === solicitud.current) {
+        setErrorCotizacion(error.estado === 400 ? error.message : MENSAJE_ERROR);
+      }
     } finally {
-      setCalculando(false);
+      if (actual === solicitud.current) setCalculando(false);
     }
   }
 
@@ -54,7 +73,8 @@ export default function CotizadorEstancia({
     setMensajeReserva(null);
     setReservando(true);
     try {
-      await crearReserva({ publicacionId, ...fechas, serviciosAdicionalesIds: elegidos });
+      const { llegada, salida, servicios } = cotizada;
+      await crearReserva({ publicacionId, llegada, salida, serviciosAdicionalesIds: servicios });
       setMensajeReserva(MENSAJE_RESERVA_CREADA);
     } catch (error) {
       setErrorReserva(error.estado >= 400 && error.estado < 500 ? error.message : MENSAJE_ERROR_RESERVA);
@@ -77,7 +97,8 @@ export default function CotizadorEstancia({
   function alternarServicio(id) {
     const nuevos = elegidos.includes(id) ? elegidos.filter((actual) => actual !== id) : [...elegidos, id];
     setElegidos(nuevos);
-    if (cotizacion) calcular(nuevos);
+    if (cotizada) calcular(nuevos);
+    else descartarCotizacion();
   }
 
   return (
@@ -107,18 +128,18 @@ export default function CotizadorEstancia({
 
       {errorCotizacion && <p role="alert" className={estilos.error}>{errorCotizacion}</p>}
 
-      {cotizacion && (
+      {cotizada && (
         <>
           <dl className={estilos.desglose} aria-label="Desglose de la cotización">
-            <div><dt>Noches</dt><dd>{cotizacion.noches}</dd></div>
-            <div><dt>Precio base</dt><dd>{FORMATO_PESOS.format(cotizacion.precioBase)}</dd></div>
-            <div><dt>Tarifa de limpieza</dt><dd>{FORMATO_PESOS.format(cotizacion.tarifaLimpieza)}</dd></div>
-            <div><dt>Tarifa de servicio</dt><dd>{FORMATO_PESOS.format(cotizacion.tarifaServicio)}</dd></div>
-            {cotizacion.serviciosAdicionales.map((adicional) => (
+            <div><dt>Noches</dt><dd>{cotizada.cotizacion.noches}</dd></div>
+            <div><dt>Precio base</dt><dd>{FORMATO_PESOS.format(cotizada.cotizacion.precioBase)}</dd></div>
+            <div><dt>Tarifa de limpieza</dt><dd>{FORMATO_PESOS.format(cotizada.cotizacion.tarifaLimpieza)}</dd></div>
+            <div><dt>Tarifa de servicio</dt><dd>{FORMATO_PESOS.format(cotizada.cotizacion.tarifaServicio)}</dd></div>
+            {cotizada.cotizacion.serviciosAdicionales.map((adicional) => (
               <div key={adicional.id}><dt>{adicional.nombre}</dt><dd>{FORMATO_PESOS.format(adicional.costo)}</dd></div>
             ))}
-            <div><dt>Descuentos</dt><dd>{FORMATO_PESOS.format(cotizacion.descuento)}</dd></div>
-            <div className={estilos.total}><dt>Total</dt><dd>{FORMATO_PESOS.format(cotizacion.total)}</dd></div>
+            <div><dt>Descuentos</dt><dd>{FORMATO_PESOS.format(cotizada.cotizacion.descuento)}</dd></div>
+            <div className={estilos.total}><dt>Total</dt><dd>{FORMATO_PESOS.format(cotizada.cotizacion.total)}</dd></div>
           </dl>
           <button type="button" className={estilos.reservar} onClick={confirmarReserva} disabled={reservando}>
             {reservando ? 'Confirmando…' : 'Confirmar reserva'}
