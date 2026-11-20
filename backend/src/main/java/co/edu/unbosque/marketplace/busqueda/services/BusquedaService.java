@@ -5,30 +5,37 @@ import co.edu.unbosque.marketplace.alojamientos.services.DetalleAlojamiento;
 import co.edu.unbosque.marketplace.alojamientos.services.PublicacionService;
 import co.edu.unbosque.marketplace.busqueda.exceptions.BusquedaInvalidaException;
 import co.edu.unbosque.marketplace.disponibilidad.services.DisponibilidadService;
+import co.edu.unbosque.marketplace.identidad.services.CuentaService;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
+
+How is Claude doing this session? (optional)
+  1: Bad    2: Fine   3: Good   0: Dismiss
 import java.util.Set;
 import org.springframework.stereotype.Service;
 
 /**
- * Búsqueda de alojamientos por ciudad y fechas, con filtros combinados.
- * entrega las publicaciones ACTIVAS de la ciudad ymdice cuáles ofrecen toda la estancia.
+ * Búsqueda de alojamientos por ciudad y fechas, con filtros combinados (RF-28, RF-30). Solo orquesta:
+ * {@code alojamientos} entrega las publicaciones ACTIVAS de la ciudad,
+ * {@code identidad} dice qué anfitriones están restringidos (RF-58) y
+ * {@code disponibilidad} dice cuáles ofrecen toda la estancia (ADR-2).
  */
 @Service
 public class BusquedaService {
 
     private final PublicacionService publicaciones;
     private final DisponibilidadService disponibilidad;
+    private final CuentaService cuentas;
 
-    public BusquedaService(PublicacionService publicaciones, DisponibilidadService disponibilidad) {
+    public BusquedaService(PublicacionService publicaciones, DisponibilidadService disponibilidad,
+            CuentaService cuentas) {
         this.publicaciones = publicaciones;
         this.disponibilidad = disponibilidad;
+        this.cuentas = cuentas;
     }
 
     /**
      * La ciudad y las fechas ya llegan validadas; sin resultados devuelve una lista vacía, no un error.
+     * El estado de la publicación no cambia al restringir al anfitrión: al rehabilitarlo, sus ACTIVAS vuelven solas.
      * Los filtros se combinan: un resultado debe cumplir todos los que vengan informados.
      */
     public List<CandidatoBusqueda> buscar(String ciudad, LocalDate llegada, LocalDate salida,
@@ -40,10 +47,20 @@ public class BusquedaService {
                 && filtros.precioMin().compareTo(filtros.precioMax()) > 0) {
             throw new BusquedaInvalidaException("El precio mínimo no puede ser mayor que el máximo");
         }
-        List<CandidatoBusqueda> candidatos = publicaciones.buscarCandidatos(ciudad.strip());
+        List<CandidatoBusqueda> activas = publicaciones.buscarCandidatos(ciudad.strip());
+        Set<Long> anfitriones = new HashSet<>();
+        for (CandidatoBusqueda activa : activas) {
+            anfitriones.add(activa.anfitrionId());
+        }
+        Set<Long> restringidos = cuentas.filtrarRestringidos(anfitriones);
+
+        List<CandidatoBusqueda> candidatos = new ArrayList<>();
         Set<Long> ids = new HashSet<>();
-        for (CandidatoBusqueda candidato : candidatos) {
-            ids.add(candidato.id());
+        for (CandidatoBusqueda activa : activas) {
+            if (!restringidos.contains(activa.anfitrionId())) {
+                candidatos.add(activa);
+                ids.add(activa.id());
+            }
         }
         Set<Long> disponibles = disponibilidad.filtrarDisponibles(ids, llegada, salida);
 

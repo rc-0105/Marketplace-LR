@@ -126,3 +126,10 @@
   text-decoration: underline;
   cursor: pointer;
 }
+
+.calendario {
+  display: inline-block;
+  margin-top: var(--espacio-3);
+  color: var(--color-terracota);
+  font-weight: 600;
+}

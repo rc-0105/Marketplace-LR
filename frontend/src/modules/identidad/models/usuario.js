@@ -195,3 +195,50 @@ export function usuarioDesdeApi(respuesta) {
     activa: respuesta.estado === 'ACTIVA',
   };
 }
+
+/**
+ * @typedef {'ACTIVA' | 'DESACTIVADA' | 'RESTRINGIDA'} EstadoCuenta
+ */
+
+/**
+ * Cuenta tal como la ve el administrador (RF-58).
+ * @typedef {Object} UsuarioAdministrado
+ * @property {number} id
+ * @property {string} nombre
+ * @property {string} correo
+ * @property {string} rol
+ * @property {EstadoCuenta} estado
+ * @property {string} motivoRestriccion vacío si no está restringida
+ */
+
+const MAXIMO_MOTIVO = 500;
+
+/**
+ * Mismo formato que valida la API (RestringirCuentaRequest): obligatorio y hasta 500 caracteres.
+ * @param {string} motivo
+ * @returns {string | undefined} mensaje de error, o nada si el formato es válido
+ */
+export function errorDeMotivo(motivo) {
+  if (!motivo.trim()) {
+    return 'Escribe el motivo de la restricción.';
+  }
+  return motivo.trim().length > MAXIMO_MOTIVO
+    ? `El motivo no puede superar los ${MAXIMO_MOTIVO} caracteres.`
+    : undefined;
+}
+
+/**
+ * @param {{id: number, nombre: string, correo: string, rol: string, estado: EstadoCuenta,
+ *   motivoRestriccion: ?string}} respuesta
+ * @returns {UsuarioAdministrado}
+ */
+export function usuarioAdministradoDesdeApi(respuesta) {
+  return {
+    id: respuesta.id,
+    nombre: respuesta.nombre,
+    correo: respuesta.correo,
+    rol: respuesta.rol,
+    estado: respuesta.estado,
+    motivoRestriccion: respuesta.motivoRestriccion ?? '',
+  };
+}

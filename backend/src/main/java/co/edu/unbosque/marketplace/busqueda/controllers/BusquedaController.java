@@ -19,22 +19,22 @@ import org.springframework.web.bind.annotation.RestController;
 @PreAuthorize(Permisos.HUESPED)
 public class BusquedaController {
 
-	private final BusquedaService busquedaService;
+    private final BusquedaService busquedaService;
 
-	public BusquedaController(BusquedaService busquedaService) {
-		this.busquedaService = busquedaService;
-	}
+    public BusquedaController(BusquedaService busquedaService) {
+        this.busquedaService = busquedaService;
+    }
 
-	/** Las ACTIVAS de la ciudad con disponibilidad en el rango; sin coincidencias, una lista vacía. */
-	@GetMapping("/busqueda")
-	public List<ResultadoBusquedaResponse> buscar(@Valid BusquedaRequest data) {
-		return ResultadoBusquedaResponse
-				.desde(busquedaService.buscar(data.ciudad(), data.llegada(), data.salida(), data.filtros()));
-	}
+    /** Las ACTIVAS de la ciudad con disponibilidad en el rango; sin coincidencias, una lista vacía. */
+    @GetMapping("/busqueda")
+    public List<ResultadoBusquedaResponse> buscar(@Valid BusquedaRequest data) {
+        return ResultadoBusquedaResponse
+                .desde(busquedaService.buscar(data.ciudad(), data.llegada(), data.salida(), data.filtros()));
+    }
 
-	/** Detalle de una publicación ACTIVA; si no existe o no está activa responde 404. */
-	@GetMapping("/busqueda/{id}")
-	public DetalleBusquedaResponse detalle(@PathVariable Long id) {
-		return DetalleBusquedaResponse.desde(busquedaService.detalle(id));
-	}
+    /** Detalle de una publicación ACTIVA; si no existe o no está activa responde 404. */
+    @GetMapping("/busqueda/{id}")
+    public DetalleBusquedaResponse detalle(@PathVariable Long id) {
+        return DetalleBusquedaResponse.desde(busquedaService.detalle(id));
+    }
 }

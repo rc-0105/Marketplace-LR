@@ -1,0 +1,122 @@
+.calendario {
+  display: grid;
+  gap: var(--espacio-4);
+}
+
+.aviso {
+  display: block;
+  margin: 0;
+  padding: var(--espacio-3) var(--espacio-4);
+  border-radius: var(--radio);
+  background: var(--color-superficie);
+  color: var(--color-texto);
+}
+
+.navegacion {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--espacio-2);
+}
+
+.boton {
+  padding: var(--espacio-2) var(--espacio-4);
+  border: 1px solid var(--color-borde-control);
+  border-radius: var(--radio);
+  background: transparent;
+  color: var(--color-texto);
+  font: inherit;
+  cursor: pointer;
+}
+
+.boton:hover:not(:disabled) {
+  background: var(--color-superficie);
+}
+
+.boton:focus-visible {
+  outline: 2px solid var(--color-terracota);
+  outline-offset: 2px;
+}
+
+.boton:disabled {
+  color: var(--color-texto-secundario);
+  cursor: not-allowed;
+}
+
+.tabla {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: var(--espacio-1);
+  table-layout: fixed;
+}
+
+.mes {
+  margin-bottom: var(--espacio-2);
+  font-size: var(--texto-titulo);
+  font-weight: 600;
+}
+
+/* Solo la inicial: capitalize volvía "De" en "noviembre de 2026". */
+.mes::first-letter {
+  text-transform: uppercase;
+}
+
+.encabezado {
+  color: var(--color-texto-secundario);
+  font-size: var(--texto-pequeno);
+  font-weight: 600;
+}
+
+.dia {
+  padding: var(--espacio-3) 0;
+  border: 2px solid transparent;
+  border-radius: var(--radio);
+  color: var(--color-texto);
+  text-align: center;
+}
+
+.vacio {
+  padding: var(--espacio-3) 0;
+}
+
+/* Cada estado lleva color y un marcador que no es color: el rayado y el borde grueso se ven en blanco y negro. */
+.disponible {
+  background: var(--color-exito-fondo);
+  border-color: var(--color-exito);
+}
+
+.reservado {
+  background: var(--color-reservado-fondo);
+  border: 4px double var(--color-reservado);
+  font-weight: 700;
+}
+
+.bloqueado {
+  background: repeating-linear-gradient(135deg, var(--color-bloqueado-fondo) 0 4px, var(--color-superficie) 4px 8px);
+  border-color: var(--color-borde-control);
+}
+
+.sinEstado {
+  color: var(--color-texto-secundario);
+}
+
+.leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espacio-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.referencia {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-2);
+}
+
+.muestra {
+  display: inline-block;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: var(--espacio-1);
+}

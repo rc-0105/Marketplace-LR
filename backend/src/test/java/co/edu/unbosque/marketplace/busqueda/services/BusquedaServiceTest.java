@@ -14,6 +14,7 @@ import co.edu.unbosque.marketplace.alojamientos.services.PublicacionService;
 import co.edu.unbosque.marketplace.busqueda.exceptions.BusquedaInvalidaException;
 import co.edu.unbosque.marketplace.disponibilidad.services.DisponibilidadService;
 import co.edu.unbosque.marketplace.disponibilidad.services.PeriodoLibre;
+import co.edu.unbosque.marketplace.identidad.services.CuentaService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.HashSet;
@@ -29,7 +30,8 @@ class BusquedaServiceTest {
 
     private final PublicacionService publicaciones = mock(PublicacionService.class);
     private final DisponibilidadService disponibilidad = mock(DisponibilidadService.class);
-    private final BusquedaService servicio = new BusquedaService(publicaciones, disponibilidad);
+    private final CuentaService cuentas = mock(CuentaService.class);
+    private final BusquedaService servicio = new BusquedaService(publicaciones, disponibilidad, cuentas);
 
     @Test
     @DisplayName("Devuelve solo los candidatos de la ciudad que tienen disponibilidad en el rango")
@@ -59,7 +61,21 @@ class BusquedaServiceTest {
         assertThatThrownBy(() -> servicio.buscar("Santa Marta", SALIDA, LLEGADA, FiltrosBusqueda.ninguno()))
                 .isInstanceOf(BusquedaInvalidaException.class);
 
-        verifyNoInteractions(publicaciones, disponibilidad);
+        verifyNoInteractions(publicaciones, disponibilidad, cuentas);
+    }
+
+    @Test
+    @DisplayName("Descarta las publicaciones de anfitriones restringidos antes de consultar la disponibilidad")
+    void descartaAnfitrionesRestringidos() {
+        CandidatoBusqueda deRestringido = candidato(1L, 10L);
+        CandidatoBusqueda deActivo = candidato(2L, 20L);
+        when(publicaciones.buscarCandidatos("Santa Marta")).thenReturn(List.of(deRestringido, deActivo));
+        when(cuentas.filtrarRestringidos(Set.of(10L, 20L))).thenReturn(Set.of(10L));
+        when(disponibilidad.filtrarDisponibles(Set.of(2L), LLEGADA, SALIDA)).thenReturn(Set.of(2L));
+
+        assertThat(servicio.buscar("Santa Marta", LLEGADA, SALIDA, FiltrosBusqueda.ninguno()))
+                .containsExactly(deActivo);
+        verify(disponibilidad).filtrarDisponibles(Set.of(2L), LLEGADA, SALIDA);
     }
 
     @Test
@@ -117,7 +133,7 @@ class BusquedaServiceTest {
         assertThatThrownBy(() -> servicio.buscar("Santa Marta", LLEGADA, SALIDA, filtros))
                 .isInstanceOf(BusquedaInvalidaException.class);
 
-        verifyNoInteractions(publicaciones, disponibilidad);
+        verifyNoInteractions(publicaciones, disponibilidad, cuentas);
     }
 
     @Test
@@ -156,13 +172,22 @@ class BusquedaServiceTest {
         when(disponibilidad.filtrarDisponibles(ids, LLEGADA, SALIDA)).thenReturn(ids);
     }
 
+    private static CandidatoBusqueda candidato(Long id, Long anfitrionId, String tipo, int capacidad, String precio,
+            Set<Long> servicios) {
+        return new CandidatoBusqueda(id, anfitrionId, "Casa " + id, "Santa Marta", tipo, capacidad,
+                new BigDecimal(precio), null, servicios);
+    }
+
     private static CandidatoBusqueda candidato(Long id, String tipo, int capacidad, String precio,
             Set<Long> servicios) {
-        return new CandidatoBusqueda(id, "Casa " + id, "Santa Marta", tipo, capacidad, new BigDecimal(precio), null,
-                servicios);
+        return candidato(id, 10L, tipo, capacidad, precio, servicios);
+    }
+
+    private static CandidatoBusqueda candidato(Long id, Long anfitrionId) {
+        return candidato(id, anfitrionId, "Casa", 4, "250000", Set.of());
     }
 
     private static CandidatoBusqueda candidato(Long id) {
-        return candidato(id, "Casa", 4, "250000", Set.of());
+        return candidato(id, 10L);
     }
 }

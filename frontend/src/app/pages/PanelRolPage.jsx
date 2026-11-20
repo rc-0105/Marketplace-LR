@@ -16,6 +16,11 @@ function HerramientasAdministrador() {
       <h2 id="herramientas-titulo" className={estilos.subtitulo}>Tus herramientas</h2>
       <div className={estilos.herramientas}>
         <ResumenRevision />
+        <section className={estilos.tarjeta} aria-labelledby="usuarios-titulo">
+          <h3 id="usuarios-titulo" className={estilos.tituloTarjeta}>Usuarios</h3>
+          <p className={estilos.nota}>Restringe las cuentas que incumplen las políticas o rehabilítalas.</p>
+          <Link to="/administrador/usuarios" className={estilos.enlace}>Administrar usuarios</Link>
+        </section>
         <section className={estilos.tarjeta} aria-labelledby="cuenta-titulo">
           <h3 id="cuenta-titulo" className={estilos.tituloTarjeta}>Tu cuenta</h3>
           <p className={estilos.nota}>Consulta y actualiza tus datos o cambia tu contraseña.</p>
