@@ -46,6 +46,20 @@ describe('BusquedaPage', () => {
     expect(screen.getByRole('img', { name: 'Foto de Casa en la playa' })).toBeInTheDocument();
   });
 
+  it('cada alojamiento enlaza a su detalle con las fechas con que se buscó, aunque se editen después', async () => {
+    vi.mocked(buscarAlojamientos).mockResolvedValue([
+      { id: 1, titulo: 'Casa en la playa', ciudad: 'Santa Marta', tipo: 'Casa', capacidad: 4, precioNoche: 250000,
+        imagenPrincipal: null },
+    ]);
+    render(<MemoryRouter><BusquedaPage /></MemoryRouter>);
+    llenar();
+    const enlace = await screen.findByRole('link', { name: 'Casa en la playa' });
+
+    fireEvent.change(screen.getByLabelText('Salida'), { target: { value: '2027-01-30' } });
+
+    expect(enlace).toHaveAttribute('href', '/huesped/busqueda/1?llegada=2026-12-20&salida=2026-12-25');
+  });
+
   it('si no hay resultados muestra el estado vacío con la sugerencia de ampliar fechas, sin error', async () => {
     vi.mocked(buscarAlojamientos).mockResolvedValue([]);
     render(<MemoryRouter><BusquedaPage /></MemoryRouter>);

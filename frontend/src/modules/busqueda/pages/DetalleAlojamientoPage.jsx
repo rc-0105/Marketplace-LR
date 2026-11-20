@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
+import CotizadorEstancia from '../../cotizacion/components/CotizadorEstancia.jsx';
 import { consultarDetalle } from '../services/busquedaService.js';
 import estilos from './DetalleAlojamientoPage.module.css';
 
@@ -12,8 +13,14 @@ function formatearFecha(fecha) {
   return FORMATO_FECHA.format(new Date(`${fecha}T00:00:00`));
 }
 
+// La búsqueda manda sus fechas en la dirección; si no vienen o no son AAAA-MM-DD, el cotizador empieza vacío.
+function fechaDeLaBusqueda(valor) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(valor ?? '') ? valor : '';
+}
+
 export default function DetalleAlojamientoPage() {
   const { id } = useParams();
+  const [consulta] = useSearchParams();
   const [detalle, setDetalle] = useState(null);
   const [estado, setEstado] = useState('cargando');
 
@@ -112,6 +119,10 @@ export default function DetalleAlojamientoPage() {
           {detalle.descripcionPolitica && <p>{detalle.descripcionPolitica}</p>}
         </section>
       )}
+
+      <CotizadorEstancia publicacionId={detalle.id} serviciosAdicionales={detalle.serviciosAdicionales}
+        llegadaInicial={fechaDeLaBusqueda(consulta.get('llegada'))}
+        salidaInicial={fechaDeLaBusqueda(consulta.get('salida'))} />
 
       <section>
         <h2 className={estilos.seccion}>Disponibilidad</h2>

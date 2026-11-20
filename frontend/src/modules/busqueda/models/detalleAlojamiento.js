@@ -13,6 +13,8 @@
  * @property {string[]} servicios
  * @property {string | null} politicaCancelacion
  * @property {string | null} descripcionPolitica
+ * @property {number | null} tarifaLimpieza nula cuando el anfitrión no cobra una
+ * @property {{id: number, nombre: string, costo: number}[]} serviciosAdicionales los que el huésped puede agregar
  * @property {{inicio: string, fin: string}[]} periodos fechas AAAA-MM-DD
  * @property {number | null} calificacionPromedio nulo mientras no tenga calificaciones
  */
@@ -36,6 +38,12 @@ export function detalleDesdeApi(dato) {
     servicios: dato.servicios ?? [],
     politicaCancelacion: dato.politicaCancelacion ?? null,
     descripcionPolitica: dato.descripcionPolitica ?? null,
+    tarifaLimpieza: dato.tarifaLimpieza == null ? null : Number(dato.tarifaLimpieza),
+    serviciosAdicionales: (dato.serviciosAdicionales ?? []).map((adicional) => ({
+      id: adicional.id,
+      nombre: adicional.nombre,
+      costo: Number(adicional.costo),
+    })),
     periodos: dato.periodos ?? [],
     calificacionPromedio: dato.calificacionPromedio ?? null,
   };

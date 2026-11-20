@@ -124,7 +124,8 @@ class BusquedaServiceTest {
     @DisplayName("El detalle junta el alojamiento activo con su calendario")
     void detalleIncluyeElCalendario() {
         DetalleAlojamiento alojamiento = new DetalleAlojamiento(1L, "Casa 1", "Frente al mar", "Santa Marta", "Casa",
-                4, new BigDecimal("250000"), "No fumar", List.of(), List.of("Wifi"), "Flexible", "Devolución total");
+                4, new BigDecimal("250000"), "No fumar", List.of(), List.of("Wifi"), "Flexible", "Devolución total",
+                null, List.of());
         PeriodoLibre periodo = new PeriodoLibre(LLEGADA, SALIDA);
         when(publicaciones.consultarActiva(1L)).thenReturn(alojamiento);
         when(disponibilidad.listarLibres(1L)).thenReturn(List.of(periodo));

@@ -41,6 +41,27 @@ describe('buscarAlojamientos', () => {
     });
   });
 
+  it('convierte la tarifa de limpieza y el costo de los servicios adicionales a número', async () => {
+    vi.mocked(get).mockResolvedValue({
+      id: 5, titulo: 'Casa', tarifaLimpieza: '30000.00',
+      serviciosAdicionales: [{ id: 1, nombre: 'Desayuno', costo: '15000.00' }],
+    });
+
+    const detalle = await consultarDetalle(5);
+
+    expect(detalle.tarifaLimpieza).toBe(30000);
+    expect(detalle.serviciosAdicionales).toEqual([{ id: 1, nombre: 'Desayuno', costo: 15000 }]);
+  });
+
+  it('sin tarifa de limpieza ni servicios adicionales los deja nulo y vacío', async () => {
+    vi.mocked(get).mockResolvedValue({ id: 5, titulo: 'Casa' });
+
+    const detalle = await consultarDetalle(5);
+
+    expect(detalle.tarifaLimpieza).toBeNull();
+    expect(detalle.serviciosAdicionales).toEqual([]);
+  });
+
   it('convierte cada resultado al modelo del frontend', async () => {
     vi.mocked(get).mockResolvedValue([
       { id: 1, titulo: 'Casa', ciudad: 'Santa Marta', tipo: 'Casa', capacidad: 4, precioNoche: '250000.00' },

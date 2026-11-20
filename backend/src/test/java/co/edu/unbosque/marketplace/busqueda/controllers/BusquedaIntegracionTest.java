@@ -113,6 +113,7 @@ class BusquedaIntegracionTest {
                 .andExpect(jsonPath("$.id").value(id.intValue()))
                 .andExpect(jsonPath("$.titulo").value("Casa en la playa"))
                 .andExpect(jsonPath("$.ciudad").value("Santa Marta"))
+                .andExpect(jsonPath("$.serviciosAdicionales.length()").value(0))
                 .andExpect(jsonPath("$.periodos.length()").value(1))
                 .andExpect(jsonPath("$.periodos[0].inicio").value(LLEGADA.toString()))
                 .andExpect(jsonPath("$.calificacionPromedio").doesNotExist())

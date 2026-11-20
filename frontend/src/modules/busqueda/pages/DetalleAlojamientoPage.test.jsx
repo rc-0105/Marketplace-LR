@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi } from '../../../shared/services/http.js';
@@ -24,9 +24,9 @@ const DETALLE = {
   calificacionPromedio: null,
 };
 
-function abrir() {
+function abrir(ruta = '/huesped/busqueda/5') {
   render(
-    <MemoryRouter initialEntries={['/huesped/busqueda/5']}>
+    <MemoryRouter initialEntries={[ruta]}>
       <Routes>
         <Route path="/huesped/busqueda/:id" element={<DetalleAlojamientoPage />} />
       </Routes>
@@ -53,6 +53,26 @@ describe('DetalleAlojamientoPage', () => {
     expect(screen.getByText('No fumar')).toBeInTheDocument();
     expect(screen.getByText('Flexible')).toBeInTheDocument();
     expect(screen.getByText(/Del 20 de diciembre de 2026 al 31 de diciembre de 2026/)).toBeInTheDocument();
+  });
+
+  it('el cotizador llega con la llegada y la salida de la búsqueda, y el huésped puede cambiarlas', async () => {
+    vi.mocked(consultarDetalle).mockResolvedValue(DETALLE);
+
+    abrir('/huesped/busqueda/5?llegada=2026-12-20&salida=2026-12-25');
+
+    expect(await screen.findByLabelText('Llegada')).toHaveValue('2026-12-20');
+    expect(screen.getByLabelText('Salida')).toHaveValue('2026-12-25');
+    fireEvent.change(screen.getByLabelText('Salida'), { target: { value: '2026-12-27' } });
+    expect(screen.getByLabelText('Salida')).toHaveValue('2026-12-27');
+  });
+
+  it('sin fechas en la dirección, o con un formato inválido, el cotizador empieza vacío', async () => {
+    vi.mocked(consultarDetalle).mockResolvedValue(DETALLE);
+
+    abrir('/huesped/busqueda/5?llegada=pronto&salida=');
+
+    expect(await screen.findByLabelText('Llegada')).toHaveValue('');
+    expect(screen.getByLabelText('Salida')).toHaveValue('');
   });
 
   it('si no tiene calificaciones lo indica en lugar de mostrar cero', async () => {
