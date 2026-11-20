@@ -1,0 +1,58 @@
+.formulario {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--espacio-3);
+  align-items: end;
+  margin: var(--espacio-6) 0 var(--espacio-4);
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-1);
+}
+
+.etiqueta {
+  font-size: var(--texto-pequeno);
+  font-weight: 600;
+}
+
+.control {
+  min-height: 2.75rem;
+  padding: var(--espacio-2) var(--espacio-3);
+  border: 1px solid var(--color-borde-control);
+  border-radius: var(--radio);
+  background: var(--color-fondo);
+  color: var(--color-texto);
+  font: inherit;
+}
+
+.control[aria-invalid='true'] {
+  border-color: var(--color-error);
+}
+
+.error {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: var(--espacio-3) var(--espacio-4);
+  border-radius: var(--radio);
+  background: var(--color-error-fondo);
+  color: var(--color-error);
+}
+
+.primario {
+  min-height: 2.75rem;
+  padding: 0 var(--espacio-4);
+  border: 1px solid var(--color-terracota);
+  border-radius: var(--radio);
+  background: var(--color-terracota);
+  color: var(--color-sobre-terracota);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transicion);
+}
+
+.primario:hover {
+  background: var(--color-terracota-oscuro);
+}
