@@ -7,9 +7,9 @@ import co.edu.unbosque.marketplace.busqueda.exceptions.BusquedaInvalidaException
 import co.edu.unbosque.marketplace.disponibilidad.services.DisponibilidadService;
 import co.edu.unbosque.marketplace.identidad.services.CuentaService;
 import java.time.LocalDate;
-
-How is Claude doing this session? (optional)
-  1: Bad    2: Fine   3: Good   0: Dismiss
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 

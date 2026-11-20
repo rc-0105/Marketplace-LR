@@ -23,11 +23,17 @@ public class ConfiguracionCotizacion {
     private BigDecimal porcentajeDescuento;
 
     protected ConfiguracionCotizacion() {
-        // Requerido por JPA.
+      
     }
 
     public ConfiguracionCotizacion(BigDecimal porcentajeServicio, BigDecimal porcentajeDescuento) {
         this.id = ID;
+        this.porcentajeServicio = porcentajeServicio;
+        this.porcentajeDescuento = porcentajeDescuento;
+    }
+
+    /** Reemplaza ambos porcentajes; las cotizaciones nuevas los usan de inmediato (RF-34). */
+    public void cambiar(BigDecimal porcentajeServicio, BigDecimal porcentajeDescuento) {
         this.porcentajeServicio = porcentajeServicio;
         this.porcentajeDescuento = porcentajeDescuento;
     }
