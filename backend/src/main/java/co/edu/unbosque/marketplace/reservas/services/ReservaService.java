@@ -5,6 +5,7 @@ import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
+import co.edu.unbosque.marketplace.compartido.infraestructura.RestriccionesPostgres;
 import co.edu.unbosque.marketplace.cotizacion.services.Cotizacion;
 import co.edu.unbosque.marketplace.cotizacion.services.CotizacionService;
 import co.edu.unbosque.marketplace.reservas.exceptions.ModoReservaNoSoportadoException;
@@ -12,7 +13,6 @@ import co.edu.unbosque.marketplace.reservas.exceptions.ReservaSuperpuestaExcepti
 import co.edu.unbosque.marketplace.reservas.model.EstadoReserva;
 import co.edu.unbosque.marketplace.reservas.model.Reserva;
 import co.edu.unbosque.marketplace.reservas.repository.ReservaRepository;
-import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Map;
@@ -32,7 +32,6 @@ public class ReservaService {
 
     private static final String ENTIDAD = "Reserva";
     private static final String RESTRICCION_SIN_CRUCE = "reserva_sin_cruce";
-    private static final String VIOLACION_EXCLUSION = "23P01";
 
     private final ReservaRepository reservas;
     private final CotizacionService cotizaciones;
@@ -83,23 +82,11 @@ public class ReservaService {
         try {
             return reservas.saveAndFlush(reserva);
         } catch (DataIntegrityViolationException error) {
-            if (violaRestriccion(error, RESTRICCION_SIN_CRUCE)) {
+            if (RestriccionesPostgres.violaExclusion(error, RESTRICCION_SIN_CRUCE)) {
                 throw new ReservaSuperpuestaException();
             }
             throw error;
         }
-    }
-
-    // Hibernate no extrae el nombre de una restricción de exclusión (SQLState 23P01), así que
-    // se busca en el mensaje del error de PostgreSQL.
-    private static boolean violaRestriccion(Throwable error, String restriccion) {
-        for (Throwable causa = error; causa != null; causa = causa.getCause()) {
-            if (causa instanceof SQLException sql && VIOLACION_EXCLUSION.equals(sql.getSQLState())
-                    && sql.getMessage() != null && sql.getMessage().contains(restriccion)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private void auditar(Reserva reserva, Long huespedId) {

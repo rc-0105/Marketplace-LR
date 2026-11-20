@@ -7,6 +7,7 @@ import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
+import co.edu.unbosque.marketplace.compartido.infraestructura.RestriccionesPostgres;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.CalendarioNoEncontradoException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.FechasPeriodoInvalidasException;
 import co.edu.unbosque.marketplace.disponibilidad.exceptions.PeriodoConReservaException;
@@ -17,7 +18,6 @@ import co.edu.unbosque.marketplace.disponibilidad.model.DisponibilidadRango;
 import co.edu.unbosque.marketplace.disponibilidad.model.MotivoNoDisponible;
 import co.edu.unbosque.marketplace.disponibilidad.model.PeriodoDisponible;
 import co.edu.unbosque.marketplace.disponibilidad.repository.PeriodoDisponibleRepository;
-import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -44,7 +44,6 @@ public class DisponibilidadService {
     // "Hoy" es el día en Colombia, donde están los alojamientos, no el del servidor.
     private static final ZoneId ZONA = ZoneId.of("America/Bogota");
     private static final String RESTRICCION_SIN_CRUCE = "periodo_disponible_sin_cruce";
-    private static final String VIOLACION_EXCLUSION = "23P01";
 
     private final PeriodoDisponibleRepository periodos;
     private final PublicacionService publicaciones;
@@ -187,23 +186,11 @@ public class DisponibilidadService {
         try {
             return periodos.saveAndFlush(periodo);
         } catch (DataIntegrityViolationException error) {
-            if (violaRestriccion(error, RESTRICCION_SIN_CRUCE)) {
+            if (RestriccionesPostgres.violaExclusion(error, RESTRICCION_SIN_CRUCE)) {
                 throw new PeriodoSuperpuestoException();
             }
             throw error;
         }
-    }
-
-    // Hibernate no extrae el nombre de una restricción de exclusión (SQLState 23P01), así
-    // que se busca en el mensaje del error de PostgreSQL.
-    private static boolean violaRestriccion(Throwable error, String restriccion) {
-        for (Throwable causa = error; causa != null; causa = causa.getCause()) {
-            if (causa instanceof SQLException sql && VIOLACION_EXCLUSION.equals(sql.getSQLState())
-                    && sql.getMessage() != null && sql.getMessage().contains(restriccion)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private void exigirSinReserva(PeriodoDisponible periodo) {
