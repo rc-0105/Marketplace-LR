@@ -8,6 +8,7 @@ import co.edu.unbosque.marketplace.compartido.seguridad.Permisos;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -29,5 +30,11 @@ public class AuditoriaController {
         return PaginaResponse.desde(
                 auditoriaService.consultar(peticion.filtro(), peticion.pagina(), peticion.tamano()),
                 EventoAuditoriaResponse::desde);
+    }
+
+    /** El mismo DTO de un elemento de la lista; si no existe, 404. */
+    @GetMapping("/{id}")
+    public EventoAuditoriaResponse detalle(@PathVariable Long id) {
+        return EventoAuditoriaResponse.desde(auditoriaService.obtener(id));
     }
 }
