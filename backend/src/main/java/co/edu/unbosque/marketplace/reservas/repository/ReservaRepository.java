@@ -60,4 +60,27 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
             + " where r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE"
             + " and r.venceEn <= :ahora")
     int vencerCaducados(@Param("ahora") Instant ahora);
+
+    // Pago aprobado (SOF-34): confirma solo si sigue PENDIENTE. Devuelve 0 si el apartado ya venció o si otro
+    // intento la resolvió primero; quien llama decide qué hacer con el cobro que quedó sin reserva.
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Reserva r set r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.CONFIRMADA,"
+            + " r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.APROBADO,"
+            + " r.transaccionId = :transaccionId where r.id = :id"
+            + " and r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE")
+    int confirmarPago(@Param("id") Long id, @Param("transaccionId") String transaccionId);
+
+    // Pago rechazado: la PENDIENTE pasa a CANCELADA, lo que libera sus noches en la restricción de exclusión.
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Reserva r set r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.CANCELADA,"
+            + " r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.RECHAZADO where r.id = :id"
+            + " and r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE")
+    int rechazarPago(@Param("id") Long id);
+
+    // La pasarela no respondió o falló: la reserva sigue PENDIENTE (vence con su apartado) y queda constancia.
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Reserva r set r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.ERROR"
+            + " where r.id = :id"
+            + " and r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE")
+    int registrarErrorPago(@Param("id") Long id);
 }

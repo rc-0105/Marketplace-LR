@@ -82,6 +82,15 @@ public class Reserva {
     @Column(name = "creado_en", nullable = false, insertable = false, updatable = false)
     private Instant creadoEn;
 
+    // El pago lo cambian solo las actualizaciones condicionales de ReservaRepository (SOF-34): así dos
+    // intentos simultáneos, o el vencimiento del apartado, no pisan el resultado del otro.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "estado_pago", nullable = false, length = 20)
+    private EstadoPago estadoPago;
+
+    @Column(name = "transaccion_id")
+    private String transaccionId;
+
     protected Reserva() {
         // Requerido por JPA.
     }
@@ -104,6 +113,7 @@ public class Reserva {
         this.total = total;
         this.serviciosAdicionalesIds = Set.copyOf(serviciosAdicionalesIds);
         this.venceEn = venceEn;
+        this.estadoPago = EstadoPago.SIN_PAGO;
     }
 
     /**
@@ -194,5 +204,13 @@ public class Reserva {
 
     public Instant getCreadoEn() {
         return creadoEn;
+    }
+
+    public EstadoPago getEstadoPago() {
+        return estadoPago;
+    }
+
+    public String getTransaccionId() {
+        return transaccionId;
     }
 }
