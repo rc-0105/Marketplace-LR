@@ -85,7 +85,8 @@ class EventoAuditoriaRepositoryIntegracionTest {
     void inmutable(String sentencia) {
         jdbc.update(INSERTAR, "2", "RESERVA", "EXITO");
 
-        assertThatThrownBy(() -> jdbc.execute(sentencia)).isInstanceOf(DataAccessException.class);
+        assertThatThrownBy(() -> jdbc.execute(sentencia)).isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("solo insercion");
 
         assertThat(jdbc.queryForObject("SELECT count(*) FROM evento_auditoria WHERE resultado = 'EXITO'",
                 Integer.class)).isEqualTo(1);
