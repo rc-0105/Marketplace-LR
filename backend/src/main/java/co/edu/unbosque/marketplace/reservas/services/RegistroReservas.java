@@ -36,6 +36,24 @@ public class RegistroReservas {
         return reservas.saveAndFlush(nueva);
     }
 
+    /** Pago aprobado (SOF-34): confirma si la reserva sigue PENDIENTE; {@code false} si ya no lo estaba. */
+    @Transactional
+    public boolean confirmarPago(Long reservaId, String transaccionId) {
+        return reservas.confirmarPago(reservaId, transaccionId) == 1;
+    }
+
+    /** Pago rechazado: la PENDIENTE pasa a CANCELADA y libera sus noches. */
+    @Transactional
+    public void rechazarPago(Long reservaId) {
+        reservas.rechazarPago(reservaId);
+    }
+
+    /** La pasarela no dio resultado: la reserva sigue PENDIENTE con el pago en ERROR. */
+    @Transactional
+    public void registrarErrorPago(Long reservaId) {
+        reservas.registrarErrorPago(reservaId);
+    }
+
     /** Pasa a VENCIDA todos los apartados agotados y devuelve cuántos fueron (tarea programada). */
     @Transactional
     public int vencerCaducados() {
