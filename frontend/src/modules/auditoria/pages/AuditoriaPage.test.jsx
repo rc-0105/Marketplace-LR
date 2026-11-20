@@ -169,4 +169,27 @@ describe('AuditoriaPage', () => {
       expect(within(navegacion()).getByRole('button', { name: 'Siguiente' })).toBeDisabled();
     });
   });
+
+  it('cada fila enlaza a su detalle conservando la búsqueda', async () => {
+    vi.mocked(listar).mockResolvedValue(pagina([EVENTO, SIN_USUARIO], { pagina: 1, totalPaginas: 3 }));
+
+    renderizar('/?usuario=2&pagina=1');
+
+    const enlace = await screen.findByRole('link', { name: '15/11/2026 22:30:00, evento 1' });
+    expect(enlace).toHaveAttribute('href', '/administrador/auditoria/1?usuario=2&pagina=1');
+    expect(screen.getByRole('link', { name: '15/11/2026 22:30:00, evento 6' }))
+      .toHaveAttribute('href', '/administrador/auditoria/6?usuario=2&pagina=1');
+  });
+
+  it('es de solo lectura: ningún control crea, edita, elimina ni limpia registros', async () => {
+    vi.mocked(listar).mockResolvedValue(pagina([EVENTO], { totalPaginas: 3 }));
+
+    renderizar();
+    await screen.findByRole('table');
+
+    const botones = screen.getAllByRole('button').map((boton) => boton.textContent);
+    expect(botones).toEqual(['Aplicar filtros', 'Anterior', 'Siguiente']);
+    expect(screen.queryByRole('button', { name: /crear|editar|eliminar|borrar|limpiar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /crear|editar|eliminar|borrar|limpiar/i })).not.toBeInTheDocument();
+  });
 });
