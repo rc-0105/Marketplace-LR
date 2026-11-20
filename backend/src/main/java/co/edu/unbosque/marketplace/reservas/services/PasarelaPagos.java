@@ -20,11 +20,13 @@ public interface PasarelaPagos {
     void reembolsar(String transaccionId);
 
     /**
-     * Conciliación: la transacción de un cobro aprobado de la reserva, si la pasarela tiene uno, aunque su
-     * respuesta nunca haya llegado. Lanza {@link FallaPasarelaException} si la pasarela no responde.
+     * Conciliación: la transacción de un cobro aprobado con esa referencia ({@code Reserva.referenciaPago()}),
+     * si la pasarela tiene uno, aunque su respuesta nunca haya llegado. Lanza {@link FallaPasarelaException} si
+     * la pasarela no responde.
      */
-    Optional<String> buscarCobroAprobado(Long reservaId);
+    Optional<String> buscarCobroAprobado(String referencia);
 
+    /** La clave de idempotencia es la referencia de pago de la reserva, que también identifica el cobro. */
     record SolicitudCobro(Long reservaId, BigDecimal monto, String metodoPago, String claveIdempotencia) {
     }
 

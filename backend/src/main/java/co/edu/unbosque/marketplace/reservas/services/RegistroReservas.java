@@ -48,7 +48,7 @@ public class RegistroReservas {
         return reservas.rechazarPago(reservaId) == 1;
     }
 
-    /** La pasarela no dio resultado: la reserva sigue PENDIENTE con el pago en ERROR. */
+    /** El resultado del cobro no se conoce: el pago pasa a ERROR para que la conciliación lo resuelva. */
     @Transactional
     public void registrarErrorPago(Long reservaId) {
         reservas.registrarErrorPago(reservaId);
@@ -66,11 +66,6 @@ public class RegistroReservas {
         reservas.marcarNoCobrado(reservaId);
     }
 
-    /** Un reembolso inmediato falló: el pago pasa a ERROR para que la conciliación lo reintente. */
-    @Transactional
-    public void marcarReembolsoPendiente(Long reservaId) {
-        reservas.marcarReembolsoPendiente(reservaId);
-    }
 
     /** Pasa a VENCIDA todos los apartados agotados y devuelve cuántos fueron (tarea programada). */
     @Transactional

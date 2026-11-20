@@ -51,6 +51,9 @@ class PagoReservaServiceTest {
     private static final Long RESERVA_ID = 42L;
     private static final Long HUESPED_ID = 7L;
     private static final Instant AHORA = Instant.parse("2026-12-01T15:00:00Z");
+    private static final Instant CREADA = Instant.parse("2026-12-01T14:55:00Z");
+    // Referencia de pago: id más instante de creación, para no chocar con reservas de otra base de datos.
+    private static final String REFERENCIA = "reserva-42-" + CREADA.toEpochMilli();
 
     private final ReservaRepository reservas = mock(ReservaRepository.class);
     private final RegistroReservas registro = mock(RegistroReservas.class);
@@ -127,7 +130,7 @@ class PagoReservaServiceTest {
         ArgumentCaptor<PasarelaPagos.SolicitudCobro> solicitudes = ArgumentCaptor.forClass(PasarelaPagos.SolicitudCobro.class);
         verify(pasarela, times(2)).cobrar(solicitudes.capture());
         assertThat(solicitudes.getAllValues()).extracting(PasarelaPagos.SolicitudCobro::claveIdempotencia)
-                .containsExactly("reserva-42", "reserva-42");
+                .containsExactly(REFERENCIA, REFERENCIA);
         verify(registro).confirmarPago(RESERVA_ID, "pi_1");
     }
 
@@ -145,7 +148,7 @@ class PagoReservaServiceTest {
         ArgumentCaptor<PasarelaPagos.SolicitudCobro> solicitudes = ArgumentCaptor.forClass(PasarelaPagos.SolicitudCobro.class);
         verify(pasarela, times(2)).cobrar(solicitudes.capture());
         assertThat(solicitudes.getAllValues()).extracting(PasarelaPagos.SolicitudCobro::claveIdempotencia)
-                .containsOnly("reserva-42");
+                .containsOnly(REFERENCIA);
     }
 
     @Test
@@ -196,7 +199,7 @@ class PagoReservaServiceTest {
             assertThat(evento.getFormattedMessage()).contains("pi_tarde", "conciliación");
         });
         // Queda en ERROR para que la conciliación vuelva a intentar el reembolso.
-        verify(registro).marcarReembolsoPendiente(RESERVA_ID);
+        verify(registro).registrarErrorPago(RESERVA_ID);
     }
 
     @Test
@@ -227,6 +230,7 @@ class PagoReservaServiceTest {
                 new BigDecimal("400000"), new BigDecimal("30000"), new BigDecimal("40000"), BigDecimal.ZERO,
                 BigDecimal.ZERO, new BigDecimal("470000"), Set.of(), AHORA.plusSeconds(600));
         ReflectionTestUtils.setField(reserva, "id", RESERVA_ID);
+        ReflectionTestUtils.setField(reserva, "creadoEn", CREADA);
         ReflectionTestUtils.setField(reserva, "estado", estado);
         ReflectionTestUtils.setField(reserva, "estadoPago", estadoPago);
         ReflectionTestUtils.setField(reserva, "transaccionId", transaccionId);

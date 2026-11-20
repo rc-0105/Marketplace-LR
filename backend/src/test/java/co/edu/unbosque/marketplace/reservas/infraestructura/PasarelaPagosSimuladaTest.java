@@ -43,9 +43,9 @@ class PasarelaPagosSimuladaTest {
         ResultadoCobro aprobado = pasarela.cobrar(new SolicitudCobro(5L, BigDecimal.TEN, "pm_card_visa", "reserva-5"));
         pasarela.cobrar(new SolicitudCobro(6L, BigDecimal.TEN, "pm_card_chargeDeclined", "reserva-6"));
 
-        assertThat(pasarela.buscarCobroAprobado(5L)).contains(((CobroAprobado) aprobado).transaccionId());
-        assertThat(pasarela.buscarCobroAprobado(6L)).isEmpty();
-        assertThat(pasarela.buscarCobroAprobado(7L)).isEmpty();
+        assertThat(pasarela.buscarCobroAprobado("reserva-5")).contains(((CobroAprobado) aprobado).transaccionId());
+        assertThat(pasarela.buscarCobroAprobado("reserva-6")).isEmpty();
+        assertThat(pasarela.buscarCobroAprobado("reserva-7")).isEmpty();
     }
 
     private static SolicitudCobro solicitud(String metodo, String clave) {

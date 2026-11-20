@@ -78,11 +78,13 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
             + " and r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE")
     int rechazarPago(@Param("id") Long id);
 
-    // La pasarela no respondió o falló: la reserva sigue PENDIENTE (vence con su apartado) y queda constancia.
+    // La pasarela no respondió, falló, o un reembolso no se completó: el resultado del cobro no se conoce y la
+    // conciliación debe resolverlo. Se marca aunque la reserva ya no esté PENDIENTE (el apartado pudo vencer
+    // mientras se esperaba a la pasarela); solo se respeta un pago ya resuelto.
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update Reserva r set r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.ERROR"
             + " where r.id = :id"
-            + " and r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE")
+            + " and r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.SIN_PAGO")
     int registrarErrorPago(@Param("id") Long id);
 
     // Conciliación (SOF-34): los pagos que quedaron en ERROR, en el orden en que se crearon las reservas.
@@ -103,11 +105,4 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
             + " and r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.ERROR"
             + " and r.estado <> co.edu.unbosque.marketplace.reservas.model.EstadoReserva.CONFIRMADA")
     int marcarNoCobrado(@Param("id") Long id);
-
-    // Un reembolso inmediato falló: sea cual sea el estado de la reserva, la conciliación debe reintentarlo.
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("update Reserva r set r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.ERROR"
-            + " where r.id = :id"
-            + " and r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.SIN_PAGO")
-    int marcarReembolsoPendiente(@Param("id") Long id);
 }

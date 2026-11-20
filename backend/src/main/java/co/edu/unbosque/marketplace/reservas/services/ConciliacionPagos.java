@@ -70,13 +70,16 @@ public class ConciliacionPagos {
             } catch (FallaPasarelaException falla) {
                 LOG.warn("No se pudo conciliar el pago de la reserva {}; se reintenta en la próxima corrida: {}",
                         reserva.getId(), falla.getMessage());
+            } catch (RuntimeException error) {
+                // Un error inesperado con una reserva (p. ej. de la base de datos) no debe frenar a las siguientes.
+                LOG.error("Error inesperado al conciliar el pago de la reserva {}", reserva.getId(), error);
             }
         }
     }
 
     private void conciliar(Reserva reserva) {
         Long id = reserva.getId();
-        Optional<String> cobro = pasarela.buscarCobroAprobado(id);
+        Optional<String> cobro = pasarela.buscarCobroAprobado(reserva.referenciaPago());
         if (cobro.isEmpty()) {
             if (Instant.now(reloj).isAfter(reserva.getVenceEn().plus(gracia))) {
                 registro.marcarNoCobrado(id);

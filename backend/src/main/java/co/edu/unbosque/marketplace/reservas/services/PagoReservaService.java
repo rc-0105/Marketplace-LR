@@ -74,7 +74,8 @@ public class PagoReservaService {
         // Una sola clave por reserva: si un cobro se completó en la pasarela después de agotarse la espera, el
         // reintento recibe ese mismo cobro y no abre otro. Con otra tarjeta la pasarela rechaza la clave en vez
         // de cobrar dos veces, por eso la pantalla deja fija la tarjeta tras un 504 o un 502.
-        SolicitudCobro solicitud = new SolicitudCobro(reservaId, reserva.getTotal(), metodoPago, "reserva-" + reservaId);
+        SolicitudCobro solicitud = new SolicitudCobro(reservaId, reserva.getTotal(), metodoPago,
+                reserva.referenciaPago());
         ResultadoCobro resultado;
         try {
             resultado = pasarela.cobrar(solicitud);
@@ -118,7 +119,7 @@ public class PagoReservaService {
             return true;
         } catch (FallaPasarelaException falla) {
             // En ERROR, la conciliación vuelve a intentar el reembolso hasta lograrlo.
-            registro.marcarReembolsoPendiente(reservaId);
+            registro.registrarErrorPago(reservaId);
             LOG.error("No se pudo reembolsar la transacción {} de la reserva {}: queda para la conciliación",
                     transaccionId, reservaId, falla);
             return false;

@@ -37,6 +37,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 class ConciliacionPagosTest {
 
     private static final Instant AHORA = Instant.parse("2026-12-01T15:00:00Z");
+    private static final Instant CREADA = Instant.parse("2026-12-01T14:00:00Z");
 
     private final ReservaRepository reservas = mock(ReservaRepository.class);
     private final RegistroReservas registro = mock(RegistroReservas.class);
@@ -50,7 +51,7 @@ class ConciliacionPagosTest {
     void unCobroDeUnaPendienteLaConfirma() {
         Reserva reserva = conError(1L, EstadoReserva.PENDIENTE, AHORA.plusSeconds(300));
         when(reservas.findByEstadoPagoOrderById(EstadoPago.ERROR)).thenReturn(List.of(reserva));
-        when(pasarela.buscarCobroAprobado(1L)).thenReturn(Optional.of("pi_1"));
+        when(pasarela.buscarCobroAprobado(referencia(1L))).thenReturn(Optional.of("pi_1"));
         when(registro.confirmarPago(1L, "pi_1")).thenReturn(true);
 
         conciliacion.conciliar();
@@ -65,7 +66,7 @@ class ConciliacionPagosTest {
     void unCobroDeUnaVencidaSeReembolsa() {
         Reserva reserva = conError(2L, EstadoReserva.VENCIDA, AHORA.minusSeconds(300));
         when(reservas.findByEstadoPagoOrderById(EstadoPago.ERROR)).thenReturn(List.of(reserva));
-        when(pasarela.buscarCobroAprobado(2L)).thenReturn(Optional.of("pi_2"));
+        when(pasarela.buscarCobroAprobado(referencia(2L))).thenReturn(Optional.of("pi_2"));
         when(registro.confirmarPago(2L, "pi_2")).thenReturn(false);
         when(reservas.findById(2L)).thenReturn(Optional.of(reserva));
 
@@ -81,7 +82,7 @@ class ConciliacionPagosTest {
     void unReembolsoFallidoSeReintentaLuego() {
         Reserva reserva = conError(2L, EstadoReserva.VENCIDA, AHORA.minusSeconds(300));
         when(reservas.findByEstadoPagoOrderById(EstadoPago.ERROR)).thenReturn(List.of(reserva));
-        when(pasarela.buscarCobroAprobado(2L)).thenReturn(Optional.of("pi_2"));
+        when(pasarela.buscarCobroAprobado(referencia(2L))).thenReturn(Optional.of("pi_2"));
         when(reservas.findById(2L)).thenReturn(Optional.of(reserva));
         doThrow(new FallaPasarelaException(true, "Stripe no respondió", null)).when(pasarela).reembolsar("pi_2");
 
@@ -99,7 +100,7 @@ class ConciliacionPagosTest {
         ReflectionTestUtils.setField(confirmada, "estadoPago", EstadoPago.APROBADO);
         ReflectionTestUtils.setField(confirmada, "transaccionId", "pi_3");
         when(reservas.findByEstadoPagoOrderById(EstadoPago.ERROR)).thenReturn(List.of(reserva));
-        when(pasarela.buscarCobroAprobado(3L)).thenReturn(Optional.of("pi_3"));
+        when(pasarela.buscarCobroAprobado(referencia(3L))).thenReturn(Optional.of("pi_3"));
         when(reservas.findById(3L)).thenReturn(Optional.of(confirmada));
 
         conciliacion.conciliar();
@@ -113,7 +114,7 @@ class ConciliacionPagosTest {
     void sinCobroEsperaLaGracia() {
         Reserva reserva = conError(4L, EstadoReserva.VENCIDA, AHORA.minusSeconds(59 * 60));
         when(reservas.findByEstadoPagoOrderById(EstadoPago.ERROR)).thenReturn(List.of(reserva));
-        when(pasarela.buscarCobroAprobado(4L)).thenReturn(Optional.empty());
+        when(pasarela.buscarCobroAprobado(referencia(4L))).thenReturn(Optional.empty());
 
         conciliacion.conciliar();
 
@@ -125,7 +126,7 @@ class ConciliacionPagosTest {
     void sinCobroTrasLaGraciaQuedaNoCobrado() {
         Reserva reserva = conError(5L, EstadoReserva.VENCIDA, AHORA.minusSeconds(61 * 60));
         when(reservas.findByEstadoPagoOrderById(EstadoPago.ERROR)).thenReturn(List.of(reserva));
-        when(pasarela.buscarCobroAprobado(5L)).thenReturn(Optional.empty());
+        when(pasarela.buscarCobroAprobado(referencia(5L))).thenReturn(Optional.empty());
 
         conciliacion.conciliar();
 
@@ -139,13 +140,29 @@ class ConciliacionPagosTest {
         Reserva primera = conError(6L, EstadoReserva.VENCIDA, AHORA.minusSeconds(300));
         Reserva segunda = conError(7L, EstadoReserva.PENDIENTE, AHORA.plusSeconds(300));
         when(reservas.findByEstadoPagoOrderById(EstadoPago.ERROR)).thenReturn(List.of(primera, segunda));
-        when(pasarela.buscarCobroAprobado(6L)).thenThrow(new FallaPasarelaException(true, "sin respuesta", null));
-        when(pasarela.buscarCobroAprobado(7L)).thenReturn(Optional.of("pi_7"));
+        when(pasarela.buscarCobroAprobado(referencia(6L))).thenThrow(new FallaPasarelaException(true, "sin respuesta", null));
+        when(pasarela.buscarCobroAprobado(referencia(7L))).thenReturn(Optional.of("pi_7"));
         when(registro.confirmarPago(7L, "pi_7")).thenReturn(true);
 
         conciliacion.conciliar();
 
         verify(registro).confirmarPago(7L, "pi_7");
+    }
+
+    @Test
+    @DisplayName("Un error inesperado con una reserva (p. ej. de la base de datos) no detiene la corrida")
+    void unErrorInesperadoNoDetieneLaCorrida() {
+        Reserva primera = conError(8L, EstadoReserva.PENDIENTE, AHORA.plusSeconds(300));
+        Reserva segunda = conError(9L, EstadoReserva.PENDIENTE, AHORA.plusSeconds(300));
+        when(reservas.findByEstadoPagoOrderById(EstadoPago.ERROR)).thenReturn(List.of(primera, segunda));
+        when(pasarela.buscarCobroAprobado(referencia(8L))).thenReturn(Optional.of("pi_8"));
+        when(registro.confirmarPago(8L, "pi_8")).thenThrow(new IllegalStateException("violación de unicidad"));
+        when(pasarela.buscarCobroAprobado(referencia(9L))).thenReturn(Optional.of("pi_9"));
+        when(registro.confirmarPago(9L, "pi_9")).thenReturn(true);
+
+        conciliacion.conciliar();
+
+        verify(registro).confirmarPago(9L, "pi_9");
     }
 
     @Test
@@ -164,11 +181,17 @@ class ConciliacionPagosTest {
         return evento.getValue();
     }
 
+    // Igual que Reserva.referenciaPago(): id más instante de creación.
+    private static String referencia(Long id) {
+        return "reserva-" + id + "-" + CREADA.toEpochMilli();
+    }
+
     private static Reserva conError(Long id, EstadoReserva estado, Instant venceEn) {
         Reserva reserva = Reserva.nueva(30L, 7L, LocalDate.of(2026, 12, 10), LocalDate.of(2026, 12, 14), 4,
                 BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ZERO, BigDecimal.ZERO,
                 new BigDecimal("470000"), Set.of(), venceEn);
         ReflectionTestUtils.setField(reserva, "id", id);
+        ReflectionTestUtils.setField(reserva, "creadoEn", CREADA);
         ReflectionTestUtils.setField(reserva, "estado", estado);
         ReflectionTestUtils.setField(reserva, "estadoPago", EstadoPago.ERROR);
         return reserva;

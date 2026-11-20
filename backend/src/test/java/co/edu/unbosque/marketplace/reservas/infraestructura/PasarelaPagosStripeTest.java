@@ -60,7 +60,7 @@ class PasarelaPagosStripeTest {
 
         assertThat(ruta.get()).isEqualTo("/v1/payment_intents");
         assertThat(cuerpo.get()).contains("amount=48500000", "currency=cop", "payment_method=pm_card_visa",
-                "confirm=true", "metadata[reservaId]=42");
+                "confirm=true", "metadata[reservaId]=42", "metadata[referencia]=reserva-42-pm_card_visa");
         assertThat(idempotencia.get()).isEqualTo("reserva-42-pm_card_visa");
     }
 
@@ -120,10 +120,10 @@ class PasarelaPagosStripeTest {
         responderCon(200, "{\"object\":\"search_result\",\"url\":\"/v1/payment_intents/search\",\"has_more\":false,"
                 + "\"data\":[{\"id\":\"pi_77\",\"object\":\"payment_intent\",\"status\":\"succeeded\"}]}");
 
-        assertThat(pasarela(Duration.ofSeconds(5)).buscarCobroAprobado(42L)).contains("pi_77");
+        assertThat(pasarela(Duration.ofSeconds(5)).buscarCobroAprobado("reserva-42-1764600000000")).contains("pi_77");
 
         assertThat(ruta.get()).isEqualTo("/v1/payment_intents/search");
-        assertThat(consulta.get()).contains("query=metadata['reservaId']:'42' AND status:'succeeded'");
+        assertThat(consulta.get()).contains("query=metadata['referencia']:'reserva-42-1764600000000' AND status:'succeeded'");
     }
 
     @Test
@@ -132,7 +132,7 @@ class PasarelaPagosStripeTest {
         responderCon(200, "{\"object\":\"search_result\",\"url\":\"/v1/payment_intents/search\",\"has_more\":false,"
                 + "\"data\":[]}");
 
-        assertThat(pasarela(Duration.ofSeconds(5)).buscarCobroAprobado(42L)).isEmpty();
+        assertThat(pasarela(Duration.ofSeconds(5)).buscarCobroAprobado("reserva-42-1764600000000")).isEmpty();
     }
 
     @Test
@@ -141,9 +141,30 @@ class PasarelaPagosStripeTest {
         demoraMs = 3000;
         responderCon(200, "{\"object\":\"search_result\",\"data\":[]}");
 
-        assertThatThrownBy(() -> pasarela(Duration.ofSeconds(1)).buscarCobroAprobado(42L))
+        assertThatThrownBy(() -> pasarela(Duration.ofSeconds(1)).buscarCobroAprobado("reserva-42-1764600000000"))
                 .isInstanceOfSatisfying(FallaPasarelaException.class,
                         falla -> assertThat(falla.isSinRespuesta()).isTrue());
+    }
+
+    @Test
+    @DisplayName("Si el cobro ya estaba reembolsado, el reembolso se da por hecho")
+    void unCobroYaReembolsadoNoFalla() {
+        responderCon(400, "{\"error\":{\"type\":\"invalid_request_error\",\"code\":\"charge_already_refunded\","
+                + "\"message\":\"Charge has already been refunded.\"}}");
+
+        pasarela(Duration.ofSeconds(5)).reembolsar("pi_123");
+
+        assertThat(ruta.get()).isEqualTo("/v1/refunds");
+    }
+
+    @Test
+    @DisplayName("Otro error al reembolsar sí falla, para que la conciliación lo reintente")
+    void otroErrorAlReembolsarFalla() {
+        responderCon(400, "{\"error\":{\"type\":\"invalid_request_error\",\"code\":\"resource_missing\","
+                + "\"message\":\"No such payment_intent.\"}}");
+
+        assertThatThrownBy(() -> pasarela(Duration.ofSeconds(5)).reembolsar("pi_123"))
+                .isInstanceOf(FallaPasarelaException.class);
     }
 
     private PasarelaPagosStripe pasarela(Duration espera) {

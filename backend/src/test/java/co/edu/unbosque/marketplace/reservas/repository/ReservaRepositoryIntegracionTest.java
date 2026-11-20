@@ -257,21 +257,22 @@ class ReservaRepositoryIntegracionTest {
     }
 
     @Test
-    @DisplayName("registrarErrorPago deja la reserva PENDIENTE con el pago en ERROR, sin tocar una que ya no lo está")
+    @DisplayName("registrarErrorPago deja la reserva PENDIENTE con el pago en ERROR, sin tocar un pago ya resuelto")
     @Transactional
     void registrarErrorPagoMantieneLaPendiente() {
         Reserva pendiente = guardar(publicacionId, "2026-12-10", "2026-12-12", EstadoReserva.PENDIENTE);
-        Reserva cancelada = guardar(publicacionId, "2026-12-12", "2026-12-14", EstadoReserva.CANCELADA);
+        Reserva rechazada = guardar(publicacionId, "2026-12-12", "2026-12-14", EstadoReserva.PENDIENTE);
+        reservas.rechazarPago(rechazada.getId());
 
         assertThat(reservas.registrarErrorPago(pendiente.getId())).isEqualTo(1);
-        assertThat(reservas.registrarErrorPago(cancelada.getId())).isZero();
+        assertThat(reservas.registrarErrorPago(rechazada.getId())).isZero();
 
         entidades.clear();
         Reserva conError = reservas.findById(pendiente.getId()).orElseThrow();
         assertThat(conError.getEstado()).isEqualTo(EstadoReserva.PENDIENTE);
         assertThat(conError.getEstadoPago()).isEqualTo(EstadoPago.ERROR);
-        assertThat(reservas.findById(cancelada.getId())).get().extracting(Reserva::getEstadoPago)
-                .isEqualTo(EstadoPago.SIN_PAGO);
+        assertThat(reservas.findById(rechazada.getId())).get().extracting(Reserva::getEstadoPago)
+                .isEqualTo(EstadoPago.RECHAZADO);
     }
 
     @Test
@@ -296,7 +297,7 @@ class ReservaRepositoryIntegracionTest {
     void marcarReembolsadoGuardaLaTransaccion() {
         Reserva vencida = guardar(publicacionId, "2026-12-10", "2026-12-12", EstadoReserva.VENCIDA);
         Reserva sinError = guardar(publicacionId, "2026-12-12", "2026-12-14", EstadoReserva.VENCIDA);
-        assertThat(reservas.marcarReembolsoPendiente(vencida.getId())).isEqualTo(1);
+        assertThat(reservas.registrarErrorPago(vencida.getId())).isEqualTo(1);
 
         assertThat(reservas.marcarReembolsado(vencida.getId(), "pi_9")).isEqualTo(1);
         assertThat(reservas.marcarReembolsado(sinError.getId(), "pi_10")).isZero();
@@ -330,15 +331,15 @@ class ReservaRepositoryIntegracionTest {
     }
 
     @Test
-    @DisplayName("marcarReembolsoPendiente pasa a ERROR un pago sin registrar, aunque la reserva ya no esté PENDIENTE")
+    @DisplayName("registrarErrorPago marca ERROR aunque el apartado haya vencido mientras se esperaba a la pasarela")
     @Transactional
-    void marcarReembolsoPendienteDejaElPagoEnError() {
+    void registrarErrorPagoAlcanzaAUnaReservaYaVencida() {
         Reserva vencida = guardar(publicacionId, "2026-12-10", "2026-12-12", EstadoReserva.VENCIDA);
         Reserva confirmada = guardar(publicacionId, "2026-12-12", "2026-12-14", EstadoReserva.PENDIENTE);
         reservas.confirmarPago(confirmada.getId(), "pi_1");
 
-        assertThat(reservas.marcarReembolsoPendiente(vencida.getId())).isEqualTo(1);
-        assertThat(reservas.marcarReembolsoPendiente(confirmada.getId())).isZero();
+        assertThat(reservas.registrarErrorPago(vencida.getId())).isEqualTo(1);
+        assertThat(reservas.registrarErrorPago(confirmada.getId())).isZero();
 
         entidades.clear();
         assertThat(reservas.findById(vencida.getId())).get().extracting(Reserva::getEstadoPago)

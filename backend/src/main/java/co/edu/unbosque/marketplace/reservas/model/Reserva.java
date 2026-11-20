@@ -137,6 +137,16 @@ public class Reserva {
                 || (estado == EstadoReserva.PENDIENTE && venceEn.isAfter(ahora));
     }
 
+    /**
+     * Referencia única del pago en la pasarela (SOF-34): clave de idempotencia de todos sus cobros y dato con
+     * que la conciliación los busca. Lleva el instante de creación además del id, porque los ids se repiten
+     * entre bases de datos (otro entorno con la misma clave de prueba, o la misma base tras reiniciarla) y un
+     * cobro de esas reservas no debe confundirse con el de esta. Requiere la reserva leída de la base.
+     */
+    public String referenciaPago() {
+        return "reserva-" + id + "-" + creadoEn.toEpochMilli();
+    }
+
     /** El apartado se agotó sin confirmarse: pasa a VENCIDA y libera las noches. */
     public void vencer() {
         this.estado = EstadoReserva.VENCIDA;

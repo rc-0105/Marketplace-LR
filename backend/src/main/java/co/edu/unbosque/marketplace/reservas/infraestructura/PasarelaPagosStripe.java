@@ -5,6 +5,7 @@ import co.edu.unbosque.marketplace.reservas.services.PasarelaPagos;
 import com.stripe.StripeClient;
 import com.stripe.exception.ApiConnectionException;
 import com.stripe.exception.CardException;
+import com.stripe.exception.InvalidRequestException;
 import com.stripe.exception.StripeException;
 import com.stripe.model.PaymentIntent;
 import com.stripe.net.RequestOptions;
@@ -51,6 +52,7 @@ public class PasarelaPagosStripe implements PasarelaPagos {
                         .build())
                 .setDescription("Reserva " + solicitud.reservaId())
                 .putMetadata("reservaId", String.valueOf(solicitud.reservaId()))
+                .putMetadata("referencia", solicitud.claveIdempotencia())
                 .build();
         try {
             PaymentIntent intento = cliente.v1().paymentIntents().create(parametros,
@@ -71,6 +73,11 @@ public class PasarelaPagosStripe implements PasarelaPagos {
         try {
             cliente.v1().refunds().create(RefundCreateParams.builder().setPaymentIntent(transaccionId).build(),
                     RequestOptions.builder().setIdempotencyKey("reembolso-" + transaccionId).build());
+        } catch (InvalidRequestException error) {
+            // Un reembolso anterior ya devolvió el cobro (la clave de idempotencia dura solo 24 horas).
+            if (!"charge_already_refunded".equals(error.getCode())) {
+                throw traducir("reembolsar la transacción " + transaccionId, error);
+            }
         } catch (StripeException error) {
             throw traducir("reembolsar la transacción " + transaccionId, error);
         }
@@ -79,9 +86,10 @@ public class PasarelaPagosStripe implements PasarelaPagos {
     // La búsqueda de Stripe puede tardar alrededor de un minuto en reflejar un cobro nuevo: la conciliación le da
     // un margen de gracia antes de cerrar un pago como no cobrado.
     @Override
-    public Optional<String> buscarCobroAprobado(Long reservaId) {
+    public Optional<String> buscarCobroAprobado(String referencia) {
+        // Por la referencia y no por el id: un id de reserva se repite entre bases de datos que comparten la clave.
         PaymentIntentSearchParams parametros = PaymentIntentSearchParams.builder()
-                .setQuery("metadata['reservaId']:'" + reservaId + "' AND status:'succeeded'")
+                .setQuery("metadata['referencia']:'" + referencia + "' AND status:'succeeded'")
                 .setLimit(1L)
                 .build();
         try {
@@ -89,7 +97,7 @@ public class PasarelaPagosStripe implements PasarelaPagos {
                     .map(PaymentIntent::getId)
                     .findFirst();
         } catch (StripeException error) {
-            throw traducir("buscar el cobro de la reserva " + reservaId, error);
+            throw traducir("buscar el cobro " + referencia, error);
         }
     }
 

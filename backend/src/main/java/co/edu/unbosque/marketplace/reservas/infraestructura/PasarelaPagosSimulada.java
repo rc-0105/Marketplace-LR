@@ -17,8 +17,8 @@ public class PasarelaPagosSimulada implements PasarelaPagos {
 
     private static final Logger LOG = LoggerFactory.getLogger(PasarelaPagosSimulada.class);
 
+    // Solo los cobros aprobados, por clave de idempotencia (la referencia de pago de la reserva).
     private final Map<String, String> transacciones = new ConcurrentHashMap<>();
-    private final Map<Long, String> aprobadasPorReserva = new ConcurrentHashMap<>();
 
     @Override
     public ResultadoCobro cobrar(SolicitudCobro solicitud) {
@@ -28,7 +28,6 @@ public class PasarelaPagosSimulada implements PasarelaPagos {
         }
         String transaccion = transacciones.computeIfAbsent(solicitud.claveIdempotencia(),
                 clave -> "sim_" + UUID.randomUUID());
-        aprobadasPorReserva.put(solicitud.reservaId(), transaccion);
         LOG.info("Pago simulado aprobado para la reserva {} con la transacción {}", solicitud.reservaId(),
                 transaccion);
         return new CobroAprobado(transaccion);
@@ -40,7 +39,7 @@ public class PasarelaPagosSimulada implements PasarelaPagos {
     }
 
     @Override
-    public Optional<String> buscarCobroAprobado(Long reservaId) {
-        return Optional.ofNullable(aprobadasPorReserva.get(reservaId));
+    public Optional<String> buscarCobroAprobado(String referencia) {
+        return Optional.ofNullable(transacciones.get(referencia));
     }
 }
