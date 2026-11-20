@@ -84,6 +84,31 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Revisión de publicaciones' })).toBeInTheDocument();
   });
 
+  it('muestra la auditoría al administrador y la pide a la API', async () => {
+    get.mockResolvedValue({ contenido: [], pagina: 0, tamano: 50, totalElementos: 0, totalPaginas: 0 });
+    iniciar('ADMINISTRADOR');
+    renderizarEn('/administrador/auditoria');
+
+    expect(screen.getByRole('heading', { name: 'Auditoría' })).toBeInTheDocument();
+    expect(await screen.findByText(/^Sin resultados/)).toBeInTheDocument();
+    expect(get).toHaveBeenCalledWith('/api/v1/admin/auditoria?pagina=0&tamano=50');
+  });
+
+  it.each([['HUESPED', 'Huésped'], ['ANFITRION', 'Anfitrión']])(
+    'un %s que entra a la auditoría vuelve a su panel', (rol, nombre) => {
+      iniciar(rol);
+      renderizarEn('/administrador/auditoria');
+      expect(screen.getByText(`Ingresaste como ${nombre}.`)).toBeInTheDocument();
+      expect(get).not.toHaveBeenCalled();
+    },
+  );
+
+  it('sin sesión la auditoría lleva al inicio de sesión', () => {
+    renderizarEn('/administrador/auditoria');
+    expect(screen.getByRole('heading', { name: 'Inicia sesión' })).toBeInTheDocument();
+    expect(get).not.toHaveBeenCalled();
+  });
+
   it('muestra el calendario de la publicación al huésped y lo pide a la API', async () => {
     get.mockResolvedValue({ publicacionId: 10, desde: '2026-12-01', hasta: '2026-12-02', tienePeriodos: true,
       dias: [{ fecha: '2026-12-01', estado: 'DISPONIBLE' }] });
