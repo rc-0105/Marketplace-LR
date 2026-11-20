@@ -9,6 +9,7 @@ import MisPublicacionesPage from '../modules/alojamientos/pages/MisPublicaciones
 import PublicacionFormPage from '../modules/alojamientos/pages/PublicacionFormPage.jsx';
 import RevisionPublicacionesPage from '../modules/alojamientos/pages/RevisionPublicacionesPage.jsx';
 import AuditoriaPage from '../modules/auditoria/pages/AuditoriaPage.jsx';
+import DetalleEventoAuditoriaPage from '../modules/auditoria/pages/DetalleEventoAuditoriaPage.jsx';
 import BusquedaPage from '../modules/busqueda/pages/BusquedaPage.jsx';
 import DetalleAlojamientoPage from '../modules/busqueda/pages/DetalleAlojamientoPage.jsx';
 import CalendarioPage from '../modules/disponibilidad/pages/CalendarioPage.jsx';
@@ -72,6 +73,8 @@ export default function App() {
           element={<RutaProtegida rol="ADMINISTRADOR"><AdministracionUsuariosPage /></RutaProtegida>} />
         <Route path="/administrador/auditoria"
           element={<RutaProtegida rol="ADMINISTRADOR"><AuditoriaPage /></RutaProtegida>} />
+        <Route path="/administrador/auditoria/:id"
+          element={<RutaProtegida rol="ADMINISTRADOR"><DetalleEventoAuditoriaPage /></RutaProtegida>} />
         {ROLES_CON_PANEL.map(({ rol, ruta }) => (
           <Route key={ruta} path={ruta} element={<RutaProtegida rol={rol}><PanelRolPage /></RutaProtegida>} />
         ))}
