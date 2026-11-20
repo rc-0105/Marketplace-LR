@@ -29,6 +29,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Answers;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -96,6 +97,7 @@ class ConsultaDisponibilidadIntegracionTest {
     @DisplayName("Sin token responde 401 y un administrador 403, sin consultar reservas")
     void sinTokenYAdministrador() throws Exception {
         mvc.perform(get(ruta(publicacionId, ESTANCIA))).andExpect(status().isUnauthorized());
+        mvc.perform(get(ruta(999_999L, ESTANCIA))).andExpect(status().isUnauthorized());
         consultar(iniciarSesion("admin@correo.com"), publicacionId, ESTANCIA).andExpect(status().isForbidden());
 
         verifyNoInteractions(reservas);
@@ -200,7 +202,24 @@ class ConsultaDisponibilidadIntegracionTest {
         doReturn(List.of()).when(reservas).ocupantesEntre(any(), any(), any());
         consultar(duenoToken, publicacionId, ESTANCIA).andExpect(status().isOk())
                 .andExpect(jsonPath("$.disponible").value(true))
-                .andExpect(jsonPath("$.motivo").doesNotExist());
+                .andExpect(jsonPath("$.motivo").isEmpty());
+    }
+
+    @ParameterizedTest(name = "{0}..{1} en la publicación {2} -> {3}")
+    @DisplayName("Los límites del periodo son inclusivos y ni un hueco ni periodos contiguos se unen")
+    @CsvSource(value = {"2026-12-01,2026-12-10,A,", "2026-12-03,2026-12-04,A,", "2026-12-11,2026-12-13,A,FUERA_DE_PERIODO",
+            "2026-12-09,2026-12-11,A,FUERA_DE_PERIODO", "2026-12-03,2026-12-08,B,FUERA_DE_PERIODO",
+            "2026-12-01,2026-12-05,B,", "2026-12-05,2026-12-10,B,"})
+    void contencionEnUnSoloPeriodo(String desde, String hasta, String cual, String motivo) throws Exception {
+        periodo(publicacionId, "2026-12-01", "2026-12-10");
+        periodo(publicacionId, "2026-12-15", "2026-12-20");
+        Long contiguos = publicacion(duenoToken, "ACTIVA");
+        periodo(contiguos, "2026-12-01", "2026-12-05");
+        periodo(contiguos, "2026-12-05", "2026-12-10");
+
+        consultar(huespedToken, "A".equals(cual) ? publicacionId : contiguos, "desde=" + desde + "&hasta=" + hasta)
+                .andExpect(status().isOk()).andExpect(jsonPath("$.disponible").value(motivo == null))
+                .andExpect(jsonPath("$.motivo").value(motivo));
     }
 
     @Test
@@ -225,7 +244,9 @@ class ConsultaDisponibilidadIntegracionTest {
     }
 
     private long contar(String tabla) {
-        Long total = jdbc.queryForObject("SELECT count(*) FROM " + tabla, Long.class);
+        Long total = jdbc.queryForObject(
+                "publicacion".equals(tabla) ? "SELECT count(*) FROM publicacion" : "SELECT count(*) FROM periodo_disponible",
+                Long.class);
         return total == null ? 0 : total;
     }
 
