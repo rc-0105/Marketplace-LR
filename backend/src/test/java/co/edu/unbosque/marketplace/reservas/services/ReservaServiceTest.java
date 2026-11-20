@@ -37,7 +37,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,18 +58,19 @@ class ReservaServiceTest {
     private final ReservaRepository reservas = mock(ReservaRepository.class);
     private final CotizacionService cotizaciones = mock(CotizacionService.class);
     private final PublicacionService publicaciones = mock(PublicacionService.class);
+    private final RegistroReservas registro = mock(RegistroReservas.class);
     private final DisponibilidadService disponibilidad = mock(DisponibilidadService.class);
     private final PublicadorEventos publicador = mock(PublicadorEventos.class);
     // Hoy en Bogotá es 2026-12-01: la llegada del 10 es futura.
-    private final Clock reloj = Clock.fixed(Instant.parse("2026-12-01T15:00:00Z"), ZoneOffset.UTC);
+    private static final Instant AHORA = Instant.parse("2026-12-01T15:00:00Z");
+    private final Clock reloj = Clock.fixed(AHORA, ZoneOffset.UTC);
     private final ReservaService servicio = new ReservaService(reservas, cotizaciones, publicaciones, disponibilidad,
-            publicador, reloj);
+            registro, publicador, reloj, 15);
 
     @BeforeEach
     void preparar() {
-        when(reservas.findFirstByHuespedIdAndPublicacionIdAndLlegadaAndSalidaAndEstadoNot(any(), any(), any(), any(),
-                eq(EstadoReserva.CANCELADA))).thenReturn(Optional.empty());
-        when(reservas.saveAndFlush(any(Reserva.class))).then(AdditionalAnswers.returnsFirstArg());
+        when(reservas.findVigentesIdenticas(any(), any(), any(), any(), any())).thenReturn(List.of());
+        when(registro.registrar(any(Reserva.class))).then(AdditionalAnswers.returnsFirstArg());
         when(cotizaciones.cotizar(eq(PUBLICACION_ID), eq(LLEGADA), eq(SALIDA), anySet())).thenReturn(cotizacion());
         when(publicaciones.esModoInmediato(PUBLICACION_ID)).thenReturn(true);
     }
@@ -84,7 +84,7 @@ class ReservaServiceTest {
         assertThat(reserva.getPublicacionId()).isEqualTo(PUBLICACION_ID);
         assertThat(reserva.getHuespedId()).isEqualTo(HUESPED_ID);
         assertThat(reserva.getTotal()).isEqualByComparingTo("485000");
-        verify(reservas).saveAndFlush(reserva);
+        verify(registro).registrar(reserva);
         ArgumentCaptor<EventoCritico> evento = ArgumentCaptor.forClass(EventoCritico.class);
         verify(publicador).publicar(evento.capture());
         assertThat(evento.getValue().usuario()).isEqualTo("7");
@@ -100,7 +100,7 @@ class ReservaServiceTest {
 
         assertThatThrownBy(() -> servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of()))
                 .isInstanceOf(PublicacionNoEncontradaException.class);
-        verify(reservas, never()).saveAndFlush(any());
+        verify(registro, never()).registrar(any());
         verify(publicador, never()).publicar(any());
     }
 
@@ -112,7 +112,7 @@ class ReservaServiceTest {
 
         assertThatThrownBy(() -> servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of()))
                 .isInstanceOf(CotizacionInvalidaException.class);
-        verify(reservas, never()).saveAndFlush(any());
+        verify(registro, never()).registrar(any());
     }
 
     @Test
@@ -123,7 +123,7 @@ class ReservaServiceTest {
         assertThatThrownBy(() -> servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of()))
                 .isInstanceOf(ModoReservaNoSoportadoException.class);
         verify(cotizaciones, never()).cotizar(any(), any(), any(), any());
-        verify(reservas, never()).saveAndFlush(any());
+        verify(registro, never()).registrar(any());
         verify(publicador, never()).publicar(any());
     }
 
@@ -131,22 +131,22 @@ class ReservaServiceTest {
     @DisplayName("Un reintento con los mismos datos devuelve la reserva ya existente sin recotizar ni duplicar")
     void reintentoIdempotenteDevuelveLaReservaExistente() {
         Reserva existente = reservaExistente();
-        when(reservas.findFirstByHuespedIdAndPublicacionIdAndLlegadaAndSalidaAndEstadoNot(HUESPED_ID, PUBLICACION_ID,
-                LLEGADA, SALIDA, EstadoReserva.CANCELADA)).thenReturn(Optional.of(existente));
+        when(reservas.findVigentesIdenticas(HUESPED_ID, PUBLICACION_ID, LLEGADA, SALIDA, AHORA))
+                .thenReturn(List.of(existente));
 
         Reserva resultado = servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of());
 
         assertThat(resultado).isSameAs(existente);
         verify(cotizaciones, never()).cotizar(any(), any(), any(), any());
         verify(publicaciones, never()).esModoInmediato(any());
-        verify(reservas, never()).saveAndFlush(any());
+        verify(registro, never()).registrar(any());
         verify(publicador, never()).publicar(any());
     }
 
     @Test
     @DisplayName("AC2 y AC3: si PostgreSQL rechaza por cruzarse con otra reserva, responde que ya no está disponible")
     void violacionDeExclusionResponde409SinAuditar() {
-        when(reservas.saveAndFlush(any(Reserva.class))).thenThrow(violacion("reserva_sin_cruce", "23P01"));
+        when(registro.registrar(any(Reserva.class))).thenThrow(violacion("reserva_sin_cruce", "23P01"));
 
         assertThatThrownBy(() -> servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of()))
                 .isInstanceOf(ReservaSuperpuestaException.class);
@@ -157,7 +157,7 @@ class ReservaServiceTest {
     @DisplayName("Otra violación de integridad no se disfraza de solapamiento")
     void otraViolacionSePropagaSinCambios() {
         DataIntegrityViolationException otra = violacion("reserva_fechas_check", "23514");
-        when(reservas.saveAndFlush(any(Reserva.class))).thenThrow(otra);
+        when(registro.registrar(any(Reserva.class))).thenThrow(otra);
 
         assertThatThrownBy(() -> servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of()))
                 .isSameAs(otra);
@@ -171,7 +171,7 @@ class ReservaServiceTest {
 
         assertThatThrownBy(() -> servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of()))
                 .isInstanceOf(EstanciaNoDisponibleException.class);
-        verify(reservas, never()).saveAndFlush(any());
+        verify(registro, never()).registrar(any());
         verify(publicador, never()).publicar(any());
     }
 
@@ -180,18 +180,18 @@ class ReservaServiceTest {
     void validaLaDisponibilidadDespuesDeCotizarYAntesDeGuardar() {
         servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of());
 
-        var orden = inOrder(publicaciones, cotizaciones, disponibilidad, reservas);
+        var orden = inOrder(publicaciones, cotizaciones, disponibilidad, registro);
         orden.verify(publicaciones).esModoInmediato(PUBLICACION_ID);
         orden.verify(cotizaciones).cotizar(eq(PUBLICACION_ID), eq(LLEGADA), eq(SALIDA), anySet());
         orden.verify(disponibilidad).exigirDisponible(PUBLICACION_ID, LLEGADA, SALIDA);
-        orden.verify(reservas).saveAndFlush(any(Reserva.class));
+        orden.verify(registro).registrar(any(Reserva.class));
     }
 
     @Test
     @DisplayName("Un reintento idempotente no vuelve a exigir disponibilidad: la reserva propia ya ocupa las noches")
     void elReintentoNoExigeDisponibilidad() {
-        when(reservas.findFirstByHuespedIdAndPublicacionIdAndLlegadaAndSalidaAndEstadoNot(HUESPED_ID, PUBLICACION_ID,
-                LLEGADA, SALIDA, EstadoReserva.CANCELADA)).thenReturn(Optional.of(reservaExistente()));
+        when(reservas.findVigentesIdenticas(HUESPED_ID, PUBLICACION_ID, LLEGADA, SALIDA, AHORA))
+                .thenReturn(List.of(reservaExistente()));
 
         servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of());
 
@@ -207,7 +207,7 @@ class ReservaServiceTest {
                 .isInstanceOf(FechasReservaInvalidasException.class)
                 .hasMessage("La fecha de llegada no puede ser anterior a hoy.");
         verify(cotizaciones, never()).cotizar(any(), any(), any(), any());
-        verify(reservas, never()).saveAndFlush(any());
+        verify(registro, never()).registrar(any());
     }
 
     @Test
@@ -215,8 +215,8 @@ class ReservaServiceTest {
     void llegarHoyEsValidoSegunLaZonaDeBogota() {
         // 2026-12-02T03:00Z es todavía 2026-12-01 en Bogotá (UTC-5).
         Clock madrugadaUtc = Clock.fixed(Instant.parse("2026-12-02T03:00:00Z"), ZoneOffset.UTC);
-        ReservaService enMadrugada = new ReservaService(reservas, cotizaciones, publicaciones, disponibilidad, publicador,
-                madrugadaUtc);
+        ReservaService enMadrugada = new ReservaService(reservas, cotizaciones, publicaciones, disponibilidad, registro,
+                publicador, madrugadaUtc, 15);
         LocalDate hoy = LocalDate.of(2026, 12, 1);
         when(cotizaciones.cotizar(eq(PUBLICACION_ID), eq(hoy), eq(SALIDA), anySet())).thenReturn(cotizacion());
 
@@ -232,7 +232,7 @@ class ReservaServiceTest {
     private static Reserva reservaExistente() {
         Reserva reserva = Reserva.nueva(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, 4, new BigDecimal("400000"),
                 new BigDecimal("30000"), new BigDecimal("40000"), BigDecimal.ZERO, new BigDecimal("15000"),
-                new BigDecimal("485000"));
+                new BigDecimal("485000"), AHORA.plusSeconds(600));
         ReflectionTestUtils.setField(reserva, "id", 99L);
         return reserva;
     }

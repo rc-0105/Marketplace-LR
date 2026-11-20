@@ -237,7 +237,7 @@ class DisponibilidadServiceTest {
 
         assertThatThrownBy(() -> servicio.modificar(PERIODO_ID, ANFITRION_ID, HOY.plusDays(2), HOY.plusDays(9)))
                 .isInstanceOf(PeriodoConReservaException.class)
-                .hasMessage("El periodo tiene la reserva 12 confirmada; no se puede modificar ni eliminar.")
+                .hasMessage("El periodo tiene la reserva 12; no se puede modificar ni eliminar.")
                 .satisfies(error -> assertThat(((PeriodoConReservaException) error).getPropiedades())
                         .containsEntry("reservaId", 12L));
         assertThat(periodo.getFechaInicio()).isEqualTo(HOY.plusDays(1));

@@ -15,7 +15,8 @@ import java.time.LocalDate;
 /**
  * Reserva sobre una cotización vigente (SOF-33, RF-35, RF-36). El desglose del precio queda
  * fijo en el momento de confirmar: no se recalcula si luego cambian las tarifas de la
- * publicación. Nace PENDIENTE; el pago, que es aparte (ADR-4), es lo que la confirma.
+ * publicación. Nace PENDIENTE y aparta las noches hasta {@code venceEn}; el pago, que es aparte (ADR-4),
+ * es lo que la confirma, y si el apartado se agota pasa a VENCIDA.
  */
 @Entity
 @Table(name = "reserva")
@@ -64,6 +65,10 @@ public class Reserva {
     @Column(nullable = false, updatable = false, precision = 12, scale = 2)
     private BigDecimal total;
 
+    // Hasta cuándo una PENDIENTE aparta las noches (ADR-4); la hora la fija el reloj de la aplicación.
+    @Column(name = "vence_en", nullable = false, updatable = false)
+    private Instant venceEn;
+
     @Column(name = "creado_en", nullable = false, insertable = false, updatable = false)
     private Instant creadoEn;
 
@@ -73,7 +78,7 @@ public class Reserva {
 
     private Reserva(Long publicacionId, Long huespedId, LocalDate llegada, LocalDate salida, int noches,
             BigDecimal precioBase, BigDecimal tarifaLimpieza, BigDecimal tarifaServicio, BigDecimal descuento,
-            BigDecimal totalServiciosAdicionales, BigDecimal total) {
+            BigDecimal totalServiciosAdicionales, BigDecimal total, Instant venceEn) {
         this.publicacionId = publicacionId;
         this.huespedId = huespedId;
         this.llegada = llegada;
@@ -86,14 +91,32 @@ public class Reserva {
         this.descuento = descuento;
         this.totalServiciosAdicionales = totalServiciosAdicionales;
         this.total = total;
+        this.venceEn = venceEn;
     }
 
-    /** El desglose llega ya calculado por la cotización vigente que originó la reserva. */
+    /**
+     * El desglose llega ya calculado por la cotización vigente que originó la reserva, y {@code venceEn} es el
+     * instante hasta el que la PENDIENTE aparta las noches.
+     */
     public static Reserva nueva(Long publicacionId, Long huespedId, LocalDate llegada, LocalDate salida, int noches,
             BigDecimal precioBase, BigDecimal tarifaLimpieza, BigDecimal tarifaServicio, BigDecimal descuento,
-            BigDecimal totalServiciosAdicionales, BigDecimal total) {
+            BigDecimal totalServiciosAdicionales, BigDecimal total, Instant venceEn) {
         return new Reserva(publicacionId, huespedId, llegada, salida, noches, precioBase, tarifaLimpieza,
-                tarifaServicio, descuento, totalServiciosAdicionales, total);
+                tarifaServicio, descuento, totalServiciosAdicionales, total, venceEn);
+    }
+
+    /**
+     * Si ocupa noches en {@code ahora}: una CONFIRMADA siempre, una PENDIENTE solo mientras su apartado no
+     * haya vencido (el instante de vencimiento ya no cuenta). Es la regla que las consultas replican.
+     */
+    public boolean ocupaNoches(Instant ahora) {
+        return estado == EstadoReserva.CONFIRMADA
+                || (estado == EstadoReserva.PENDIENTE && venceEn.isAfter(ahora));
+    }
+
+    /** El apartado se agotó sin confirmarse: pasa a VENCIDA y libera las noches. */
+    public void vencer() {
+        this.estado = EstadoReserva.VENCIDA;
     }
 
     public Long getId() {
@@ -146,6 +169,10 @@ public class Reserva {
 
     public BigDecimal getTotal() {
         return total;
+    }
+
+    public Instant getVenceEn() {
+        return venceEn;
     }
 
     public Instant getCreadoEn() {

@@ -1,6 +1,7 @@
 package co.edu.unbosque.marketplace.reservas.controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -184,6 +185,52 @@ class ReservaIntegracionTest {
                 .andExpect(jsonPath("$.id").value(primeraId));
 
         assertThat(reservasGuardadas(id)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("ADR-4: la reserva PENDIENTE aparta las noches 15 minutos y lo guarda en vence_en")
+    void laReservaApartaLasNochesQuinceMinutos() throws Exception {
+        Long id = publicacion("ACTIVA");
+
+        reservar(iniciarSesion("ana@correo.com"), id, LLEGADA, SALIDA, "[]").andExpect(status().isCreated());
+
+        Long minutos = jdbc.queryForObject(
+                "SELECT ROUND(EXTRACT(EPOCH FROM (vence_en - creado_en)) / 60) FROM reserva WHERE publicacion_id = ?",
+                Long.class, id);
+        assertThat(minutos).isEqualTo(15);
+    }
+
+    @Test
+    @DisplayName("Un apartado vencido libera las noches: otro huésped reserva y la anterior queda VENCIDA")
+    void unApartadoVencidoLiberaLasNoches() throws Exception {
+        Long id = publicacion("ACTIVA");
+        reservar(iniciarSesion("ana@correo.com"), id, LLEGADA, SALIDA, "[]").andExpect(status().isCreated());
+        jdbc.update("UPDATE reserva SET vence_en = now() - interval '1 minute' WHERE publicacion_id = ?", id);
+
+        reservar(iniciarSesion("carla@correo.com"), id, LLEGADA.plusDays(1), SALIDA.plusDays(1), "[]")
+                .andExpect(status().isCreated());
+
+        assertThat(jdbc.queryForList("SELECT estado FROM reserva WHERE publicacion_id = ? ORDER BY id",
+                String.class, id)).containsExactly("VENCIDA", "PENDIENTE");
+    }
+
+    @Test
+    @DisplayName("Mientras el apartado vale, el anfitrión no puede eliminar el periodo; vencido, sí")
+    void unApartadoVigenteBloqueaElPeriodoYVencidoNo() throws Exception {
+        Long id = publicacion("ACTIVA");
+        Long periodoId = jdbc.queryForObject("SELECT id FROM periodo_disponible WHERE publicacion_id = ?", Long.class,
+                id);
+        reservar(iniciarSesion("ana@correo.com"), id, LLEGADA, SALIDA, "[]").andExpect(status().isCreated());
+        String anfitrion = iniciarSesion("luis@correo.com");
+
+        mvc.perform(delete("/api/v1/disponibilidad/" + periodoId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + anfitrion))
+                .andExpect(status().isConflict());
+
+        jdbc.update("UPDATE reserva SET vence_en = now() - interval '1 minute' WHERE publicacion_id = ?", id);
+        mvc.perform(delete("/api/v1/disponibilidad/" + periodoId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + anfitrion))
+                .andExpect(status().isNoContent());
     }
 
     @Test
