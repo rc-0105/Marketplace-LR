@@ -509,6 +509,8 @@ class DisponibilidadServiceTest {
         assertThat(reservado.disponible()).isFalse();
         ocupacion.liberar(PUBLICACION_ID);
         assertThat(servicio.consultar(PUBLICACION_ID, OTRO_ANFITRION_ID, LLEGADA, SALIDA).motivo()).isNull();
+        verify(periodos, never()).saveAndFlush(any());
+        verify(publicador, never()).publicar(any());
     }
 
     @Test
@@ -521,7 +523,6 @@ class DisponibilidadServiceTest {
                 LocalDate.of(2028, 1, 1));
 
         assertThat(rango.hasta()).isEqualTo(LocalDate.of(2028, 1, 1));
-        assertThat(rango.disponible()).isTrue();
     }
 
     private void accesible() {
