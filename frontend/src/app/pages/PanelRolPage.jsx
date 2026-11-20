@@ -21,6 +21,11 @@ function HerramientasAdministrador() {
           <p className={estilos.nota}>Restringe las cuentas que incumplen las políticas o rehabilítalas.</p>
           <Link to="/administrador/usuarios" className={estilos.enlace}>Administrar usuarios</Link>
         </section>
+        <section className={estilos.tarjeta} aria-labelledby="auditoria-titulo">
+          <h3 id="auditoria-titulo" className={estilos.tituloTarjeta}>Auditoría</h3>
+          <p className={estilos.nota}>Consulta los eventos críticos registrados en la plataforma.</p>
+          <Link to="/administrador/auditoria" className={estilos.enlace}>Consultar auditoría</Link>
+        </section>
         <section className={estilos.tarjeta} aria-labelledby="cuenta-titulo">
           <h3 id="cuenta-titulo" className={estilos.tituloTarjeta}>Tu cuenta</h3>
           <p className={estilos.nota}>Consulta y actualiza tus datos o cambia tu contraseña.</p>
