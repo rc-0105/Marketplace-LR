@@ -143,4 +143,77 @@ class ServicioIdempotenciaTest {
         assertThat(respuesta.cuerpo()).isEqualTo("{\"zeta\":1,\"alfa\":2}");
         verify(registro, times(1)).reclamar(any(), any(), anyString(), any(), any());
     }
+
+    private static final UUID CLAVE_UUID = UUID.fromString(CLAVE);
+
+    private String huellaEsperada() {
+        return ServicioIdempotencia.huella(OPERACION, CONTENIDO);
+    }
+
+    private RegistroClave completada(String huella, Instant venceEn) {
+        return new RegistroClave(RegistroClave.Estado.COMPLETADA, huella, 201, "{\"id\":7}", AHORA.minusSeconds(10),
+                venceEn);
+    }
+
+    private void claveTomada() {
+        when(registro.reclamar(any(), any(), anyString(), any(), any())).thenReturn(Optional.empty());
+    }
+
+    @Test
+    @DisplayName("Réplica: con la clave ya completada y la misma huella no ejecuta y devuelve lo guardado")
+    void replica() {
+        claveTomada();
+        when(registro.buscar(2L, CLAVE_UUID))
+                .thenReturn(Optional.of(completada(huellaEsperada(), AHORA.plus(VIGENCIA))));
+        AtomicInteger ejecuciones = new AtomicInteger();
+
+        RespuestaIdempotente respuesta = servicio.ejecutar(solicitud(), HttpStatus.CREATED, () -> {
+            ejecuciones.incrementAndGet();
+            return "no debe ejecutarse";
+        });
+
+        assertThat(ejecuciones).hasValue(0);
+        assertThat(respuesta).isEqualTo(new RespuestaIdempotente(201, "{\"id\":7}", true));
+        verify(registro, never()).completar(any(), any(), any(), anyInt(), anyString(), any());
+        verify(registro, never()).liberar(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Cinco llamadas idénticas devuelven cinco respuestas iguales sin ejecutar nada")
+    void replicaRepetida() {
+        claveTomada();
+        when(registro.buscar(2L, CLAVE_UUID))
+                .thenReturn(Optional.of(completada(huellaEsperada(), AHORA.plus(VIGENCIA))));
+
+        for (int i = 0; i < 5; i++) {
+            RespuestaIdempotente respuesta = servicio.ejecutar(solicitud(), HttpStatus.CREATED, () -> "x");
+            assertThat(respuesta.cuerpo()).isEqualTo("{\"id\":7}");
+            assertThat(respuesta.replicada()).isTrue();
+        }
+    }
+
+    @Test
+    @DisplayName("Un segundo antes de vencer todavía replica")
+    void replicaEnElLimite() {
+        claveTomada();
+        when(registro.buscar(2L, CLAVE_UUID))
+                .thenReturn(Optional.of(completada(huellaEsperada(), AHORA.plusSeconds(1))));
+
+        assertThat(servicio.ejecutar(solicitud(), HttpStatus.CREATED, () -> "x").replicada()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Si la fila se liberó entre el reclamo y la lectura, reintenta el reclamo una vez")
+    void reintentaSiSeLiberoEnMedio() {
+        when(registro.reclamar(any(), any(), anyString(), any(), any()))
+                .thenReturn(Optional.empty(), Optional.of(reclamo));
+        when(registro.buscar(2L, CLAVE_UUID)).thenReturn(Optional.empty());
+        when(registro.completar(any(), any(), any(), anyInt(), anyString(), any())).thenReturn(true);
+
+        RespuestaIdempotente respuesta = servicio.ejecutar(solicitud(), HttpStatus.CREATED, () -> Map.of("id", 9));
+
+        assertThat(respuesta.replicada()).isFalse();
+        assertThat(respuesta.cuerpo()).isEqualTo("{\"id\":9}");
+        verify(registro, times(2)).reclamar(any(), any(), anyString(), any(), any());
+    }
 }

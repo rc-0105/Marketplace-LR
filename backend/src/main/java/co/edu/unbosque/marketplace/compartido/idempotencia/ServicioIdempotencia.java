@@ -60,15 +60,34 @@ public class ServicioIdempotencia {
             Supplier<T> operacion) {
         UUID clave = validar(solicitud.clave());
         String huella = huella(solicitud.operacion(), solicitud.contenidoCanonico());
-        Instant ahora = Instant.now(reloj);
-        Optional<UUID> reclamo = registro.reclamar(solicitud.usuarioId(), clave, huella, ahora, lease);
-        if (reclamo.isEmpty()) {
-            throw new SolicitudEnProcesoException(segundosReintento);
+        // Dos vueltas: si quien tenía la clave la libera entre el reclamo y la lectura, se reclama otra vez.
+        for (int intento = 0; intento < 2; intento++) {
+            Optional<UUID> reclamo = registro.reclamar(solicitud.usuarioId(), clave, huella, Instant.now(reloj),
+                    lease);
+            if (reclamo.isPresent()) {
+                return ejecutarReclamado(solicitud, clave, reclamo.get(), exito, operacion);
+            }
+            Optional<RegistroClave> existente = registro.buscar(solicitud.usuarioId(), clave);
+            if (existente.isPresent()) {
+                return resolver(existente.get(), huella);
+            }
         }
+        throw new SolicitudEnProcesoException(segundosReintento);
+    }
+
+    private <T> RespuestaIdempotente ejecutarReclamado(SolicitudIdempotente solicitud, UUID clave, UUID reclamo,
+            HttpStatus exito, Supplier<T> operacion) {
         T resultado = operacion.get();
         String cuerpo = serializar(resultado);
-        registro.completar(solicitud.usuarioId(), clave, reclamo.get(), exito.value(), cuerpo, vigencia);
+        registro.completar(solicitud.usuarioId(), clave, reclamo, exito.value(), cuerpo, vigencia);
         return new RespuestaIdempotente(exito.value(), cuerpo, false);
+    }
+
+    private RespuestaIdempotente resolver(RegistroClave existente, String huella) {
+        if (existente.estado() == RegistroClave.Estado.COMPLETADA && existente.huella().equals(huella)) {
+            return new RespuestaIdempotente(existente.codigoEstado(), existente.cuerpo(), true);
+        }
+        throw new SolicitudEnProcesoException(segundosReintento);
     }
 
     private static UUID validar(String clave) {
@@ -78,7 +97,7 @@ public class ServicioIdempotencia {
         return UUID.fromString(clave);
     }
 
-    private static String huella(String operacion, String contenidoCanonico) {
+    static String huella(String operacion, String contenidoCanonico) {
         try {
             MessageDigest sha = MessageDigest.getInstance("SHA-256");
             byte[] resumen = sha.digest((operacion + "\n" + contenidoCanonico).getBytes(StandardCharsets.UTF_8));
