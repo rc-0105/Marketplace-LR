@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import co.edu.unbosque.marketplace.alojamientos.repository.PublicacionRepository;
 import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasCalendario;
+import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasPeriodo;
 import co.edu.unbosque.marketplace.compartido.consultas.ReservaOcupada;
 import co.edu.unbosque.marketplace.identidad.model.Rol;
 import co.edu.unbosque.marketplace.identidad.model.Usuario;
@@ -67,6 +68,11 @@ class ConsultaDisponibilidadIntegracionTest {
     // CALLS_REAL_METHODS deja vivo el método por lote default del puerto: solo se stubea ocupantesEntre.
     @MockBean(answer = Answers.CALLS_REAL_METHODS)
     private ConsultaReservasCalendario reservas;
+
+    // ConsultaOcupacionReservas (SOF-33) implementa los dos puertos: al reemplazarla por el doble del calendario,
+    // el de periodos también hay que darlo, o disponibilidad no arranca.
+    @MockBean
+    private ConsultaReservasPeriodo reservasPeriodo;
 
     private String duenoToken;
     private String huespedToken;
