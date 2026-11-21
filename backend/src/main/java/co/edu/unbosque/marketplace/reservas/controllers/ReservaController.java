@@ -44,6 +44,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReservaController {
 
     private static final String OPERACION_CREAR = "POST /api/v1/reservas";
+    private static final String OPERACION_PAGAR = "POST /api/v1/reservas/{id}/pago";
 
     private final ReservaService reservaService;
     private final PagoReservaService pagoService;
@@ -119,9 +120,15 @@ public class ReservaController {
 
     /** Paga la reserva PENDIENTE del huésped con la pasarela en modo prueba (SOF-34, RF-37). */
     @PostMapping("/{id}/pago")
-    public ReservaResponse pagar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
+    public ResponseEntity<String> pagar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
+            @RequestHeader(value = ServicioIdempotencia.CABECERA, required = false) String clave,
             @Valid @RequestBody PagarReservaRequest data) {
-        return ReservaResponse.desde(pagoService.pagar(id, Long.valueOf(jwt.getSubject()), data.metodoPago()));
+        Long huespedId = Long.valueOf(jwt.getSubject());
+        String metodo = data.metodoPago();
+        SolicitudIdempotente solicitud = new SolicitudIdempotente(huespedId, clave, OPERACION_PAGAR,
+                "reserva=" + id + ";metodoPago=" + metodo);
+        return idempotencia.ejecutar(solicitud, HttpStatus.OK,
+                () -> ReservaResponse.desde(pagoService.pagar(id, huespedId, metodo))).comoRespuesta();
     }
 
     /**

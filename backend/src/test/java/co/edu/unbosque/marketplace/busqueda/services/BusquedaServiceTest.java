@@ -15,6 +15,7 @@ import co.edu.unbosque.marketplace.busqueda.exceptions.BusquedaInvalidaException
 import co.edu.unbosque.marketplace.disponibilidad.services.DisponibilidadService;
 import co.edu.unbosque.marketplace.disponibilidad.services.PeriodoLibre;
 import co.edu.unbosque.marketplace.identidad.services.CuentaService;
+import co.edu.unbosque.marketplace.resenas.services.ConsultaResenasService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.HashSet;
@@ -31,7 +32,8 @@ class BusquedaServiceTest {
     private final PublicacionService publicaciones = mock(PublicacionService.class);
     private final DisponibilidadService disponibilidad = mock(DisponibilidadService.class);
     private final CuentaService cuentas = mock(CuentaService.class);
-    private final BusquedaService servicio = new BusquedaService(publicaciones, disponibilidad, cuentas);
+    private final ConsultaResenasService resenas = mock(ConsultaResenasService.class);
+    private final BusquedaService servicio = new BusquedaService(publicaciones, disponibilidad, cuentas, resenas);
 
     @Test
     @DisplayName("Devuelve solo los candidatos de la ciudad que tienen disponibilidad en el rango")
@@ -181,6 +183,21 @@ class BusquedaServiceTest {
     }
 
     @Test
+    @DisplayName("SOF-81: el detalle trae el promedio de las reseñas visibles, y nulo si no hay ninguna")
+    void detalleTraeElPromedioDeLasResenas() {
+        DetalleAlojamiento alojamiento = new DetalleAlojamiento(1L, "Casa 1", "Frente al mar", "Santa Marta", "Casa",
+                4, new BigDecimal("250000"), "No fumar", List.of(), List.of("Wifi"), "Flexible", "Devolución total",
+                null, List.of());
+        when(publicaciones.consultarActiva(1L)).thenReturn(alojamiento);
+        when(publicaciones.consultarActiva(3L)).thenReturn(alojamiento);
+        when(resenas.promedio(1L)).thenReturn(4.3);
+        when(resenas.promedio(3L)).thenReturn(null);
+
+        assertThat(servicio.detalle(1L).calificacionPromedio()).isEqualTo(4.3);
+        assertThat(servicio.detalle(3L).calificacionPromedio()).isNull();
+    }
+
+    @Test
     @DisplayName("Si la publicación no está activa el detalle falla y no consulta el calendario")
     void detalleDeUnaNoActivaNoConsultaElCalendario() {
         when(publicaciones.consultarActiva(2L)).thenThrow(new PublicacionNoEncontradaException());
@@ -188,6 +205,7 @@ class BusquedaServiceTest {
         assertThatThrownBy(() -> servicio.detalle(2L)).isInstanceOf(PublicacionNoEncontradaException.class);
 
         verifyNoInteractions(disponibilidad);
+        verifyNoInteractions(resenas);
     }
 
     private void todosDisponibles(CandidatoBusqueda... candidatos) {
