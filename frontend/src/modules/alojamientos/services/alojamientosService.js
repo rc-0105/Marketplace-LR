@@ -1,4 +1,4 @@
-import { get, post, put } from '../../../shared/services/http.js';
+import { get, post, put, subirArchivo } from '../../../shared/services/http.js';
 import { publicacionDesdeApi } from '../models/publicacion.js';
 
 const RUTA = '/api/v1/publicaciones';
@@ -89,6 +89,20 @@ export async function actualizarServicios(id, servicioIds) {
  */
 export async function actualizarImagenes(id, urls) {
   return publicacionDesdeApi(await put(`${RUTA}/${id}/imagenes`, { imagenes: urls }));
+}
+
+/**
+ * Sube un archivo PNG o JPG de hasta 5 MB y devuelve su URL pública. La imagen no queda en la publicación
+ * hasta que su URL se guarda con `actualizarImagenes`, que es lo que fija el orden.
+ * @param {number | string} id
+ * @param {File} archivo
+ * @returns {Promise<string>}
+ */
+export async function subirImagen(id, archivo) {
+  const datos = new FormData();
+  datos.append('archivo', archivo);
+  const respuesta = await subirArchivo(`${RUTA}/${id}/imagenes/archivo`, datos);
+  return respuesta.url;
 }
 
 /**

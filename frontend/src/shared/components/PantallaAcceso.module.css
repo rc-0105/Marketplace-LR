@@ -1,0 +1,165 @@
+.pagina {
+  max-width: 75rem;
+  margin: 0 auto;
+  padding: var(--espacio-6) var(--espacio-4) var(--espacio-12);
+}
+
+.marco {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 26rem);
+  align-items: center;
+  gap: 5rem;
+  min-height: 36rem;
+  padding: var(--espacio-12) 6.5rem;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background-color: var(--color-texto-secundario);
+  background-position: center;
+  background-size: cover;
+}
+
+/* Velo cálido: da contraste al texto blanco sin apagar la foto. */
+.velo {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgb(43 33 28 / 55%), rgb(43 33 28 / 35%));
+}
+
+.titulo,
+.formulario {
+  position: relative;
+}
+
+.encabezado {
+  margin: 0 0 var(--espacio-3);
+  color: #fff;
+  font-size: clamp(2.5rem, 6vw, 4.5rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.marca {
+  margin: 0;
+  color: #fff;
+  font-size: var(--texto-titulo);
+  font-weight: 700;
+}
+
+/*
+ * Dentro de la foto el formulario es blanco sobre líneas. Se redefinen los tokens en este ámbito
+ * para que Campo y los requisitos de contraseña, que los usan, se vean bien sin tocarlos.
+ */
+.formulario {
+  --color-texto: #fff;
+  --color-texto-secundario: rgb(255 255 255 / 88%);
+  --color-borde-control: rgb(255 255 255 / 80%);
+  --color-error: #ffd9d2;
+  --color-exito: #c4efca;
+  color: #fff;
+}
+
+.formulario label,
+.formulario legend {
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.formulario input:not([type='radio']) {
+  min-height: 2.5rem;
+  padding: var(--espacio-1) 0;
+  border: 0;
+  border-bottom: 1px solid rgb(255 255 255 / 80%);
+  border-radius: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 1.05rem;
+}
+
+.formulario input:not([type='radio']):hover {
+  border-bottom-color: #fff;
+}
+
+.formulario input:not([type='radio']):focus-visible {
+  border-bottom: 2px solid #fff;
+  outline: 0;
+}
+
+.formulario input:-webkit-autofill {
+  -webkit-text-fill-color: #fff;
+  transition: background-color 9999s ease-out;
+}
+
+.formulario a {
+  color: #fff;
+  font-weight: 700;
+}
+
+.formulario :focus-visible {
+  outline-color: #fff;
+}
+
+/* Entrada: el contenido llega deslizándose; el título unos instantes después, para dar sensación de relevo. */
+.derecha {
+  --desplazamiento: 4rem;
+}
+
+.izquierda {
+  --desplazamiento: -4rem;
+}
+
+.titulo {
+  animation: deslizar 620ms cubic-bezier(0.22, 1, 0.36, 1) 60ms both;
+}
+
+.formulario {
+  animation: deslizar 620ms cubic-bezier(0.22, 1, 0.36, 1) 160ms both;
+}
+
+.velo {
+  animation: aparecer 500ms ease-out both;
+}
+
+@keyframes deslizar {
+  from {
+    opacity: 0;
+    transform: translateX(var(--desplazamiento));
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes aparecer {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .titulo,
+  .formulario,
+  .velo {
+    animation: none;
+  }
+}
+
+@media (max-width: 56rem) {
+  .marco {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--espacio-8);
+    padding: var(--espacio-8) var(--espacio-6);
+  }
+
+  .velo {
+    background: rgb(43 33 28 / 55%);
+  }
+}

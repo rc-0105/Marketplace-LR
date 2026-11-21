@@ -19,6 +19,9 @@ public interface PublicacionRepository extends JpaRepository<Publicacion, Long> 
     @EntityGraph(attributePaths = {"tipo", "imagenes"})
     List<Publicacion> findByEstadoAndCiudadIgnoreCaseOrderById(EstadoPublicacion estado, String ciudad);
 
+    @EntityGraph(attributePaths = {"tipo", "imagenes"})
+    List<Publicacion> findByEstadoOrderByIdDesc(EstadoPublicacion estado);
+
     Optional<AnfitrionDePublicacion> findAnfitrionById(Long id);
 
     Optional<AccesoDePublicacion> findAccesoById(Long id);

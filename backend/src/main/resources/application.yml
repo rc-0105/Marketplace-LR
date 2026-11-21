@@ -6,6 +6,12 @@ spring:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
+  # Las imágenes de las publicaciones pesan a lo sumo 5 MB (SubidaImagenService); el resto del
+  # cuerpo multipart es poco más que el archivo.
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   jpa:
     open-in-view: false
     # Flyway es dueño del esquema; Hibernate solo verifica que coincida.

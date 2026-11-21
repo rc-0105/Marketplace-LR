@@ -3,12 +3,14 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi } from '../../../shared/services/http.js';
 import {
-  actualizarImagenes, actualizarServicios, consultarPublicacion, crearPublicacion, editarPublicacion,
-  listarPoliticasCancelacion, listarServicios, listarTiposAlojamiento,
+  activarPublicacion, actualizarImagenes, actualizarServicios, consultarPublicacion, crearPublicacion,
+  editarPublicacion, listarPoliticasCancelacion, listarServicios, listarTiposAlojamiento,
 } from '../services/alojamientosService.js';
 import PublicacionFormPage from './PublicacionFormPage.jsx';
 
 vi.mock('../services/alojamientosService.js', () => ({
+  activarPublicacion: vi.fn(),
+  subirImagen: vi.fn(),
   actualizarConfiguracion: vi.fn(),
   listarPoliticasCancelacion: vi.fn(),
   actualizarImagenes: vi.fn(),
@@ -36,6 +38,8 @@ function renderizarEn(ruta) {
       <Routes>
         <Route path="/anfitrion/publicaciones/nueva" element={<PublicacionFormPage />} />
         <Route path="/anfitrion/publicaciones/:id/editar" element={<PublicacionFormPage />} />
+        <Route path="/anfitrion/publicaciones/:id/enviada" element={<p>Publicación enviada</p>} />
+        <Route path="/anfitrion/publicaciones" element={<p>Lista de publicaciones</p>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -55,38 +59,74 @@ describe('PublicacionFormPage', () => {
     ]);
   });
 
-  it('al editar muestra el panel de condiciones de reserva', async () => {
-    vi.mocked(consultarPublicacion).mockResolvedValue(EXISTENTE);
-    renderizarEn('/anfitrion/publicaciones/5/editar');
-
-    expect(await screen.findByRole('heading', { name: 'Condiciones de reserva' })).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Reserva inmediata' })).toBeChecked();
-  });
-
-  it('al crear no muestra el panel de condiciones de reserva', () => {
+  it('empieza en el paso 1, con los seis pasos a la vista y el estado BORRADOR', async () => {
     renderizarEn('/anfitrion/publicaciones/nueva');
 
-    expect(screen.queryByRole('heading', { name: 'Condiciones de reserva' })).not.toBeInTheDocument();
+    expect(screen.getByText('PASO 1 DE 6')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Información básica' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Nueva publicación' })).toBeInTheDocument();
+    expect(screen.getByText('Borrador')).toBeInTheDocument();
+    for (const nombre of ['Información básica', 'Ubicación', 'Precio y tarifas', 'Servicios y reglas', 'Imágenes',
+      'Reserva y cancelación']) {
+      expect(screen.getByRole('button', { name: new RegExp(nombre) })).toBeInTheDocument();
+    }
+    await screen.findByRole('option', { name: 'Casa' });
   });
 
-  it('crea el borrador con los datos escritos y lleva a editarlo', async () => {
+  it('el paso viene de la dirección y un valor inválido cae al paso 1', async () => {
+    renderizarEn('/anfitrion/publicaciones/nueva?paso=99');
+    expect(screen.getByText('PASO 1 DE 6')).toBeInTheDocument();
+    await screen.findByRole('option', { name: 'Casa' });
+  });
+
+  it('al editar muestra en el paso 6 las condiciones de reserva y la política', async () => {
+    vi.mocked(consultarPublicacion).mockResolvedValue(EXISTENTE);
+    renderizarEn('/anfitrion/publicaciones/5/editar?paso=6');
+
+    expect(await screen.findByRole('radio', { name: /Reserva inmediata/ })).toBeChecked();
+    expect(screen.getByText('PASO 6 DE 6')).toBeInTheDocument();
+    expect(screen.getByLabelText('Política de cancelación')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Tarifa de limpieza (COP)')).not.toBeInTheDocument();
+  });
+
+  it('al crear, los pasos que necesitan el borrador piden guardarlo primero', async () => {
+    renderizarEn('/anfitrion/publicaciones/nueva?paso=6');
+    await screen.findByText(/Guarda el borrador/);
+
+    expect(screen.queryByRole('radio', { name: /Reserva inmediata/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Solicitar activación' })).not.toBeInTheDocument();
+  });
+
+  it('crea el borrador con los datos escritos y lleva a editarlo en el mismo paso', async () => {
     vi.mocked(crearPublicacion).mockResolvedValue({ ...EXISTENTE, id: 12 });
     vi.mocked(consultarPublicacion).mockResolvedValue({ ...EXISTENTE, id: 12 });
     renderizarEn('/anfitrion/publicaciones/nueva');
 
-    expect(screen.getByRole('heading', { name: 'Nueva publicación' })).toBeInTheDocument();
     await screen.findByRole('option', { name: 'Casa' });
     escribir('Título', '  Casa en la playa ');
     escribir('Tipo de alojamiento', '2');
     escribir('Capacidad (huéspedes)', '4');
-    escribir('Precio por noche (COP)', '250000.50');
     fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador' }));
 
     expect(await screen.findByRole('heading', { name: 'Editar publicación' })).toBeInTheDocument();
+    expect(screen.getByText('PASO 1 DE 6')).toBeInTheDocument();
     expect(crearPublicacion).toHaveBeenCalledWith({
       titulo: 'Casa en la playa', descripcion: null, ciudad: null, direccion: null, tipo: 2,
-      capacidad: 4, precioNoche: 250000.5, reglas: null, servicios: [], imagenes: [],
+      capacidad: 4, precioNoche: null, reglas: null, servicios: [], imagenes: [],
     });
+  });
+
+  it('«Siguiente» al crear guarda el borrador y sigue al paso siguiente', async () => {
+    vi.mocked(crearPublicacion).mockResolvedValue({ ...EXISTENTE, id: 12 });
+    vi.mocked(consultarPublicacion).mockResolvedValue({ ...EXISTENTE, id: 12 });
+    renderizarEn('/anfitrion/publicaciones/nueva');
+
+    await screen.findByRole('option', { name: 'Casa' });
+    escribir('Título', 'Casa');
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+
+    expect(await screen.findByText('PASO 2 DE 6')).toBeInTheDocument();
+    expect(crearPublicacion).toHaveBeenCalledTimes(1);
   });
 
   it('sin título muestra el error y no llama a la API', async () => {
@@ -99,21 +139,43 @@ describe('PublicacionFormPage', () => {
     expect(crearPublicacion).not.toHaveBeenCalled();
   });
 
-  it('rechaza una capacidad o un precio con formato inválido', async () => {
+  it('rechaza una capacidad con formato inválido', async () => {
     renderizarEn('/anfitrion/publicaciones/nueva');
     await screen.findByRole('option', { name: 'Casa' });
 
     escribir('Título', 'Casa');
     escribir('Capacidad (huéspedes)', '2.5');
-    escribir('Precio por noche (COP)', '-10');
     fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador' }));
 
     expect(screen.getByText('La capacidad debe ser un número entero mayor que cero.')).toBeInTheDocument();
+    expect(crearPublicacion).not.toHaveBeenCalled();
+  });
+
+  it('un error que está en otro paso lleva a ese paso', async () => {
+    renderizarEn('/anfitrion/publicaciones/nueva?paso=3');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador' }));
+
+    // Falta el título, que se captura en el paso 1: el paso 3 no tiene errores, así que se salta al 1.
+    expect(await screen.findByText('PASO 1 DE 6')).toBeInTheDocument();
+    expect(screen.getByText('El título es obligatorio.')).toBeInTheDocument();
+    expect(crearPublicacion).not.toHaveBeenCalled();
+  });
+
+  it('el precio inválido se muestra junto al campo del paso 3', async () => {
+    renderizarEn('/anfitrion/publicaciones/nueva?paso=3');
+
+    fireEvent.click(screen.getByRole('button', { name: /^1\s*Información básica/ }));
+    escribir('Título', 'Casa');
+    fireEvent.click(screen.getByRole('button', { name: /Precio y tarifas/ }));
+    escribir('Precio por noche (COP)', '-10');
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador' }));
+
     expect(screen.getByText('El precio por noche debe ser mayor que cero, con máximo 2 decimales.')).toBeInTheDocument();
     expect(crearPublicacion).not.toHaveBeenCalled();
   });
 
-  it('muestra junto a cada campo los errores que devuelve la API', async () => {
+  it('muestra junto a su campo los errores que devuelve la API y lleva al paso de ese campo', async () => {
     vi.mocked(crearPublicacion).mockRejectedValue(
       new ErrorApi(400, 'Datos inválidos.', { ciudad: 'La ciudad admite máximo 100 caracteres.' }));
     renderizarEn('/anfitrion/publicaciones/nueva');
@@ -122,7 +184,8 @@ describe('PublicacionFormPage', () => {
     escribir('Título', 'Casa');
     fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador' }));
 
-    expect(await screen.findByText('La ciudad admite máximo 100 caracteres.')).toBeInTheDocument();
+    expect(await screen.findByText('PASO 2 DE 6')).toBeInTheDocument();
+    expect(screen.getByText('La ciudad admite máximo 100 caracteres.')).toBeInTheDocument();
   });
 
   it('al editar carga los datos actuales y conserva servicios e imágenes al guardar', async () => {
@@ -131,7 +194,9 @@ describe('PublicacionFormPage', () => {
     renderizarEn('/anfitrion/publicaciones/5/editar');
 
     expect(await screen.findByLabelText('Título')).toHaveValue('Casa en la playa');
+    fireEvent.click(screen.getByRole('button', { name: /Ubicación/ }));
     expect(screen.getByLabelText('Ciudad')).toHaveValue('Santa Marta');
+    fireEvent.click(screen.getByRole('button', { name: /Precio y tarifas/ }));
     expect(screen.getByLabelText('Precio por noche (COP)')).toHaveValue('250000');
     escribir('Precio por noche (COP)', '300000');
     fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
@@ -144,11 +209,25 @@ describe('PublicacionFormPage', () => {
     }));
   });
 
-  it('al editar ofrece los servicios, y el PUT envía los recién guardados', async () => {
+  it('«Siguiente» y «Atrás» al editar guardan y mueven entre pasos', async () => {
+    vi.mocked(consultarPublicacion).mockResolvedValue(EXISTENTE);
+    vi.mocked(editarPublicacion).mockResolvedValue(EXISTENTE);
+    renderizarEn('/anfitrion/publicaciones/5/editar');
+    await screen.findByLabelText('Título');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+    expect(await screen.findByText('PASO 2 DE 6')).toBeInTheDocument();
+    expect(editarPublicacion).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Atrás' }));
+    expect(screen.getByText('PASO 1 DE 6')).toBeInTheDocument();
+  });
+
+  it('en el paso 4 ofrece los servicios, y el PUT envía los recién guardados', async () => {
     vi.mocked(consultarPublicacion).mockResolvedValue(EXISTENTE);
     vi.mocked(actualizarServicios).mockResolvedValue({ ...EXISTENTE, servicios: [] });
     vi.mocked(editarPublicacion).mockResolvedValue(EXISTENTE);
-    renderizarEn('/anfitrion/publicaciones/5/editar');
+    renderizarEn('/anfitrion/publicaciones/5/editar?paso=4');
 
     fireEvent.click(await screen.findByRole('checkbox', { name: 'Wifi' }));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar servicios' }));
@@ -160,14 +239,14 @@ describe('PublicacionFormPage', () => {
     expect(editarPublicacion).toHaveBeenCalledWith('5', expect.objectContaining({ servicios: [] }));
   });
 
-  it('al editar ofrece los servicios y las imágenes, y el PUT envía las imágenes recién guardadas', async () => {
+  it('en el paso 5 ofrece las imágenes, y el PUT envía las recién guardadas', async () => {
     const nueva = 'https://imagenes.com/2.jpg';
     vi.mocked(consultarPublicacion).mockResolvedValue(EXISTENTE);
     vi.mocked(actualizarImagenes).mockResolvedValue({ ...EXISTENTE, imagenes: [nueva, 'https://imagenes.com/1.jpg'] });
     vi.mocked(editarPublicacion).mockResolvedValue(EXISTENTE);
-    renderizarEn('/anfitrion/publicaciones/5/editar');
+    renderizarEn('/anfitrion/publicaciones/5/editar?paso=5');
 
-    expect(await screen.findByRole('checkbox', { name: 'Wifi' })).toBeChecked();
+    await screen.findByLabelText('URL de la imagen');
     escribir('URL de la imagen', nueva);
     fireEvent.click(screen.getByRole('button', { name: 'Agregar imagen' }));
     fireEvent.click(screen.getByRole('button', { name: 'Subir la imagen 2' }));
@@ -180,6 +259,59 @@ describe('PublicacionFormPage', () => {
     expect(editarPublicacion).toHaveBeenCalledWith('5', expect.objectContaining({
       imagenes: [nueva, 'https://imagenes.com/1.jpg'],
     }));
+  });
+
+  it('el panel lateral marca lo que falta y lista los requisitos de activación', async () => {
+    vi.mocked(consultarPublicacion).mockResolvedValue({ ...EXISTENTE, camposFaltantes: ['direccion'] });
+    renderizarEn('/anfitrion/publicaciones/5/editar');
+
+    expect(await screen.findByText('Falta la dirección')).toBeInTheDocument();
+    expect(screen.getByText('Antes de solicitar la activación')).toBeInTheDocument();
+    expect(screen.getByText('Título y descripción')).toBeInTheDocument();
+    expect(screen.getByText('Al menos una imagen')).toBeInTheDocument();
+  });
+
+  it('al pulsar un paso del panel lateral se va a ese paso', async () => {
+    vi.mocked(consultarPublicacion).mockResolvedValue(EXISTENTE);
+    renderizarEn('/anfitrion/publicaciones/5/editar');
+    await screen.findByLabelText('Título');
+
+    fireEvent.click(screen.getByRole('button', { name: /Servicios y reglas/ }));
+
+    expect(screen.getByText('PASO 4 DE 6')).toBeInTheDocument();
+  });
+
+  it('en el último paso de un borrador, «Solicitar activación» la envía a revisión', async () => {
+    vi.mocked(consultarPublicacion).mockResolvedValue(EXISTENTE);
+    vi.mocked(activarPublicacion).mockResolvedValue({ ...EXISTENTE, estado: 'PENDIENTE_REVISION' });
+    renderizarEn('/anfitrion/publicaciones/5/editar?paso=6');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Solicitar activación' }));
+
+    expect(await screen.findByText('Publicación enviada')).toBeInTheDocument();
+    expect(activarPublicacion).toHaveBeenCalledWith('5');
+  });
+
+  it('si falta información, la activación explica qué completar y no cambia de pantalla', async () => {
+    vi.mocked(consultarPublicacion).mockResolvedValue({ ...EXISTENTE, camposFaltantes: ['direccion', 'imagenes'] });
+    vi.mocked(activarPublicacion).mockRejectedValue(new ErrorApi(422, 'Faltan datos para activar.'));
+    renderizarEn('/anfitrion/publicaciones/5/editar?paso=6');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Solicitar activación' }));
+
+    expect(await screen.findByRole('alert'))
+      .toHaveTextContent('Faltan datos para activar. Completa: dirección, imágenes.');
+    expect(screen.getByText('PASO 6 DE 6')).toBeInTheDocument();
+  });
+
+  it('una publicación que ya no es borrador termina en «Terminar», sin pedir activación', async () => {
+    vi.mocked(consultarPublicacion).mockResolvedValue({ ...EXISTENTE, estado: 'ACTIVA' });
+    renderizarEn('/anfitrion/publicaciones/5/editar?paso=6');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Terminar' }));
+
+    expect(await screen.findByText('Lista de publicaciones')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Solicitar activación' })).not.toBeInTheDocument();
   });
 
   it('avisa cuando la publicación no es del anfitrión', async () => {

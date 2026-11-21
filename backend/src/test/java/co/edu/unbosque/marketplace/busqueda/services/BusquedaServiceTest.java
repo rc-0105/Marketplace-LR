@@ -79,6 +79,34 @@ class BusquedaServiceTest {
     }
 
     @Test
+    @DisplayName("Los destacados saltan a los anfitriones restringidos y respetan el límite pedido")
+    void destacadosSaltaRestringidosYRespetaElLimite() {
+        CandidatoBusqueda deRestringido = candidato(1L, 10L);
+        CandidatoBusqueda primera = candidato(2L, 20L);
+        CandidatoBusqueda segunda = candidato(3L, 20L);
+        when(publicaciones.listarActivasRecientes()).thenReturn(List.of(deRestringido, primera, segunda));
+        when(cuentas.filtrarRestringidos(Set.of(10L, 20L))).thenReturn(Set.of(10L));
+
+        assertThat(servicio.destacados(1)).containsExactly(primera);
+        assertThat(servicio.destacados(5)).containsExactly(primera, segunda);
+    }
+
+    @Test
+    @DisplayName("Un límite fuera de rango se ajusta: mínimo uno y máximo el tope")
+    void destacadosAjustaElLimite() {
+        List<CandidatoBusqueda> activas = new java.util.ArrayList<>();
+        for (long id = 1; id <= BusquedaService.LIMITE_MAXIMO_DESTACADOS + 5; id++) {
+            activas.add(candidato(id, 20L));
+        }
+        when(publicaciones.listarActivasRecientes()).thenReturn(activas);
+        when(cuentas.filtrarRestringidos(Set.of(20L))).thenReturn(Set.of());
+
+        assertThat(servicio.destacados(0)).hasSize(1);
+        assertThat(servicio.destacados(-3)).hasSize(1);
+        assertThat(servicio.destacados(1000)).hasSize(BusquedaService.LIMITE_MAXIMO_DESTACADOS);
+    }
+
+    @Test
     @DisplayName("Con varios filtros devuelve solo lo que cumple los cuatro a la vez")
     void combinaTodosLosFiltros() {
         CandidatoBusqueda cumple = candidato(1L, "Casa", 6, "300000", Set.of(10L, 20L, 30L));

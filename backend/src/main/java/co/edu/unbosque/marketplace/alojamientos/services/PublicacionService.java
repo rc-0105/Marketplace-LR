@@ -228,6 +228,16 @@ public class PublicacionService {
                 .map(CandidatoBusqueda::desde).toList();
     }
 
+    /** Publicaciones ACTIVAS, las más recientes primero: de ahí parte el Inicio público. */
+    @Transactional(readOnly = true)
+    public List<CandidatoBusqueda> listarActivasRecientes() {
+        List<CandidatoBusqueda> candidatos = new ArrayList<>();
+        for (Publicacion publicacion : publicaciones.findByEstadoOrderByIdDesc(EstadoPublicacion.ACTIVA)) {
+            candidatos.add(CandidatoBusqueda.desde(publicacion));
+        }
+        return candidatos;
+    }
+
     /** Detalle público: solo una publicación ACTIVA; si no existe o no está activa responde 404. */
     @Transactional(readOnly = true)
     public DetalleAlojamiento consultarActiva(Long publicacionId) {

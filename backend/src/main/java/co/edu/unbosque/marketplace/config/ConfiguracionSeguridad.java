@@ -31,6 +31,11 @@ public class ConfiguracionSeguridad {
     private static final String RUTA_REACTIVAR = "/api/v1/perfil/reactivar";
     private static final String RUTA_RECUPERACION = "/api/v1/auth/recuperacion";
     private static final String RUTA_CONFIRMAR_RECUPERACION = "/api/v1/auth/recuperacion/confirmar";
+    private static final String RUTA_INICIO_DESTACADOS = "/api/v1/inicio/destacados";
+    // Solo la lista: /api/v1/busqueda/{id} (el detalle) no coincide y sigue pidiendo huésped.
+    private static final String RUTA_BUSQUEDA = "/api/v1/busqueda";
+    // Las fotos de las publicaciones las ven los visitantes: una sola lectura pública, de un único segmento.
+    private static final String RUTA_IMAGENES = "/api/v1/imagenes/*";
     // Rutas de quien aún no tiene sesión: públicas y sin leer el Bearer.
     private static final Set<String> RUTAS_DE_ACCESO = Set.of(RUTA_LOGIN, RUTA_REGISTRO, RUTA_REACTIVAR,
             RUTA_RECUPERACION, RUTA_CONFIRMAR_RECUPERACION);
@@ -56,6 +61,9 @@ public class ConfiguracionSeguridad {
                         .requestMatchers(HttpMethod.GET, "/api/estado", "/actuator/health",
                                 "/actuator/health/**", "/actuator/info", "/v3/api-docs/**",
                                 "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        // Vitrina y búsqueda del Inicio: rutas exactas, públicas para quien aún no tiene sesión.
+                        .requestMatchers(HttpMethod.GET, RUTA_INICIO_DESTACADOS, RUTA_BUSQUEDA, RUTA_IMAGENES)
+                                .permitAll()
                         // El rol lo verifica el @PreAuthorize del endpoint; sin él, se niega.
                         .requestMatchers("/api/v1/**").access(autorizacionDeclarada)
                         // El build de React y sus rutas; nunca algo de /api ni del actuator.

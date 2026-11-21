@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi } from '../../../shared/services/http.js';
@@ -36,7 +36,7 @@ describe('MisPublicacionesPage', () => {
     renderizar();
 
     expect(await screen.findByRole('heading', { name: 'Casa en la playa' })).toBeInTheDocument();
-    expect(screen.getByText('Borrador · Santa Marta')).toBeInTheDocument();
+    expect(screen.getByText('Santa Marta')).toBeInTheDocument();
     expect(screen.getByText('Le faltan 2 datos para activarse.')).toBeInTheDocument();
     expect(screen.getByText('Le falta 1 dato para activarse.')).toBeInTheDocument();
     expect(screen.getByText('Tiene todos los datos para activarse.')).toBeInTheDocument();
@@ -44,6 +44,28 @@ describe('MisPublicacionesPage', () => {
       .toHaveAttribute('href', '/anfitrion/publicaciones/1/editar');
     expect(screen.getByRole('link', { name: 'Disponibilidad de Casa en la playa' }))
       .toHaveAttribute('href', '/anfitrion/publicaciones/1/disponibilidad');
+  });
+
+  it('reparte las publicaciones en columnas por estado, con conteo, foto y precio', async () => {
+    vi.mocked(listarMisPublicaciones).mockResolvedValue([
+      publicacion({ id: 1, titulo: 'Casa colonial', estado: 'ACTIVA', precioNoche: 320000,
+        tipo: { id: 1, nombre: 'Casa' }, ciudad: 'Cartagena', imagenes: ['https://imagenes.com/1.jpg'] }),
+      publicacion({ id: 2, titulo: 'Apartamento con balcón', estado: 'ACTIVA' }),
+      publicacion({ id: 3, titulo: 'Habitación en la playa', estado: 'PAUSADA' }),
+    ]);
+    renderizar();
+
+    const activas = await screen.findByRole('region', { name: 'Activa' });
+    expect(within(activas).getByText('2')).toBeInTheDocument();
+    expect(within(activas).getByRole('heading', { name: 'Casa colonial' })).toBeInTheDocument();
+    expect(within(activas).getByText('Casa · Cartagena')).toBeInTheDocument();
+    expect(within(activas).getByText(/320\.000/)).toBeInTheDocument();
+    expect(within(activas).getByAltText('Foto de Casa colonial')).toHaveAttribute('src', 'https://imagenes.com/1.jpg');
+    expect(within(screen.getByRole('region', { name: 'Pausada' })).getByRole('heading', { name: 'Habitación en la playa' }))
+      .toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Borrador' })).queryByRole('heading', { level: 3 }))
+      .not.toBeInTheDocument();
+    expect(screen.getByText('Todas · 3')).toBeInTheDocument();
   });
 
   it('ofrece crear una publicación nueva', () => {
@@ -75,7 +97,7 @@ describe('MisPublicacionesPage', () => {
     vi.mocked(activarPublicacion).mockResolvedValue(publicacion({ id: 1, estado: 'PENDIENTE_REVISION' }));
 
     renderizar();
-    fireEvent.click(await screen.findByRole('button', { name: 'Activar Casa en la playa' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Solicitar activación Casa en la playa' }));
 
     expect(await screen.findByText('En revisión')).toBeInTheDocument();
     expect(screen.getByText('Esperando la aprobación de un administrador.')).toBeInTheDocument();
@@ -90,11 +112,12 @@ describe('MisPublicacionesPage', () => {
     vi.mocked(activarPublicacion).mockRejectedValue(new ErrorApi(422, 'Faltan campos para activar la publicación.'));
 
     renderizar();
-    fireEvent.click(await screen.findByRole('button', { name: 'Activar Casa en la playa' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Solicitar activación Casa en la playa' }));
 
     expect(await screen.findByRole('alert'))
       .toHaveTextContent('Faltan campos para activar la publicación. Completa: precio por noche, imágenes.');
-    expect(screen.getByText('Borrador')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Borrador' })).getByRole('heading', { name: 'Casa en la playa' }))
+      .toBeInTheDocument();
   });
 
   it('pausa una publicación activa y después ofrece reactivarla', async () => {

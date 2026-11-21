@@ -25,7 +25,11 @@ public class BusquedaController {
         this.busquedaService = busquedaService;
     }
 
-    /** Las ACTIVAS de la ciudad con disponibilidad en el rango; sin coincidencias, una lista vacía. */
+    /**
+     * Las ACTIVAS de la ciudad con disponibilidad en el rango; sin coincidencias, una lista vacía. Es pública:
+     * el visitante busca antes de iniciar sesión; el detalle y la reserva siguen siendo del huésped.
+     */
+    @PreAuthorize(Permisos.PUBLICO)
     @GetMapping("/busqueda")
     public List<ResultadoBusquedaResponse> buscar(@Valid BusquedaRequest data) {
         return ResultadoBusquedaResponse

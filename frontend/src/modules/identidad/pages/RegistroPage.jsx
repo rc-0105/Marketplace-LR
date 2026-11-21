@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Campo from '../../../shared/components/Campo.jsx';
+import PantallaAcceso from '../../../shared/components/PantallaAcceso.jsx';
 import RequisitosContrasena from '../components/RequisitosContrasena.jsx';
 import { validarRegistro } from '../models/usuario.js';
 import { registrarUsuario } from '../services/identidadService.js';
@@ -76,9 +77,7 @@ export default function RegistroPage() {
   }
 
   return (
-    <main className={estilos.pagina}>
-      <h1 className={estilos.titulo}>Crea tu cuenta</h1>
-      <p className={estilos.intro}>Elige cómo vas a usar la plataforma. Podrás iniciar sesión apenas termines.</p>
+    <PantallaAcceso titulo="Regístrate con nosotros">
 
       {errorGeneral && <p role="alert" className={estilos.aviso}>{errorGeneral}</p>}
 
@@ -107,12 +106,13 @@ export default function RegistroPage() {
           ))}
         </fieldset>
 
-        <button type="submit" className={estilos.boton} disabled={enviando}>
-          {enviando ? 'Creando cuenta…' : 'Crear cuenta'}
-        </button>
+        <div className={estilos.acciones}>
+          <button type="submit" className={estilos.boton} disabled={enviando}>
+            {enviando ? 'Creando cuenta…' : 'Crear cuenta'}
+          </button>
+          <p className={estilos.pie}>¿Ya tienes cuenta? <Link to="/inicio-sesion">Inicia sesión</Link></p>
+        </div>
       </form>
-
-      <p className={estilos.pie}>¿Ya tienes cuenta? <Link to="/inicio-sesion">Inicia sesión</Link></p>
-    </main>
+    </PantallaAcceso>
   );
 }

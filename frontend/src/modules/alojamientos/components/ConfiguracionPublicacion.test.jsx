@@ -56,7 +56,7 @@ describe('ConfiguracionPublicacion', () => {
 
     expect(await screen.findByRole('option', { name: 'Moderada' })).toBeInTheDocument();
     expect(screen.getByLabelText('Tarifa de limpieza (COP)')).toHaveValue('40000');
-    expect(screen.getByRole('radio', { name: 'Requiere mi aprobación' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: /Requiere mi aprobación/ })).toBeChecked();
     expect(screen.getByLabelText('Política de cancelación')).toHaveValue('2');
     expect(screen.getByText('Devolución total hasta 5 días antes.')).toBeInTheDocument();
     expect(adicionalesEnPantalla()).toEqual([expect.stringContaining('Desayuno')]);
@@ -66,7 +66,7 @@ describe('ConfiguracionPublicacion', () => {
     renderizar(SIN_CONFIGURAR);
 
     await screen.findByRole('option', { name: 'Flexible' });
-    expect(screen.getByRole('radio', { name: 'Reserva inmediata' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: /Reserva inmediata/ })).toBeChecked();
     expect(screen.getByLabelText('Política de cancelación')).toHaveValue('');
     expect(screen.getByText('Todavía no hay servicios adicionales.')).toBeInTheDocument();
   });
@@ -79,7 +79,7 @@ describe('ConfiguracionPublicacion', () => {
     await screen.findByRole('option', { name: 'Moderada' });
 
     escribir('Tarifa de limpieza (COP)', ' 50000 ');
-    fireEvent.click(screen.getByRole('radio', { name: 'Requiere mi aprobación' }));
+    fireEvent.click(screen.getByRole('radio', { name: /Requiere mi aprobación/ }));
     escribir('Política de cancelación', '2');
     agregarAdicional(' Desayuno ', '15000');
     agregarAdicional('Traslado', '60000.50');
@@ -164,7 +164,7 @@ describe('ConfiguracionPublicacion', () => {
     await screen.findByRole('option', { name: 'Flexible' });
 
     expect(screen.queryByText('Hay cambios en las condiciones sin guardar.')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('radio', { name: 'Requiere mi aprobación' }));
+    fireEvent.click(screen.getByRole('radio', { name: /Requiere mi aprobación/ }));
     expect(screen.getByText('Hay cambios en las condiciones sin guardar.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Guardar condiciones' }));

@@ -37,7 +37,7 @@ describe('RegistroPage', () => {
   it('muestra el formulario con huésped elegido por defecto', () => {
     renderizar();
 
-    expect(screen.getByRole('heading', { name: 'Crea tu cuenta' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Regístrate con nosotros' })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: /huésped/i })).toBeChecked();
     expect(screen.getByRole('radio', { name: /anfitrión/i })).not.toBeChecked();
   });
@@ -147,7 +147,7 @@ describe('RegistroPage', () => {
     await waitFor(() =>
       expect(screen.getByLabelText('Correo electrónico')).toHaveAccessibleDescription('El correo ya está en uso.'),
     );
-    expect(screen.getByRole('heading', { name: 'Crea tu cuenta' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Regístrate con nosotros' })).toBeInTheDocument();
   });
 
   it('muestra en cada campo los errores de validación que devuelve el servidor', async () => {

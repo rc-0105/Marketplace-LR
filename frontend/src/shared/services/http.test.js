@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ErrorApi, eliminar, get, post, put } from './http.js';
+import { ErrorApi, eliminar, get, post, put, subirArchivo } from './http.js';
 import { guardarSesion, limpiarSesion, obtenerSesion, suscribirExpiracion } from './sesion.js';
 
 function respuesta(estado, cuerpo) {
@@ -25,6 +25,21 @@ describe('http', () => {
       body: '{"a":1}',
       headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
     }));
+  });
+
+  it('un archivo viaja como multipart: no fija el Content-Type, que lleva el separador del navegador', async () => {
+    const fetchFalso = vi.fn(() => respuesta(201, { url: '/api/v1/imagenes/abc' }));
+    vi.stubGlobal('fetch', fetchFalso);
+    const datos = new FormData();
+    datos.append('archivo', new File(['x'], 'foto.png', { type: 'image/png' }));
+
+    await expect(subirArchivo('/api/v1/recurso/archivo', datos)).resolves.toEqual({ url: '/api/v1/imagenes/abc' });
+
+    const [, opciones] = fetchFalso.mock.calls[0];
+    expect(opciones.method).toBe('POST');
+    expect(opciones.body).toBe(datos);
+    expect(opciones.headers['Content-Type']).toBeUndefined();
+    expect(opciones.headers.Accept).toBe('application/json');
   });
 
   it('consulta con GET sin cuerpo y devuelve la respuesta', async () => {

@@ -39,7 +39,11 @@ async function leerJson(respuesta) {
 
 async function solicitar(ruta, opciones) {
   const sesion = obtenerSesion();
-  const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
+  const headers = { Accept: 'application/json' };
+  // Con un archivo el navegador fija el Content-Type con su separador (boundary): no se debe pisar.
+  if (!(opciones.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
   if (sesion) {
     headers.Authorization = `Bearer ${sesion.token}`;
   }
@@ -71,6 +75,11 @@ export function get(ruta) {
 
 export function post(ruta, cuerpo) {
   return solicitar(ruta, { method: 'POST', body: JSON.stringify(cuerpo) });
+}
+
+/** Envía un archivo como multipart: `datos` es un FormData con el archivo ya adjunto. */
+export function subirArchivo(ruta, datos) {
+  return solicitar(ruta, { method: 'POST', body: datos });
 }
 
 export function put(ruta, cuerpo) {

@@ -1,26 +1,16 @@
-.pagina {
-  max-width: 28rem;
-  margin: 0 auto;
-  padding: var(--espacio-12) var(--espacio-4);
-}
-
-.titulo {
-  margin: 0 0 var(--espacio-6);
-  font-size: var(--texto-encabezado);
-}
-
 .texto {
   margin: 0;
-  color: var(--color-texto-secundario);
+  color: #fff;
 }
 
 .exito {
   display: block;
-  margin: 0;
+  margin: 0 0 var(--espacio-4);
   padding: var(--espacio-3) var(--espacio-4);
-  border-radius: var(--radio);
-  background: var(--color-exito-fondo);
-  color: var(--color-exito);
+  border-left: 4px solid #3f6b48;
+  border-radius: 0.625rem;
+  background: rgb(255 255 255 / 92%);
+  color: #2a2522;
 }
 
 .formulario {
@@ -30,20 +20,27 @@
   margin-top: var(--espacio-4);
 }
 
+.acciones {
+  display: grid;
+  justify-items: center;
+  margin-top: var(--espacio-4);
+}
+
 .boton {
-  min-height: 2.75rem;
+  min-height: 3rem;
+  padding: 0 3rem;
   border: 0;
-  border-radius: var(--radio);
-  background: var(--color-terracota);
-  color: var(--color-sobre-terracota);
+  border-radius: 0.625rem;
+  background: #f3efec;
+  color: #2a2522;
   font: inherit;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
   transition: background-color var(--transicion);
 }
 
 .boton:hover:not(:disabled) {
-  background: var(--color-terracota-oscuro);
+  background: #fff;
 }
 
 .boton:disabled {
@@ -54,12 +51,14 @@
 .aviso {
   margin: var(--espacio-4) 0 0;
   padding: var(--espacio-3) var(--espacio-4);
-  border-radius: var(--radio);
-  background: var(--color-error-fondo);
-  color: var(--color-error);
+  border-left: 4px solid #a3352a;
+  border-radius: 0.625rem;
+  background: rgb(255 255 255 / 92%);
+  color: #7c2a21;
 }
 
 .pie {
-  margin: var(--espacio-4) 0 0;
-  color: var(--color-texto-secundario);
+  margin: var(--espacio-6) 0 0;
+  font-size: var(--texto-pequeno);
+  text-align: center;
 }

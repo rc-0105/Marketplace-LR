@@ -29,7 +29,7 @@ describe('Encabezado', () => {
 
   it.each([
     ['HUESPED', '/huesped'],
-    ['ANFITRION', '/anfitrion'],
+    ['ANFITRION', '/anfitrion/publicaciones'],
     ['ADMINISTRADOR', '/administrador'],
   ])('con sesión de %s la marca lleva al panel de su rol', (rol, panel) => {
     iniciar(rol);
@@ -40,7 +40,7 @@ describe('Encabezado', () => {
 
   it.each([
     ['HUESPED', '/mi-cuenta', '/huesped'],
-    ['ANFITRION', '/anfitrion/publicaciones/nueva', '/anfitrion'],
+    ['ANFITRION', '/anfitrion/publicaciones/nueva', '/anfitrion/publicaciones'],
     ['ADMINISTRADOR', '/administrador/publicaciones', '/administrador'],
   ])('a un %s en %s le ofrece volver a su panel', (rol, ruta, panel) => {
     iniciar(rol);
@@ -51,7 +51,7 @@ describe('Encabezado', () => {
 
   it('en su propio panel no ofrece volver al panel', () => {
     iniciar('ANFITRION');
-    renderizar(vi.fn(), '/anfitrion');
+    renderizar(vi.fn(), '/anfitrion/publicaciones');
 
     expect(screen.queryByRole('link', { name: 'Volver a mi panel' })).not.toBeInTheDocument();
   });

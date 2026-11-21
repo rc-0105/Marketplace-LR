@@ -6,13 +6,22 @@ import estilos from './MisPublicacionesPage.module.css';
 
 const MENSAJE_ERROR = 'No pudimos cargar tus publicaciones. Intenta de nuevo.';
 const MENSAJE_CAMBIO_FALLIDO = 'No pudimos cambiar el estado. Intenta de nuevo.';
+const FORMATO_PESOS = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
 // La API decide si el cambio procede; aquí solo se elige qué botón ofrecer.
 const ACCIONES = {
-  BORRADOR: { etiqueta: 'Activar', ejecutar: activarPublicacion },
+  BORRADOR: { etiqueta: 'Solicitar activación', ejecutar: activarPublicacion },
   PAUSADA: { etiqueta: 'Reactivar', ejecutar: activarPublicacion },
   ACTIVA: { etiqueta: 'Pausar', ejecutar: pausarPublicacion },
 };
+
+// Las cuatro columnas del tablero, en el orden del ciclo de vida de una publicación.
+const COLUMNAS = [
+  { estado: 'BORRADOR', titulo: 'Borrador' },
+  { estado: 'PENDIENTE_REVISION', titulo: 'Pendiente de revisión' },
+  { estado: 'ACTIVA', titulo: 'Activa' },
+  { estado: 'PAUSADA', titulo: 'Pausada' },
+];
 
 const RESUMEN_ESTADO = {
   PENDIENTE_REVISION: 'Esperando la aprobación de un administrador.',
@@ -69,11 +78,70 @@ export default function MisPublicacionesPage() {
     }
   }
 
+  function tarjetaDe(publicacion) {
+    const accion = ACCIONES[publicacion.estado];
+    const foto = publicacion.imagenes?.[0];
+    const lugar = [publicacion.tipo?.nombre, publicacion.ciudad].filter(Boolean).join(' · ');
+    return (
+      <li key={publicacion.id} className={estilos.tarjeta}>
+        {foto ? (
+          <img src={foto} alt={`Foto de ${publicacion.titulo}`} className={estilos.foto} />
+        ) : (
+          <div className={estilos.sinFoto}>Sin foto</div>
+        )}
+        <span className={`${estilos.estado} ${estilos[publicacion.estado]}`}>
+          {nombreDeEstado(publicacion.estado)}
+        </span>
+        <div className={estilos.texto}>
+          <h3 className={estilos.nombre}>{publicacion.titulo}</h3>
+          {lugar && <p className={estilos.detalle}>{lugar}</p>}
+        </div>
+        {publicacion.precioNoche != null && (
+          <p className={estilos.precio}>
+            {FORMATO_PESOS.format(publicacion.precioNoche)} <span>por noche</span>
+          </p>
+        )}
+        <p className={estilos.detalle}>{resumenDe(publicacion)}</p>
+        {publicacion.estado === 'BORRADOR' && publicacion.observacionesRevision && (
+          <p className={estilos.observaciones}>
+            Devuelta por el administrador: {publicacion.observacionesRevision}
+          </p>
+        )}
+        {errores[publicacion.id] && (
+          <p role="alert" className={estilos.error}>{errores[publicacion.id]}</p>
+        )}
+        <div className={estilos.acciones}>
+          <Link to={`/anfitrion/publicaciones/${publicacion.id}/editar`} className={estilos.enlace}
+            aria-label={`Editar ${publicacion.titulo}`}>
+            {publicacion.estado === 'BORRADOR' ? 'Completar' : 'Editar'}
+          </Link>
+          <Link to={`/anfitrion/publicaciones/${publicacion.id}/disponibilidad`} className={estilos.enlace}
+            aria-label={`Disponibilidad de ${publicacion.titulo}`}>
+            Disponibilidad
+          </Link>
+          {accion && (
+            <button type="button" className={estilos.cambiarEstado}
+              aria-label={`${accion.etiqueta} ${publicacion.titulo}`}
+              disabled={enCurso === publicacion.id}
+              onClick={() => cambiarEstado(publicacion, accion)}>
+              {accion.etiqueta}
+            </button>
+          )}
+        </div>
+      </li>
+    );
+  }
+
   return (
     <main className={estilos.pagina}>
       <div className={estilos.cabecera}>
-        <h1 className={estilos.titulo}>Mis publicaciones</h1>
-        <Link to="/anfitrion/publicaciones/nueva" className={estilos.nueva}>Nueva publicación</Link>
+        <div>
+          <h1 className={estilos.titulo}>Mis publicaciones</h1>
+          <p className={estilos.subtitulo}>Administra tus alojamientos, su estado y su disponibilidad.</p>
+        </div>
+        <Link to="/anfitrion/publicaciones/nueva" className={estilos.nueva}>
+          <span aria-hidden="true">+</span> Nueva publicación
+        </Link>
       </div>
       {errorCarga && <p role="alert" className={estilos.error}>{errorCarga}</p>}
       {!errorCarga && publicaciones === null && <p className={estilos.nota}>Cargando tus publicaciones…</p>}
@@ -81,47 +149,28 @@ export default function MisPublicacionesPage() {
         <p className={estilos.nota}>Todavía no tienes publicaciones.</p>
       )}
       {publicaciones?.length > 0 && (
-        <ul className={estilos.lista}>
-          {publicaciones.map((publicacion) => {
-            const accion = ACCIONES[publicacion.estado];
-            return (
-              <li key={publicacion.id} className={estilos.tarjeta}>
-                <h2 className={estilos.nombre}>{publicacion.titulo}</h2>
-                <p className={estilos.detalle}>
-                  {nombreDeEstado(publicacion.estado)}
-                  {publicacion.ciudad && ` · ${publicacion.ciudad}`}
-                </p>
-                <p className={estilos.detalle}>{resumenDe(publicacion)}</p>
-                {publicacion.estado === 'BORRADOR' && publicacion.observacionesRevision && (
-                  <p className={estilos.observaciones}>
-                    Devuelta por el administrador: {publicacion.observacionesRevision}
-                  </p>
-                )}
-                {errores[publicacion.id] && (
-                  <p role="alert" className={estilos.error}>{errores[publicacion.id]}</p>
-                )}
-                <div className={estilos.acciones}>
-                  <Link to={`/anfitrion/publicaciones/${publicacion.id}/editar`} className={estilos.editar}
-                    aria-label={`Editar ${publicacion.titulo}`}>
-                    Editar
-                  </Link>
-                  <Link to={`/anfitrion/publicaciones/${publicacion.id}/disponibilidad`} className={estilos.editar}
-                    aria-label={`Disponibilidad de ${publicacion.titulo}`}>
-                    Disponibilidad
-                  </Link>
-                  {accion && (
-                    <button type="button" className={estilos.cambiarEstado}
-                      aria-label={`${accion.etiqueta} ${publicacion.titulo}`}
-                      disabled={enCurso === publicacion.id}
-                      onClick={() => cambiarEstado(publicacion, accion)}>
-                      {accion.etiqueta}
-                    </button>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <p className={estilos.total}>Todas · {publicaciones.length}</p>
+          <div className={estilos.tablero}>
+            {COLUMNAS.map((columna) => {
+              const deLaColumna = publicaciones.filter((publicacion) => publicacion.estado === columna.estado);
+              return (
+                <section key={columna.estado} className={estilos.columna} aria-label={columna.titulo}>
+                  <div className={estilos.encabezadoColumna}>
+                    <h2 className={estilos.tituloColumna}>{columna.titulo}</h2>
+                    <span className={estilos.conteo}>{deLaColumna.length}</span>
+                  </div>
+                  {deLaColumna.length === 0 && <p className={estilos.columnaVacia}>Sin publicaciones aquí</p>}
+                  <ul className={estilos.lista}>{deLaColumna.map(tarjetaDe)}</ul>
+                </section>
+              );
+            })}
+          </div>
+          <p className={estilos.leyenda}>
+            Las publicaciones pasan por Borrador, En revisión, Activa y Pausada. Solo las activas aparecen en las
+            búsquedas y reciben reservas.
+          </p>
+        </>
       )}
     </main>
   );
