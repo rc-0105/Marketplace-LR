@@ -1,45 +1,50 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi } from '../../../shared/services/http.js';
-import { cancelarReserva, pagarReserva } from '../services/reservaService.js';
+import { pagarReserva } from '../services/reservaService.js';
 import PagoReserva from './PagoReserva.jsx';
 
-vi.mock('../services/reservaService.js', () => ({ pagarReserva: vi.fn(), cancelarReserva: vi.fn() }));
+vi.mock('../services/reservaService.js', () => ({ pagarReserva: vi.fn() }));
 
 function abrir() {
   render(<PagoReserva reservaId={7} total={470000} />);
 }
 
+function metodo(tarjeta) {
+  return screen.getAllByRole('radio').find((opcion) => opcion.value === tarjeta);
+}
+
 function pagar(tarjeta) {
-  if (tarjeta) fireEvent.change(screen.getByLabelText('Tarjeta de prueba'), { target: { value: tarjeta } });
+  if (tarjeta) fireEvent.click(metodo(tarjeta));
   fireEvent.click(screen.getByRole('button', { name: /Pagar/ }));
-}
-
-async function pagarAprobado() {
-  vi.mocked(pagarReserva).mockResolvedValue({ id: 7, estado: 'CONFIRMADA', estadoPago: 'APROBADO', transaccionId: 'pi_123' });
-  abrir();
-  pagar();
-  await screen.findByRole('status');
-}
-
-function cancelar(motivo) {
-  fireEvent.change(screen.getByLabelText('Motivo de la cancelación'), { target: { value: motivo } });
-  fireEvent.click(screen.getByRole('button', { name: /Cancelar reserva/ }));
 }
 
 describe('PagoReserva', () => {
   beforeEach(() => vi.resetAllMocks());
 
-  it('paga con la tarjeta de prueba aprobada por defecto y muestra la transacción', async () => {
+  it('paga con la tarjeta de prueba aprobada por defecto y muestra el pago aceptado sin la transacción', async () => {
     vi.mocked(pagarReserva).mockResolvedValue({ id: 7, estado: 'CONFIRMADA', estadoPago: 'APROBADO', transaccionId: 'pi_123' });
-    abrir();
+    const onAprobado = vi.fn();
+    render(<PagoReserva reservaId={7} total={470000} onAprobado={onAprobado} />);
 
     pagar();
 
-    expect(await screen.findByRole('status'))
-      .toHaveTextContent('Pago aprobado: tu reserva está confirmada. Transacción pi_123.');
+    expect(await screen.findByRole('status')).toHaveTextContent('Pago aceptado: tu reserva está confirmada.');
+    expect(screen.queryByText(/pi_123/)).not.toBeInTheDocument();
+    expect(onAprobado).toHaveBeenCalled();
     expect(pagarReserva).toHaveBeenCalledWith(7, 'pm_card_visa', expect.any(String));
     expect(screen.queryByRole('button', { name: /Pagar/ })).not.toBeInTheDocument();
+  });
+
+  it('ofrece las cuatro tarjetas de prueba como métodos de pago, con la Visa aprobada elegida', () => {
+    abrir();
+
+    const opciones = screen.getAllByRole('radio');
+    expect(opciones.map((opcion) => opcion.value)).toEqual([
+      'pm_card_visa', 'pm_card_mastercard', 'pm_card_chargeDeclined', 'pm_card_chargeDeclinedInsufficientFunds',
+    ]);
+    expect(screen.getByRole('radio', { name: /Visa terminada en 4242/ })).toBeChecked();
+    expect(screen.getByRole('radio', { name: /Visa terminada en 0002.*rechazada/ })).not.toBeChecked();
   });
 
   it('muestra el total a pagar en el botón', () => {
@@ -79,10 +84,11 @@ describe('PagoReserva', () => {
     pagar('pm_card_mastercard');
     await screen.findByRole('alert');
 
-    expect(screen.getByLabelText('Tarjeta de prueba')).toBeDisabled();
+    expect(metodo('pm_card_visa')).toBeDisabled();
+    expect(metodo('pm_card_mastercard')).toBeChecked();
     pagar();
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Transacción pi_1.');
+    expect(await screen.findByRole('status')).toHaveTextContent('Pago aceptado');
     const clave = vi.mocked(pagarReserva).mock.calls[0][2];
     expect(clave).toEqual(expect.any(String));
     expect(pagarReserva).toHaveBeenNthCalledWith(2, 7, 'pm_card_mastercard', clave);
@@ -112,74 +118,14 @@ describe('PagoReserva', () => {
     expect(screen.getByRole('button', { name: /Pagar/ })).toBeEnabled();
   });
 
-  it('antes de pagar no ofrece cancelar la reserva', () => {
+  it('tras el pago aceptado no ofrece cancelar: eso se hace desde el detalle de la reserva', async () => {
+    vi.mocked(pagarReserva).mockResolvedValue({ id: 7, estado: 'CONFIRMADA', estadoPago: 'APROBADO', transaccionId: 'pi_1' });
     abrir();
 
-    expect(screen.queryByRole('button', { name: /Cancelar reserva/ })).not.toBeInTheDocument();
-  });
+    pagar();
+    await screen.findByRole('status');
 
-  it('tras un pago aprobado ofrece cancelar la reserva con un motivo (SOF-75)', async () => {
-    await pagarAprobado();
-
-    expect(screen.getByRole('button', { name: /Cancelar reserva/ })).toBeInTheDocument();
-    expect(screen.getByLabelText('Motivo de la cancelación')).toBeInTheDocument();
-  });
-
-  it('cancela la reserva con el motivo indicado y muestra la devolución', async () => {
-    await pagarAprobado();
-    vi.mocked(cancelarReserva).mockResolvedValue({
-      reservaId: 7, estado: 'CANCELADA', motivo: 'Cambio de planes', valorDevolucion: 470000,
-      fecha: '2026-12-01T15:00:00Z',
-    });
-
-    cancelar('Cambio de planes');
-
-    expect(await screen.findByText(/Reserva cancelada/)).toHaveTextContent(/470\.000/);
-    expect(cancelarReserva).toHaveBeenCalledWith(7, 'Cambio de planes');
-    expect(screen.queryByRole('button', { name: /Cancelar reserva/ })).not.toBeInTheDocument();
-  });
-
-  it('si la reserva ya no se puede cancelar muestra el mensaje de la API (409)', async () => {
-    await pagarAprobado();
-    vi.mocked(cancelarReserva).mockRejectedValue(new ErrorApi(409, 'Esta reserva ya está cancelada.'));
-
-    cancelar('Cambio de planes');
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('Esta reserva ya está cancelada.');
-    expect(screen.getByRole('button', { name: /Cancelar reserva/ })).toBeEnabled();
-  });
-
-  it('si el usuario no es el huésped ni el anfitrión muestra el mensaje de permiso (403)', async () => {
-    await pagarAprobado();
-    vi.mocked(cancelarReserva).mockRejectedValue(new ErrorApi(403, 'No tienes permiso para realizar esta acción.'));
-
-    cancelar('Cambio de planes');
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('No tienes permiso para realizar esta acción.');
-  });
-
-  it('ante un error inesperado al cancelar muestra un aviso genérico y deja reintentar', async () => {
-    await pagarAprobado();
-    vi.mocked(cancelarReserva).mockRejectedValue(new ErrorApi(500, 'Error'));
-
-    cancelar('Cambio de planes');
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos cancelar la reserva. Intenta de nuevo.');
-    expect(screen.getByRole('button', { name: /Cancelar reserva/ })).toBeEnabled();
-  });
-
-  it('ante una falla del servidor o del proxy (503) no muestra su mensaje técnico sino el aviso genérico', async () => {
-    await pagarAprobado();
-    vi.mocked(cancelarReserva).mockRejectedValue(new ErrorApi(503, 'upstream connect error'));
-
-    cancelar('Cambio de planes');
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos cancelar la reserva. Intenta de nuevo.');
-  });
-
-  it('el motivo no admite más de 500 caracteres, el mismo límite de la API', async () => {
-    await pagarAprobado();
-
-    expect(screen.getByLabelText('Motivo de la cancelación')).toHaveAttribute('maxLength', '500');
+    expect(screen.queryByRole('button', { name: /Cancelar/ })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Motivo de la cancelación')).not.toBeInTheDocument();
   });
 });

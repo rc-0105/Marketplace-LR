@@ -124,3 +124,27 @@
   font-weight: 300;
   letter-spacing: -0.02em;
 }
+
+/* Estancia que el huésped ya tiene confirmada y pagada: aviso en lugar de Confirmar reserva. */
+.yaReservada {
+  display: grid;
+  gap: var(--espacio-3);
+  padding: var(--espacio-4);
+  border-radius: var(--radio);
+  background: var(--color-exito-fondo);
+  color: var(--color-exito);
+}
+
+.verReserva {
+  justify-self: start;
+  padding: var(--espacio-2) var(--espacio-6);
+  border-radius: 999px;
+  background: var(--color-exito);
+  color: #fff;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.verReserva:hover {
+  opacity: 0.9;
+}

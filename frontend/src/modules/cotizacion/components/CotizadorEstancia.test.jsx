@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi } from '../../../shared/services/http.js';
 import { crearReserva } from '../../reservas/services/reservaService.js';
@@ -28,8 +29,19 @@ function cotizar() {
   fireEvent.click(screen.getByRole('button', { name: 'Cotizar' }));
 }
 
-function abrir() {
-  render(<CotizadorEstancia publicacionId={5} serviciosAdicionales={ADICIONALES} />);
+function PortalDePrueba() {
+  return <p>Portal de pagos de la reserva</p>;
+}
+
+function abrir(props = { serviciosAdicionales: ADICIONALES }) {
+  render(
+    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={['/alojamiento']}>
+      <Routes>
+        <Route path="/alojamiento" element={<CotizadorEstancia publicacionId={5} {...props} />} />
+        <Route path="/huesped/reservas/1/pago" element={<PortalDePrueba />} />
+      </Routes>
+    </MemoryRouter>,
+  );
 }
 
 function desglose() {
@@ -93,7 +105,7 @@ describe('CotizadorEstancia', () => {
 
   it('con las fechas de la búsqueda cotiza sin escribirlas de nuevo', async () => {
     vi.mocked(cotizarEstancia).mockResolvedValue(SIN_SERVICIOS);
-    render(<CotizadorEstancia publicacionId={5} llegadaInicial="2026-12-10" salidaInicial="2026-12-14" />);
+    abrir({ llegadaInicial: '2026-12-10', salidaInicial: '2026-12-14' });
 
     expect(screen.getByLabelText('Llegada')).toHaveValue('2026-12-10');
     expect(screen.getByLabelText('Salida')).toHaveValue('2026-12-14');
@@ -136,7 +148,7 @@ describe('CotizadorEstancia', () => {
   });
 
   it('sin servicios adicionales no ofrece ese bloque', () => {
-    render(<CotizadorEstancia publicacionId={5} />);
+    abrir({});
 
     expect(screen.queryByText('Servicios adicionales')).not.toBeInTheDocument();
   });
@@ -156,7 +168,7 @@ describe('CotizadorEstancia', () => {
     await waitFor(() => expect(crearReserva).toHaveBeenCalledWith({
       publicacionId: 5, llegada: '2026-12-10', salida: '2026-12-14', serviciosAdicionalesIds: [1],
     }, expect.any(String)));
-    expect(await screen.findByRole('status')).toHaveTextContent('Reserva creada, queda pendiente de pago.');
+    expect(await screen.findByText('Portal de pagos de la reserva')).toBeInTheDocument();
   });
 
   it('al reintentar la confirmación tras un error reusa la misma clave de idempotencia (SOF-77)', async () => {
@@ -197,7 +209,7 @@ describe('CotizadorEstancia', () => {
     expect(segunda).not.toBe(primera);
   });
 
-  it('con la reserva creada ofrece pagarla por su total en lugar de volver a confirmarla', async () => {
+  it('con la reserva creada redirige al portal de pagos de esa reserva', async () => {
     vi.mocked(cotizarEstancia).mockResolvedValue(SIN_SERVICIOS);
     vi.mocked(crearReserva).mockResolvedValue({ id: 1, estado: 'PENDIENTE', total: 470000 });
     abrir();
@@ -206,9 +218,37 @@ describe('CotizadorEstancia', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar reserva' }));
 
-    const pago = await screen.findByRole('region', { name: 'Pago de la reserva' });
-    expect(within(pago).getByRole('button', { name: /Pagar/ })).toHaveTextContent(/470\.000/);
+    expect(await screen.findByText('Portal de pagos de la reserva')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Confirmar reserva' })).not.toBeInTheDocument();
+  });
+
+  it('si esas fechas ya las reservó y pagó, avisa que ya las reservó y no va al portal de pagos', async () => {
+    vi.mocked(cotizarEstancia).mockResolvedValue(SIN_SERVICIOS);
+    vi.mocked(crearReserva).mockResolvedValue({ id: 1, estado: 'CONFIRMADA', total: 470000 });
+    abrir();
+    cotizar();
+    await desglose();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar reserva' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Ya reservaste estas fechas');
+    expect(screen.getByRole('link', { name: 'Ver mi reserva' })).toHaveAttribute('href', '/huesped/reservas/1');
+    expect(screen.queryByText('Portal de pagos de la reserva')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Confirmar reserva' })).not.toBeInTheDocument();
+  });
+
+  it('si la reserva no se crea no redirige y deja reintentar la confirmación', async () => {
+    vi.mocked(cotizarEstancia).mockResolvedValue(SIN_SERVICIOS);
+    vi.mocked(crearReserva).mockRejectedValue(new ErrorApi(409, 'Esas fechas ya están reservadas.'));
+    abrir();
+    cotizar();
+    await desglose();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar reserva' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Esas fechas ya están reservadas.');
+    expect(screen.queryByText('Portal de pagos de la reserva')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirmar reserva' })).toBeEnabled();
   });
 
   it('si otro huésped ya reservó esas fechas, muestra el mensaje de conflicto de la API', async () => {
@@ -265,18 +305,18 @@ describe('CotizadorEstancia', () => {
     expect(crearReserva).not.toHaveBeenCalled();
   });
 
-  it('al editar una fecha limpia el resultado de la reserva anterior', async () => {
+  it('al editar una fecha limpia el error de la reserva anterior', async () => {
     vi.mocked(cotizarEstancia).mockResolvedValue(SIN_SERVICIOS);
-    vi.mocked(crearReserva).mockResolvedValue({ id: 1, estado: 'PENDIENTE', total: 470000 });
+    vi.mocked(crearReserva).mockRejectedValue(new ErrorApi(409, 'Esas fechas ya están reservadas.'));
     abrir();
     cotizar();
     await desglose();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar reserva' }));
-    await screen.findByRole('status');
+    await screen.findByRole('alert');
 
     fireEvent.change(screen.getByLabelText('Llegada'), { target: { value: '2026-12-11' } });
 
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('al cambiar un servicio no deja confirmar la cotización anterior mientras recalcula y luego envía los nuevos', async () => {
