@@ -37,14 +37,14 @@ import org.springframework.test.web.servlet.ResultActions;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-class PagoReservaIntegracionTest {
+abstract class EscenarioPagoReserva {
 
     private static final String CONTRASENA = "Segura#2026";
     private static final LocalDate LLEGADA = LocalDate.now().plusDays(10);
     private static final LocalDate SALIDA = LLEGADA.plusDays(4);
 
     @Autowired
-    private MockMvc mvc;
+    MockMvc mvc;
     @Autowired
     private UsuarioRepository usuarios;
     @Autowired
@@ -52,7 +52,7 @@ class PagoReservaIntegracionTest {
     @Autowired
     private ReservaRepository reservas;
     @Autowired
-    private JdbcTemplate jdbc;
+    JdbcTemplate jdbc;
     @Autowired
     private PasswordEncoder codificador;
     @Autowired
@@ -77,6 +77,75 @@ class PagoReservaIntegracionTest {
         reservas.deleteAll();
         publicaciones.deleteAll();
     }
+
+    ResultActions pagar(String token, long id, String metodo, String clave) throws Exception {
+        var solicitud = post("/api/v1/reservas/{id}/pago", id).header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON).content(cuerpoPago(metodo));
+        if (clave != null) {
+            solicitud.header(ServicioIdempotencia.CABECERA, clave);
+        }
+        return mvc.perform(solicitud);
+    }
+
+    ResultActions pagar(String token, long id, String metodo) throws Exception {
+        return pagar(token, id, metodo, UUID.randomUUID().toString());
+    }
+
+    static String cuerpoPago(String metodo) {
+        return """
+                {"metodoPago": "%s"}
+                """.formatted(metodo);
+    }
+
+    long reservar(String token) throws Exception {
+        String respuesta = mvc.perform(post("/api/v1/reservas").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .header(ServicioIdempotencia.CABECERA, UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON).content(cuerpoReserva()))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return json.readTree(respuesta).get("id").asLong();
+    }
+
+    String cuerpoReserva() {
+        return """
+                {"publicacionId": %d, "llegada": "%s", "salida": "%s", "serviciosAdicionalesIds": []}
+                """.formatted(publicacionId, LLEGADA, SALIDA);
+    }
+
+    Map<String, Object> fila(long id) {
+        return jdbc.queryForMap("SELECT estado, estado_pago, transaccion_id FROM reserva WHERE id = ?", id);
+    }
+
+    private Long publicacionActiva() throws Exception {
+        String respuesta = mvc.perform(post("/api/v1/publicaciones")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + iniciarSesion("luis@correo.com"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"titulo": "Casa en la playa"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = json.readTree(respuesta).get("id").asLong();
+        jdbc.update("UPDATE publicacion SET estado = 'ACTIVA', precio_noche = 100000, tarifa_limpieza = 30000 "
+                + "WHERE id = ?", id);
+        jdbc.update("INSERT INTO periodo_disponible (publicacion_id, fecha_inicio, fecha_fin) VALUES (?, ?, ?)",
+                id, LocalDate.now().minusDays(1), LocalDate.now().plusDays(60));
+        return id;
+    }
+
+    String iniciarSesion(String correo) throws Exception {
+        String cuerpo = """
+                {"correo": "%s", "contrasena": "%s"}
+                """.formatted(correo, CONTRASENA);
+        String respuesta = mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content(cuerpo))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return json.readTree(respuesta).get("token").asText();
+    }
+}
+
+class PagoReservaIntegracionTest extends EscenarioPagoReserva {
 
     @Test
     @DisplayName("AC1: con el pago exitoso la reserva queda CONFIRMADA y se registra el identificador de la transacción")
@@ -188,6 +257,7 @@ class PagoReservaIntegracionTest {
                 .andExpect(jsonPath("$.errores.metodoPago").value("Usa una tarjeta de prueba: pm_card_visa, "
                         + "pm_card_mastercard, pm_card_chargeDeclined o pm_card_chargeDeclinedInsufficientFunds"));
         mvc.perform(post("/api/v1/reservas/{id}/pago", id).header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .header(ServicioIdempotencia.CABECERA, UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errores.metodoPago").value("Indica el método de pago de prueba"));
@@ -207,62 +277,4 @@ class PagoReservaIntegracionTest {
                 .andExpect(jsonPath("$.transaccionId").doesNotExist());
     }
 
-    private ResultActions pagar(String token, long id, String metodo) throws Exception {
-        return mvc.perform(post("/api/v1/reservas/{id}/pago", id).header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .contentType(MediaType.APPLICATION_JSON).content(cuerpoPago(metodo)));
-    }
-
-    private static String cuerpoPago(String metodo) {
-        return """
-                {"metodoPago": "%s"}
-                """.formatted(metodo);
-    }
-
-    private long reservar(String token) throws Exception {
-        String respuesta = mvc.perform(post("/api/v1/reservas").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                        .header(ServicioIdempotencia.CABECERA, UUID.randomUUID().toString())
-                        .contentType(MediaType.APPLICATION_JSON).content(cuerpoReserva()))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        return json.readTree(respuesta).get("id").asLong();
-    }
-
-    private String cuerpoReserva() {
-        return """
-                {"publicacionId": %d, "llegada": "%s", "salida": "%s", "serviciosAdicionalesIds": []}
-                """.formatted(publicacionId, LLEGADA, SALIDA);
-    }
-
-    private Map<String, Object> fila(long id) {
-        return jdbc.queryForMap("SELECT estado, estado_pago, transaccion_id FROM reserva WHERE id = ?", id);
-    }
-
-    // Igual que ReservaIntegracionTest: ACTIVA con precio fijo y un periodo que cubre las fechas de las pruebas.
-    private Long publicacionActiva() throws Exception {
-        String respuesta = mvc.perform(post("/api/v1/publicaciones")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + iniciarSesion("luis@correo.com"))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"titulo": "Casa en la playa"}
-                                """))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        Long id = json.readTree(respuesta).get("id").asLong();
-        jdbc.update("UPDATE publicacion SET estado = 'ACTIVA', precio_noche = 100000, tarifa_limpieza = 30000 "
-                + "WHERE id = ?", id);
-        jdbc.update("INSERT INTO periodo_disponible (publicacion_id, fecha_inicio, fecha_fin) VALUES (?, ?, ?)",
-                id, LocalDate.now().minusDays(1), LocalDate.now().plusDays(60));
-        return id;
-    }
-
-    private String iniciarSesion(String correo) throws Exception {
-        String cuerpo = """
-                {"correo": "%s", "contrasena": "%s"}
-                """.formatted(correo, CONTRASENA);
-        String respuesta = mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
-                        .content(cuerpo))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        return json.readTree(respuesta).get("token").asText();
-    }
 }
