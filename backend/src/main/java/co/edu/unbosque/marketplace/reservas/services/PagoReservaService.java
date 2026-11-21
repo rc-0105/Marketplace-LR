@@ -4,6 +4,7 @@ import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
+import co.edu.unbosque.marketplace.compartido.notificaciones.TipoNotificacion;
 import co.edu.unbosque.marketplace.compartido.seguridad.Propiedad;
 import co.edu.unbosque.marketplace.reservas.exceptions.ApartadoPerdidoDuranteElPagoException;
 import co.edu.unbosque.marketplace.reservas.exceptions.FalloPasarelaPagoException;
@@ -46,14 +47,16 @@ public class PagoReservaService {
     private final RegistroReservas registro;
     private final PasarelaPagos pasarela;
     private final PublicadorEventos publicador;
+    private final NotificacionesReserva notificaciones;
     private final Clock reloj;
 
     public PagoReservaService(ReservaRepository reservas, RegistroReservas registro, PasarelaPagos pasarela,
-            PublicadorEventos publicador, Clock reloj) {
+            PublicadorEventos publicador, NotificacionesReserva notificaciones, Clock reloj) {
         this.reservas = reservas;
         this.registro = registro;
         this.pasarela = pasarela;
         this.publicador = publicador;
+        this.notificaciones = notificaciones;
         this.reloj = reloj;
     }
 
@@ -88,7 +91,7 @@ public class PagoReservaService {
         }
         return switch (resultado) {
             case CobroAprobado aprobado -> confirmar(reservaId, huespedId, aprobado.transaccionId());
-            case CobroRechazado rechazado -> rechazar(reservaId, huespedId, rechazado.motivo());
+            case CobroRechazado rechazado -> rechazar(reserva, huespedId, rechazado.motivo());
         };
     }
 
@@ -96,7 +99,9 @@ public class PagoReservaService {
         if (registro.confirmarPago(reservaId, transaccionId)) {
             auditar(reservaId, huespedId, ResultadoEvento.EXITO,
                     Map.of("resultado", "aprobado", "transaccionId", transaccionId));
-            return reservas.findById(reservaId).orElseThrow(ReservaNoEncontradaException::new);
+            Reserva confirmada = reservas.findById(reservaId).orElseThrow(ReservaNoEncontradaException::new);
+            notificaciones.notificar(confirmada, TipoNotificacion.RESERVA_CONFIRMADA);
+            return confirmada;
         }
         // Dos intentos simultáneos con el mismo método comparten la clave de idempotencia y la pasarela les
         // devuelve la misma transacción: si el otro ya confirmó con ella, este cobro es ese mismo, no otro.
@@ -126,7 +131,8 @@ public class PagoReservaService {
         }
     }
 
-    private Reserva rechazar(Long reservaId, Long huespedId, String motivo) {
+    private Reserva rechazar(Reserva reserva, Long huespedId, String motivo) {
+        Long reservaId = reserva.getId();
         if (!registro.rechazarPago(reservaId)) {
             // Otro intento ya la resolvió mientras este se rechazaba: no se informa que las fechas quedaron libres.
             Reserva actual = reservas.findById(reservaId).orElseThrow(ReservaNoEncontradaException::new);
@@ -135,6 +141,7 @@ public class PagoReservaService {
                     : "Esta reserva ya no se puede pagar: su apartado venció o fue cancelada.");
         }
         auditar(reservaId, huespedId, ResultadoEvento.FALLO, Map.of("resultado", "rechazado", "motivo", motivo));
+        notificaciones.notificar(reserva, TipoNotificacion.RESERVA_RECHAZADA);
         throw new PagoRechazadoException(motivo);
     }
 

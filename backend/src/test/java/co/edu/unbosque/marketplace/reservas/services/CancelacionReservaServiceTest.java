@@ -15,6 +15,7 @@ import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
 import co.edu.unbosque.marketplace.compartido.exceptions.AccesoDenegadoException;
+import co.edu.unbosque.marketplace.compartido.notificaciones.TipoNotificacion;
 import co.edu.unbosque.marketplace.reservas.exceptions.ReservaNoCancelableException;
 import co.edu.unbosque.marketplace.reservas.exceptions.ReservaNoEncontradaException;
 import co.edu.unbosque.marketplace.reservas.model.Cancelacion;
@@ -53,8 +54,9 @@ class CancelacionReservaServiceTest {
     private final PublicacionService publicaciones = mock(PublicacionService.class);
     private final RegistroReservas registro = mock(RegistroReservas.class);
     private final PublicadorEventos publicador = mock(PublicadorEventos.class);
+    private final NotificacionesReserva notificaciones = mock(NotificacionesReserva.class);
     private final CancelacionReservaService servicio = new CancelacionReservaService(reservas, publicaciones,
-            registro, publicador, Clock.fixed(AHORA, ZoneOffset.UTC));
+            registro, publicador, notificaciones, Clock.fixed(AHORA, ZoneOffset.UTC));
 
     @BeforeEach
     void preparar() {
@@ -79,6 +81,9 @@ class CancelacionReservaServiceTest {
                 && registrada.getUsuarioId().equals(HUESPED_ID)));
         assertThat(auditado().resultado()).isEqualTo(ResultadoEvento.EXITO);
         assertThat(auditado().datos()).containsEntry("canceladoPor", "HUESPED");
+        // SOF-37: la cancelación avisa al huésped y al anfitrión.
+        verify(notificaciones).notificar(argThat(reserva -> RESERVA_ID.equals(reserva.getId())),
+                org.mockito.ArgumentMatchers.eq(TipoNotificacion.RESERVA_CANCELADA));
     }
 
     @Test
@@ -103,6 +108,7 @@ class CancelacionReservaServiceTest {
                 .hasMessage("La estancia ya terminó: no se puede cancelar.");
 
         verify(registro, never()).cancelar(any());
+        verify(notificaciones, never()).notificar(any(), any());
     }
 
     @Test

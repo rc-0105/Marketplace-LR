@@ -4,6 +4,7 @@ import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
+import co.edu.unbosque.marketplace.compartido.notificaciones.TipoNotificacion;
 import co.edu.unbosque.marketplace.reservas.model.EstadoPago;
 import co.edu.unbosque.marketplace.reservas.model.Reserva;
 import co.edu.unbosque.marketplace.reservas.repository.ReservaRepository;
@@ -46,16 +47,18 @@ public class ConciliacionPagos {
     private final RegistroReservas registro;
     private final PasarelaPagos pasarela;
     private final PublicadorEventos publicador;
+    private final NotificacionesReserva notificaciones;
     private final Clock reloj;
     private final Duration gracia;
 
     public ConciliacionPagos(ReservaRepository reservas, RegistroReservas registro, PasarelaPagos pasarela,
-            PublicadorEventos publicador, Clock reloj,
+            PublicadorEventos publicador, NotificacionesReserva notificaciones, Clock reloj,
             @Value("${pagos.conciliacion.gracia-minutos:60}") long minutosGracia) {
         this.reservas = reservas;
         this.registro = registro;
         this.pasarela = pasarela;
         this.publicador = publicador;
+        this.notificaciones = notificaciones;
         this.reloj = reloj;
         this.gracia = Duration.ofMinutes(minutosGracia);
     }
@@ -92,6 +95,7 @@ public class ConciliacionPagos {
         if (registro.confirmarPago(id, transaccion)) {
             LOG.info("La conciliación confirmó la reserva {} con la transacción {}", id, transaccion);
             auditar(reserva, ResultadoEvento.EXITO, Map.of("resultado", "confirmado", "transaccionId", transaccion));
+            notificaciones.notificar(reserva, TipoNotificacion.RESERVA_CONFIRMADA);
             return;
         }
         Optional<Reserva> actual = reservas.findById(id);

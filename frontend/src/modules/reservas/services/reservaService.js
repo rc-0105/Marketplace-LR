@@ -1,7 +1,33 @@
-import { post } from '../../../shared/services/http.js';
-import { cancelacionDesdeApi, reservaDesdeApi } from '../models/reserva.js';
+import { get, post } from '../../../shared/services/http.js';
+import {
+  cancelacionDesdeApi, detalleReservaDesdeApi, reservaDesdeApi, resumenReservaDesdeApi,
+} from '../models/reserva.js';
 
 const RUTA = '/api/v1/reservas';
+
+/**
+ * Reservas del huésped autenticado (SOF-35): las futuras, de la más próxima a la más lejana, y las pasadas,
+ * de la más reciente a la más antigua. El ErrorApi se propaga.
+ * @returns {Promise<{futuras: import('../models/reserva.js').ResumenReserva[],
+ *   pasadas: import('../models/reserva.js').ResumenReserva[]}>}
+ */
+export async function listarMisReservas() {
+  const respuesta = await get(`${RUTA}/mias`);
+  return {
+    futuras: respuesta.futuras.map(resumenReservaDesdeApi),
+    pasadas: respuesta.pasadas.map(resumenReservaDesdeApi),
+  };
+}
+
+/**
+ * Una reserva del huésped con su alojamiento, desglose y pago (SOF-35). Si no existe la API responde 404 y si
+ * es de otro usuario, 403. El ErrorApi se propaga.
+ * @param {number|string} reservaId
+ * @returns {Promise<import('../models/reserva.js').DetalleReserva>}
+ */
+export async function consultarReserva(reservaId) {
+  return detalleReservaDesdeApi(await get(`${RUTA}/${reservaId}`));
+}
 
 /**
  * Confirma la reserva sobre la cotización vigente de la estancia (SOF-33). Si otro huésped ya

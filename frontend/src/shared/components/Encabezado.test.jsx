@@ -1,8 +1,14 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { listarNotificaciones } from '../../modules/notificaciones/services/notificacionesService.js';
 import { guardarSesion, limpiarSesion } from '../services/sesion.js';
 import Encabezado from './Encabezado.jsx';
+
+vi.mock('../../modules/notificaciones/services/notificacionesService.js', () => ({
+  listarNotificaciones: vi.fn(() => Promise.resolve({ noLeidas: 0, notificaciones: [] })),
+  marcarLeida: vi.fn(),
+}));
 
 function iniciar(rol = 'HUESPED') {
   const expiraEn = new Date(Date.now() + 3600_000).toISOString();
@@ -18,7 +24,10 @@ function renderizar(alCerrarSesion, ruta = '/mi-cuenta') {
 }
 
 describe('Encabezado', () => {
-  afterEach(() => limpiarSesion());
+  afterEach(() => {
+    limpiarSesion();
+    vi.clearAllMocks();
+  });
 
   it('muestra la marca con un enlace al inicio', () => {
     renderizar(vi.fn());
@@ -62,6 +71,20 @@ describe('Encabezado', () => {
     renderizar(vi.fn());
 
     expect(screen.getByRole('link', { name: 'Mis publicaciones' })).toHaveAttribute('href', '/anfitrion/publicaciones');
+  });
+
+  it('al huésped le ofrece sus reservas y solo a él', () => {
+    iniciar('HUESPED');
+    renderizar(vi.fn());
+
+    expect(screen.getByRole('link', { name: 'Mis reservas' })).toHaveAttribute('href', '/huesped/reservas');
+  });
+
+  it.each(['ANFITRION', 'ADMINISTRADOR'])('al %s no le ofrece reservas de huésped', (rol) => {
+    iniciar(rol);
+    renderizar(vi.fn());
+
+    expect(screen.queryByRole('link', { name: 'Mis reservas' })).not.toBeInTheDocument();
   });
 
   it('al huésped no le ofrece publicaciones', () => {
@@ -115,6 +138,26 @@ describe('Encabezado', () => {
     renderizar(vi.fn());
 
     expect(screen.getByRole('link', { name: 'Mi cuenta' })).toHaveAttribute('href', '/mi-cuenta');
+  });
+
+  it.each(['HUESPED', 'ANFITRION', 'ADMINISTRADOR'])(
+    'a un %s le muestra la campana con sus no leídas junto a las acciones de siempre', async (rol) => {
+      vi.mocked(listarNotificaciones).mockResolvedValue({ noLeidas: 3, notificaciones: [] });
+      iniciar(rol);
+      renderizar(vi.fn());
+
+      expect(await screen.findByRole('link', { name: 'Notificaciones, 3 sin leer' }))
+        .toHaveAttribute('href', '/notificaciones');
+      expect(screen.getByRole('link', { name: 'Mi cuenta' })).toHaveAttribute('href', '/mi-cuenta');
+      expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeInTheDocument();
+    },
+  );
+
+  it('sin sesión no muestra la campana ni consulta notificaciones', () => {
+    renderizar(vi.fn());
+
+    expect(screen.queryByRole('link', { name: /^Notificaciones/ })).not.toBeInTheDocument();
+    expect(listarNotificaciones).not.toHaveBeenCalled();
   });
 
   it('sin sesión no ofrece el enlace a Mi cuenta', () => {

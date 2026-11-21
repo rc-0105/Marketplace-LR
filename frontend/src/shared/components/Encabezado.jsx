@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
+import CampanaNotificaciones from '../../modules/notificaciones/components/CampanaNotificaciones.jsx';
 import { homeDe } from '../sesion/rutasPorRol.js';
 import { useSesion } from '../sesion/useSesion.js';
 import estilos from './Encabezado.module.css';
@@ -9,7 +10,8 @@ import estilos from './Encabezado.module.css';
  * Encabezado común de todas las páginas con la marca: sin sesión lleva al inicio
  * público y con sesión al panel del rol, desde cualquier pantalla.
  * Con sesión ofrece "Mi cuenta" y "Cerrar sesión", que delega en `alCerrarSesion`;
- * al anfitrión además le ofrece "Mis publicaciones" y al administrador "Revisar publicaciones".
+ * al huésped además le ofrece "Mis reservas", al anfitrión "Mis publicaciones" y al administrador
+ * "Revisar publicaciones". Con sesión, cualquier rol ve además la campana de notificaciones.
  */
 export default function Encabezado({ alCerrarSesion }) {
   const sesion = useSesion();
@@ -34,12 +36,16 @@ export default function Encabezado({ alCerrarSesion }) {
       </Link>
       {sesion && (
         <div className={estilos.acciones}>
+          {sesion.usuario.rol === 'HUESPED' && (
+            <Link to="/huesped/reservas" className={estilos.enlace}>Mis reservas</Link>
+          )}
           {sesion.usuario.rol === 'ANFITRION' && (
             <Link to="/anfitrion/publicaciones" className={estilos.enlace}>Mis publicaciones</Link>
           )}
           {sesion.usuario.rol === 'ADMINISTRADOR' && (
             <Link to="/administrador/publicaciones" className={estilos.enlace}>Revisar publicaciones</Link>
           )}
+          <CampanaNotificaciones />
           <Link to="/mi-cuenta" className={estilos.enlace}>Mi cuenta</Link>
           <button type="button" className={estilos.cerrarSesion} onClick={cerrar} disabled={cerrando}>
             Cerrar sesión

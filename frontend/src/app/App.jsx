@@ -15,6 +15,9 @@ import BusquedaPage from '../modules/busqueda/pages/BusquedaPage.jsx';
 import DetalleAlojamientoPage from '../modules/busqueda/pages/DetalleAlojamientoPage.jsx';
 import CalendarioPage from '../modules/disponibilidad/pages/CalendarioPage.jsx';
 import DisponibilidadPage from '../modules/disponibilidad/pages/DisponibilidadPage.jsx';
+import DetalleReservaPage from '../modules/reservas/pages/DetalleReservaPage.jsx';
+import MisReservasPage from '../modules/reservas/pages/MisReservasPage.jsx';
+import NotificacionesPage from '../modules/notificaciones/pages/NotificacionesPage.jsx';
 import InicioPage from './pages/InicioPage.jsx';
 import PanelRolPage from './pages/PanelRolPage.jsx';
 import Encabezado from '../shared/components/Encabezado.jsx';
@@ -44,6 +47,7 @@ export default function App() {
         <Route path="/inicio-sesion" element={<SoloInvitados><InicioSesionPage /></SoloInvitados>} />
         <Route path="/recuperar-contrasena" element={<SoloInvitados><RecuperacionPage /></SoloInvitados>} />
         <Route path="/mi-cuenta" element={<RutaProtegida><MiCuentaPage /></RutaProtegida>} />
+        <Route path="/notificaciones" element={<RutaProtegida><NotificacionesPage /></RutaProtegida>} />
         {/* Mis publicaciones es el inicio del anfitrión: /anfitrion lleva directo ahí. */}
         <Route path="/anfitrion"
           element={<RutaProtegida rol="ANFITRION"><Navigate to="/anfitrion/publicaciones" replace /></RutaProtegida>} />
@@ -63,6 +67,10 @@ export default function App() {
           element={<RutaProtegida rol="HUESPED"><DetalleAlojamientoPage /></RutaProtegida>} />
         <Route path="/huesped/publicaciones/:id/calendario"
           element={<RutaProtegida rol="HUESPED"><CalendarioPage /></RutaProtegida>} />
+        <Route path="/huesped/reservas"
+          element={<RutaProtegida rol="HUESPED"><MisReservasPage /></RutaProtegida>} />
+        <Route path="/huesped/reservas/:id"
+          element={<RutaProtegida rol="HUESPED"><DetalleReservaPage /></RutaProtegida>} />
         <Route path="/administrador/publicaciones"
           element={<RutaProtegida rol="ADMINISTRADOR"><RevisionPublicacionesPage /></RutaProtegida>} />
         <Route path="/administrador/usuarios"

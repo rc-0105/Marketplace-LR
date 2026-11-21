@@ -15,6 +15,9 @@ import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
+import co.edu.unbosque.marketplace.compartido.notificaciones.Notificador;
+import co.edu.unbosque.marketplace.compartido.notificaciones.NuevaNotificacion;
+import co.edu.unbosque.marketplace.compartido.notificaciones.TipoNotificacion;
 import co.edu.unbosque.marketplace.identidad.UsuariosDePrueba;
 import co.edu.unbosque.marketplace.identidad.exceptions.ConfirmacionInvalidaException;
 import co.edu.unbosque.marketplace.identidad.exceptions.OperacionCuentaNoPermitidaException;
@@ -58,11 +61,12 @@ class CuentaServiceTest {
     private final PublicadorEventos publicador = mock(PublicadorEventos.class);
     private final PasswordEncoder codificador = mock(PasswordEncoder.class);
     private final ConsultaReservasFuturas reservas = mock(ConsultaReservasFuturas.class);
+    private final Notificador notificador = mock(Notificador.class);
     private CuentaService servicio;
 
     @BeforeEach
     void preparar() {
-        servicio = new CuentaService(usuarios, publicador, codificador, reservas);
+        servicio = new CuentaService(usuarios, publicador, codificador, reservas, notificador);
     }
 
     @Test
@@ -114,6 +118,9 @@ class CuentaServiceTest {
         assertThat(evento.entidad()).isEqualTo("Usuario");
         assertThat(evento.entidadId()).isEqualTo("7");
         assertThat(evento.datos()).containsEntry(OPERACION, "restringir_cuenta");
+        // SOF-37 AC3: la persona restringida recibe la notificación con el motivo.
+        verify(notificador).notificar(new NuevaNotificacion(AFECTADO, TipoNotificacion.CUENTA_RESTRINGIDA,
+                "Un administrador restringió tu cuenta. Motivo: Pagos en disputa", "Usuario", AFECTADO));
     }
 
     @Test
@@ -162,6 +169,7 @@ class CuentaServiceTest {
         assertThat(restringida.getMotivoRestriccion()).isEqualTo("Motivo previo");
         verify(usuarios, never()).save(restringida);
         verifyNoInteractions(publicador);
+        verifyNoInteractions(notificador);
     }
 
     @Test
@@ -192,6 +200,8 @@ class CuentaServiceTest {
         assertThat(evento.usuario()).isEqualTo("1");
         assertThat(evento.entidadId()).isEqualTo("7");
         assertThat(evento.datos()).containsEntry(OPERACION, "levantar_restriccion");
+        // Levantar la restricción no se notifica (SOF-37, A4).
+        verifyNoInteractions(notificador);
     }
 
     @Test

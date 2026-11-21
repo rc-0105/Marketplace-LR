@@ -1,0 +1,151 @@
+.pagina {
+  display: grid;
+  gap: var(--espacio-6);
+  max-width: 45rem;
+  margin: 0 auto;
+  padding: var(--espacio-8) var(--espacio-4) var(--espacio-12);
+}
+
+.volver {
+  justify-self: start;
+  color: var(--color-terracota-oscuro);
+  font-weight: 500;
+}
+
+.cabecera {
+  display: grid;
+  gap: var(--espacio-4);
+}
+
+.foto {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 1rem;
+  object-fit: cover;
+}
+
+.texto {
+  display: grid;
+  gap: var(--espacio-1);
+}
+
+.titulo {
+  margin: 0;
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.detalle {
+  margin: 0;
+  color: var(--color-texto-secundario);
+}
+
+.estado {
+  justify-self: start;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.PENDIENTE {
+  background: #f6e7c8;
+  color: #6b4a12;
+}
+
+.CONFIRMADA {
+  background: var(--color-exito-fondo);
+  color: var(--color-exito);
+}
+
+.CANCELADA {
+  background: var(--color-error-fondo);
+  color: var(--color-error);
+}
+
+.VENCIDA {
+  background: var(--color-bloqueado-fondo);
+  color: var(--color-texto-secundario);
+}
+
+.bloque {
+  display: grid;
+  gap: var(--espacio-4);
+  padding: var(--espacio-6);
+  border: 1px solid var(--color-borde);
+  border-radius: 1rem;
+  background: var(--color-superficie);
+}
+
+.subtitulo {
+  margin: 0;
+  font-size: var(--texto-titulo);
+  font-weight: 500;
+}
+
+.desglose,
+.estadoPago {
+  display: grid;
+  gap: var(--espacio-2);
+  margin: 0;
+}
+
+.desglose div,
+.estadoPago div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--espacio-4);
+}
+
+.desglose dt,
+.estadoPago dt {
+  color: var(--color-texto-secundario);
+}
+
+.desglose dd,
+.estadoPago dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.desglose .total {
+  padding-top: var(--espacio-2);
+  border-top: 1px solid var(--color-borde);
+  font-weight: 500;
+}
+
+.desglose .total dt {
+  color: var(--color-texto);
+}
+
+.servicios {
+  margin: 0;
+  padding-left: var(--espacio-4);
+  color: var(--color-texto-secundario);
+  font-size: var(--texto-pequeno);
+}
+
+.estadoPago {
+  padding-top: var(--espacio-4);
+  border-top: 1px solid var(--color-borde);
+}
+
+.nota {
+  margin: 0;
+  color: var(--color-texto-secundario);
+}
+
+.error {
+  margin: 0;
+  padding: var(--espacio-2) var(--espacio-3);
+  border-radius: var(--radio);
+  background: var(--color-error-fondo);
+  color: var(--color-error);
+  font-size: var(--texto-pequeno);
+}

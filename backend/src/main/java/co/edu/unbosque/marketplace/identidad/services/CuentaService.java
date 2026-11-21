@@ -5,6 +5,9 @@ import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
+import co.edu.unbosque.marketplace.compartido.notificaciones.Notificador;
+import co.edu.unbosque.marketplace.compartido.notificaciones.NuevaNotificacion;
+import co.edu.unbosque.marketplace.compartido.notificaciones.TipoNotificacion;
 import co.edu.unbosque.marketplace.identidad.exceptions.ConfirmacionInvalidaException;
 import co.edu.unbosque.marketplace.identidad.exceptions.OperacionCuentaNoPermitidaException;
 import co.edu.unbosque.marketplace.identidad.exceptions.ReservasFuturasException;
@@ -46,13 +49,15 @@ public class CuentaService {
     private final PublicadorEventos publicador;
     private final PasswordEncoder codificador;
     private final ConsultaReservasFuturas reservas;
+    private final Notificador notificador;
 
     public CuentaService(UsuarioRepository usuarios, PublicadorEventos publicador, PasswordEncoder codificador,
-            ConsultaReservasFuturas reservas) {
+            ConsultaReservasFuturas reservas, Notificador notificador) {
         this.usuarios = usuarios;
         this.publicador = publicador;
         this.codificador = codificador;
         this.reservas = reservas;
+        this.notificador = notificador;
     }
 
     public void restringir(Long usuarioId, String motivo, Long adminId) {
@@ -64,6 +69,10 @@ public class CuentaService {
         usuario.restringir(motivo);
         usuarios.save(usuario);
         auditar(adminId, usuarioId, RESTRINGIR);
+        // SOF-37 AC3: la persona restringida queda avisada con el motivo. Levantar la restricción no se avisa.
+        notificador.notificar(new NuevaNotificacion(usuarioId, TipoNotificacion.CUENTA_RESTRINGIDA,
+                "Un administrador restringió tu cuenta. Motivo: " + usuario.getMotivoRestriccion(), ENTIDAD,
+                usuarioId));
     }
 
     public void levantarRestriccion(Long usuarioId, Long adminId) {
