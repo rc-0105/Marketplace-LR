@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { reservaDesdeApi } from './reserva.js';
+import { cancelacionDesdeApi, reservaDesdeApi } from './reserva.js';
 
 describe('reservaDesdeApi', () => {
   it('convierte los importes, que llegan como texto, a número', () => {
@@ -32,5 +32,19 @@ describe('reservaDesdeApi', () => {
 
     expect(reserva.estadoPago).toBe('APROBADO');
     expect(reserva.transaccionId).toBe('pi_123');
+  });
+});
+
+describe('cancelacionDesdeApi', () => {
+  it('convierte el valor de devolución, que llega como texto, a número', () => {
+    const cancelacion = cancelacionDesdeApi({
+      reservaId: 7, estado: 'CANCELADA', motivo: 'Cambio de planes', valorDevolucion: '470000.00',
+      fecha: '2026-12-01T15:00:00Z',
+    });
+
+    expect(cancelacion).toEqual({
+      reservaId: 7, estado: 'CANCELADA', motivo: 'Cambio de planes', valorDevolucion: 470000,
+      fecha: '2026-12-01T15:00:00Z',
+    });
   });
 });

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { post } from '../../../shared/services/http.js';
-import { crearReserva, pagarReserva } from './reservaService.js';
+import { cancelarReserva, crearReserva, pagarReserva } from './reservaService.js';
 
 vi.mock('../../../shared/services/http.js', () => ({ post: vi.fn() }));
 
@@ -51,5 +51,24 @@ describe('pagarReserva', () => {
     expect(reserva).toEqual(expect.objectContaining({
       id: 7, estado: 'CONFIRMADA', estadoPago: 'APROBADO', transaccionId: 'pi_123',
     }));
+  });
+});
+
+describe('cancelarReserva', () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  it('envía el motivo a la ruta de cancelación de la reserva y devuelve la cancelación convertida', async () => {
+    vi.mocked(post).mockResolvedValue({
+      reservaId: 7, estado: 'CANCELADA', motivo: 'Cambio de planes', valorDevolucion: '470000.00',
+      fecha: '2026-12-01T15:00:00Z',
+    });
+
+    const cancelacion = await cancelarReserva(7, 'Cambio de planes');
+
+    expect(post).toHaveBeenCalledWith('/api/v1/reservas/7/cancelacion', { motivo: 'Cambio de planes' });
+    expect(cancelacion).toEqual({
+      reservaId: 7, estado: 'CANCELADA', motivo: 'Cambio de planes', valorDevolucion: 470000,
+      fecha: '2026-12-01T15:00:00Z',
+    });
   });
 });
