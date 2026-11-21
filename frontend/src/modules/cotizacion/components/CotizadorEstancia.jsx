@@ -60,7 +60,11 @@ export default function CotizadorEstancia({
     setCalculando(true);
     try {
       const resultado = await cotizarEstancia({ publicacionId, llegada, salida, serviciosAdicionales: servicios });
-      if (actual === solicitud.current) setCotizada({ cotizacion: resultado, llegada, salida, servicios });
+      // Cada cotización es un intento de reserva con su propia clave de idempotencia (SOF-77): reintentar
+      // la confirmación de esta misma cotización reusa la clave y no crea una segunda reserva.
+      if (actual === solicitud.current) {
+        setCotizada({ cotizacion: resultado, llegada, salida, servicios, clave: crypto.randomUUID() });
+      }
     } catch (error) {
       if (actual === solicitud.current) {
         setErrorCotizacion(error.estado === 400 ? error.message : MENSAJE_ERROR);
@@ -77,8 +81,8 @@ export default function CotizadorEstancia({
     setMensajeReserva(null);
     setReservando(true);
     try {
-      const { llegada, salida, servicios } = cotizada;
-      setReserva(await crearReserva({ publicacionId, llegada, salida, serviciosAdicionalesIds: servicios }));
+      const { llegada, salida, servicios, clave } = cotizada;
+      setReserva(await crearReserva({ publicacionId, llegada, salida, serviciosAdicionalesIds: servicios }, clave));
       setMensajeReserva(MENSAJE_RESERVA_CREADA);
     } catch (error) {
       setErrorReserva(error.estado >= 400 && error.estado < 500 ? error.message : MENSAJE_ERROR_RESERVA);
