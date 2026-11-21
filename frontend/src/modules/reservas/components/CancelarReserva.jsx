@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { formatearPesos } from '../models/reserva.js';
-import { cancelarReserva } from '../services/reservaService.js';
+import { anticiparCancelacion, cancelarReserva } from '../services/reservaService.js';
 import estilos from './CancelarReserva.module.css';
 
 const MENSAJE_ERROR = 'No pudimos cancelar la reserva. Intenta de nuevo.';
@@ -16,6 +16,19 @@ export default function CancelarReserva({ reservaId, onCancelada }) {
   const [cancelando, setCancelando] = useState(false);
   const [cancelacion, setCancelacion] = useState(null);
   const [error, setError] = useState(null);
+  const [calculo, setCalculo] = useState(null);
+
+  async function anticipar() {
+    setError(null);
+    setCancelando(true);
+    try {
+      setCalculo(await anticiparCancelacion(reservaId));
+    } catch (falla) {
+      setError(falla.estado >= 400 && falla.estado < 500 ? falla.message : 'No pudimos consultar la devolución. Intenta de nuevo.');
+    } finally {
+      setCancelando(false);
+    }
+  }
 
   async function confirmar() {
     setError(null);
@@ -33,6 +46,7 @@ export default function CancelarReserva({ reservaId, onCancelada }) {
   }
 
   function cerrar() {
+    setCalculo(null);
     setAbierto(false);
     setMotivo('');
     setError(null);
@@ -41,7 +55,9 @@ export default function CancelarReserva({ reservaId, onCancelada }) {
   if (cancelacion) {
     return (
       <output className={estilos.exito}>
-        Reserva cancelada: se devuelve {formatearPesos(cancelacion.valorDevolucion)}.
+        Reserva cancelada: {cancelacion.resultadoReembolso === 'REVISION_MANUAL' ? 'la devolución requiere revisión manual.'
+          : cancelacion.resultadoReembolso === 'NO_APLICA' ? 'no corresponde devolución.'
+            : `devolución simulada de ${formatearPesos(cancelacion.valorDevolucion)}.`}
       </output>
     );
   }
@@ -64,10 +80,12 @@ export default function CancelarReserva({ reservaId, onCancelada }) {
           maxLength={500} />
       </label>
       {error && <p role="alert" className={estilos.error}>{error}</p>}
+      {calculo && <p aria-live="polite">{calculo.politica || 'Sin política'} · Base: {formatearPesos(calculo.base)}.
+        {' '}Devolución estimada: {calculo.porcentaje}% ({formatearPesos(calculo.valorDevolucion)}).</p>}
       <div className={estilos.acciones}>
-        <button type="button" className={estilos.confirmar} onClick={confirmar}
+        <button type="button" className={estilos.confirmar} onClick={calculo ? confirmar : anticipar}
           disabled={cancelando || !motivo.trim()}>
-          {cancelando ? 'Cancelando…' : 'Confirmar cancelación'}
+          {calculo ? (cancelando ? 'Cancelando…' : 'Confirmar cancelación') : (cancelando ? 'Consultando…' : 'Ver devolución')}
         </button>
         <button type="button" className={estilos.volver} onClick={cerrar} disabled={cancelando}>
           No cancelar

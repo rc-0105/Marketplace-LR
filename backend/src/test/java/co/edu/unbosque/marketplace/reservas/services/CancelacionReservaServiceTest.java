@@ -56,7 +56,8 @@ class CancelacionReservaServiceTest {
     private final PublicadorEventos publicador = mock(PublicadorEventos.class);
     private final NotificacionesReserva notificaciones = mock(NotificacionesReserva.class);
     private final CancelacionReservaService servicio = new CancelacionReservaService(reservas, publicaciones,
-            registro, publicador, notificaciones, Clock.fixed(AHORA, ZoneOffset.UTC));
+            registro, publicador, notificaciones, Clock.fixed(AHORA, ZoneOffset.UTC),
+            new co.edu.unbosque.marketplace.reservas.infraestructura.ReembolsosSimulados());
 
     @BeforeEach
     void preparar() {

@@ -1,10 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi } from '../../../shared/services/http.js';
-import { cancelarReserva } from '../services/reservaService.js';
+import { anticiparCancelacion, cancelarReserva } from '../services/reservaService.js';
 import CancelarReserva from './CancelarReserva.jsx';
 
-vi.mock('../services/reservaService.js', () => ({ cancelarReserva: vi.fn() }));
+vi.mock('../services/reservaService.js', () => ({ anticiparCancelacion: vi.fn(), cancelarReserva: vi.fn() }));
 
 function abrir(onCancelada = vi.fn()) {
   render(<CancelarReserva reservaId={7} onCancelada={onCancelada} />);
@@ -12,13 +12,26 @@ function abrir(onCancelada = vi.fn()) {
   return onCancelada;
 }
 
-function confirmar(motivo) {
+async function confirmar(motivo) {
   fireEvent.change(screen.getByLabelText('Motivo de la cancelación'), { target: { value: motivo } });
+  fireEvent.click(screen.getByRole('button', { name: 'Ver devolución' }));
+  expect(await screen.findByText(/Devolución estimada/)).toHaveTextContent(/50%/);
+  expect(cancelarReserva).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Confirmar cancelación' }));
 }
 
 describe('CancelarReserva', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    anticiparCancelacion.mockResolvedValue({ politica: 'Flexible', porcentaje: 50, base: 940000, valorDevolucion: 470000 });
+  });
+
+  it('informa la revisión manual sin anunciar una devolución exitosa', async () => {
+    cancelarReserva.mockResolvedValue({ resultadoReembolso: 'REVISION_MANUAL' });
+    abrir();
+    await confirmar('Cambio');
+    expect(await screen.findByRole('status')).toHaveTextContent(/revisión manual/);
+  });
 
   it('primero muestra solo el botón Cancelar reserva', () => {
     render(<CancelarReserva reservaId={7} />);
@@ -31,7 +44,7 @@ describe('CancelarReserva', () => {
     abrir();
 
     expect(screen.getByLabelText('Motivo de la cancelación')).toHaveAttribute('maxLength', '500');
-    expect(screen.getByRole('button', { name: 'Confirmar cancelación' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Ver devolución' })).toBeDisabled();
   });
 
   it('No cancelar cierra el formulario sin llamar a la API', () => {
@@ -48,7 +61,7 @@ describe('CancelarReserva', () => {
     vi.mocked(cancelarReserva).mockResolvedValue(resultado);
     const onCancelada = abrir();
 
-    confirmar('Cambio de planes');
+    await confirmar('Cambio de planes');
 
     expect(await screen.findByText(/Reserva cancelada/)).toHaveTextContent(/470\.000/);
     expect(cancelarReserva).toHaveBeenCalledWith(7, 'Cambio de planes');
@@ -60,7 +73,7 @@ describe('CancelarReserva', () => {
     vi.mocked(cancelarReserva).mockRejectedValue(new ErrorApi(409, 'Esta reserva ya está cancelada.'));
     abrir();
 
-    confirmar('Cambio de planes');
+    await confirmar('Cambio de planes');
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Esta reserva ya está cancelada.');
     expect(screen.getByRole('button', { name: 'Confirmar cancelación' })).toBeEnabled();
@@ -70,7 +83,7 @@ describe('CancelarReserva', () => {
     vi.mocked(cancelarReserva).mockRejectedValue(new ErrorApi(403, 'No tienes permiso para realizar esta acción.'));
     abrir();
 
-    confirmar('Cambio de planes');
+    await confirmar('Cambio de planes');
 
     expect(await screen.findByRole('alert')).toHaveTextContent('No tienes permiso para realizar esta acción.');
   });
@@ -79,7 +92,7 @@ describe('CancelarReserva', () => {
     vi.mocked(cancelarReserva).mockRejectedValue(new ErrorApi(estado, 'upstream connect error'));
     abrir();
 
-    confirmar('Cambio de planes');
+    await confirmar('Cambio de planes');
 
     expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos cancelar la reserva. Intenta de nuevo.');
     expect(screen.getByRole('button', { name: 'Confirmar cancelación' })).toBeEnabled();

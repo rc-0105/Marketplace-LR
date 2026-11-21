@@ -12,29 +12,25 @@ import co.edu.unbosque.marketplace.reservas.exceptions.ReservaNoEncontradaExcept
 import co.edu.unbosque.marketplace.reservas.model.Cancelacion;
 import co.edu.unbosque.marketplace.reservas.model.EstadoReserva;
 import co.edu.unbosque.marketplace.reservas.model.Reserva;
+import co.edu.unbosque.marketplace.reservas.infraestructura.ReembolsosSimulados;
 import co.edu.unbosque.marketplace.reservas.repository.ReservaRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 
 /**
  * Cancelación de una reserva CONFIRMADA por su huésped titular o por el anfitrión de la publicación
- * (SOF-75, HU-30, RF-46/RF-48). El valor de devolución es siempre el 100% del total de la reserva: el
- * cálculo por política de cancelación (porcentajes parciales según anticipación) es SOF-76, fuera de
- * alcance acá. La auditoría distingue quién canceló (AC3); huésped y anfitrión reciben la notificación
- * (SOF-37).
+ * con los términos de la reserva. Solo el ganador de la transición solicita la devolución.
  */
 @Service
 public class CancelacionReservaService {
 
     private static final String ENTIDAD = "Reserva";
-    // "Hoy" es el día en Colombia, igual que en ReservaService.
-    private static final ZoneId ZONA = ZoneId.of("America/Bogota");
+    private final ReembolsosSimulados reembolsos;
 
     private final ReservaRepository reservas;
     private final PublicacionService publicaciones;
@@ -45,7 +41,8 @@ public class CancelacionReservaService {
 
     public CancelacionReservaService(ReservaRepository reservas, PublicacionService publicaciones,
             RegistroReservas registro, PublicadorEventos publicador, NotificacionesReserva notificaciones,
-            Clock reloj) {
+            Clock reloj, ReembolsosSimulados reembolsos) {
+        this.reembolsos = reembolsos;
         this.reservas = reservas;
         this.publicaciones = publicaciones;
         this.registro = registro;
@@ -54,13 +51,13 @@ public class CancelacionReservaService {
         this.reloj = reloj;
     }
 
-    /**
-     * Cancela la reserva CONFIRMADA de {@code usuarioId}, que debe ser su huésped titular o el anfitrión de
-     * la publicación (AC1, AC3); cualquier otro usuario recibe 403 y el intento queda auditado (AC5). Una
-     * estancia que ya terminó, o una reserva que dejó de estar CONFIRMADA, responde 409 sin registrar la
-     * cancelación (AC4).
-     */
-    public Cancelacion cancelar(Long reservaId, Long usuarioId, String motivo) {
+    private record Evaluacion(Reserva reserva, boolean anfitrion, Instant fecha, CalculoCancelacion calculo) {}
+
+    public CalculoCancelacion anticipar(Long reservaId, Long usuarioId) {
+        return evaluar(reservaId, usuarioId).calculo();
+    }
+
+    private Evaluacion evaluar(Long reservaId, Long usuarioId) {
         Reserva reserva = reservas.findById(reservaId).orElseThrow(ReservaNoEncontradaException::new);
         boolean esHuesped = reserva.getHuespedId().equals(usuarioId);
         boolean esAnfitrion = !esHuesped && esAnfitrionDeLaPublicacion(reserva.getPublicacionId(), usuarioId);
@@ -71,13 +68,22 @@ public class CancelacionReservaService {
         if (reserva.getEstado() != EstadoReserva.CONFIRMADA) {
             throw new ReservaNoCancelableException(mensajeEstadoNoCancelable(reserva.getEstado()));
         }
-        if (!hoyEnColombia(reloj).isBefore(reserva.getSalida())) {
+        Instant ahora = reloj.instant();
+        if (!ahora.atZone(CalculoCancelacion.ZONA).toLocalDate().isBefore(reserva.getSalida())) {
             throw new ReservaNoCancelableException("La estancia ya terminó: no se puede cancelar.");
         }
 
-        BigDecimal valorDevolucion = reserva.getTotal();
-        Cancelacion cancelacion = Cancelacion.nueva(reservaId, usuarioId, Instant.now(reloj), motivo,
+        return new Evaluacion(reserva, esAnfitrion, ahora, CalculoCancelacion.calcular(reserva.getPoliticaNombre(),
+                reserva.getPoliticaDiasSinCosto(), reserva.getPoliticaPorcentajeDevolucion(), reserva.getLlegada(),
+                ahora, reserva.getTotal(), esAnfitrion));
+    }
+
+    public Cancelacion cancelar(Long reservaId, Long usuarioId, String motivo) {
+        Evaluacion evaluacion = evaluar(reservaId, usuarioId);
+        BigDecimal valorDevolucion = evaluacion.calculo().valorDevolucion();
+        Cancelacion cancelacion = Cancelacion.nueva(reservaId, usuarioId, evaluacion.fecha(), motivo,
                 valorDevolucion, EstadoReserva.CANCELADA);
+        cancelacion.prepararReembolsoSimulado();
         // El cambio de estado y el registro de la cancelación son una sola transacción (RegistroReservas).
         if (!registro.cancelar(cancelacion)) {
             // Perdió la carrera: otra cancelación, o una conciliación de pago, la resolvió justo antes.
@@ -85,17 +91,25 @@ public class CancelacionReservaService {
             throw new ReservaNoCancelableException(mensajeEstadoNoCancelable(actual.getEstado()));
         }
 
+        if (valorDevolucion.signum() > 0) {
+            try {
+                cancelacion.registrarExito(reembolsos.solicitar(reservaId, valorDevolucion));
+            } catch (RuntimeException errorPasarela) {
+                cancelacion.registrarFallo();
+            }
+            registro.guardarResultado(cancelacion);
+        }
         auditar(reservaId, usuarioId, ResultadoEvento.EXITO, Map.of(
-                "canceladoPor", esAnfitrion ? "ANFITRION" : "HUESPED",
+                "canceladoPor", evaluacion.anfitrion() ? "ANFITRION" : "HUESPED",
                 "motivo", motivo,
                 "valorDevolucion", valorDevolucion.toPlainString()));
-        notificaciones.notificar(reserva, TipoNotificacion.RESERVA_CANCELADA);
+        notificaciones.notificar(evaluacion.reserva(), TipoNotificacion.RESERVA_CANCELADA);
         return cancelacion;
     }
 
     /** "Hoy" en Colombia según el reloj de la aplicación: la regla de la cancelación y de la revisión manual. */
     static LocalDate hoyEnColombia(Clock reloj) {
-        return LocalDate.now(reloj.withZone(ZONA));
+        return LocalDate.now(reloj.withZone(CalculoCancelacion.ZONA));
     }
 
     private boolean esAnfitrionDeLaPublicacion(Long publicacionId, Long usuarioId) {
