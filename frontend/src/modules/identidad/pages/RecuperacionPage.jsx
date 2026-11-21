@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Campo from '../../../shared/components/Campo.jsx';
+import PantallaAcceso from '../../../shared/components/PantallaAcceso.jsx';
 import RequisitosContrasena from '../components/RequisitosContrasena.jsx';
 import { validarConfirmacionRecuperacion, validarSolicitudRecuperacion } from '../models/usuario.js';
 import { confirmarRecuperacion, solicitarRecuperacion } from '../services/identidadService.js';
@@ -62,8 +63,7 @@ export default function RecuperacionPage() {
   }
 
   return (
-    <main className={estilos.pagina}>
-      <h1 className={estilos.titulo}>Recupera tu contraseña</h1>
+    <PantallaAcceso titulo="Recupera tu contraseña">
 
       {mensajeSolicitud ? (
         <>
@@ -78,9 +78,11 @@ export default function RecuperacionPage() {
                 value={datos.contrasenaNueva} onChange={cambiar} error={errores.contrasenaNueva} />
               <RequisitosContrasena contrasena={datos.contrasenaNueva} />
             </div>
-            <button type="submit" className={estilos.boton} disabled={enviando}>
-              {enviando ? 'Guardando…' : 'Guardar contraseña'}
-            </button>
+            <div className={estilos.acciones}>
+              <button type="submit" className={estilos.boton} disabled={enviando}>
+                {enviando ? 'Guardando…' : 'Guardar contraseña'}
+              </button>
+            </div>
           </form>
         </>
       ) : (
@@ -90,14 +92,16 @@ export default function RecuperacionPage() {
           <form className={estilos.formulario} onSubmit={solicitar} noValidate>
             <Campo id="correo" etiqueta="Correo electrónico" type="email" autoComplete="email"
               value={datos.correo} onChange={cambiar} error={errores.correo} />
-            <button type="submit" className={estilos.boton} disabled={enviando}>
-              {enviando ? 'Enviando…' : 'Enviar código'}
-            </button>
+            <div className={estilos.acciones}>
+              <button type="submit" className={estilos.boton} disabled={enviando}>
+                {enviando ? 'Enviando…' : 'Enviar código'}
+              </button>
+            </div>
           </form>
         </>
       )}
 
       <p className={estilos.pie}><Link to="/inicio-sesion">Volver a iniciar sesión</Link></p>
-    </main>
+    </PantallaAcceso>
   );
 }

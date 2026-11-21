@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import PantallaAcceso from '../../../shared/components/PantallaAcceso.jsx';
 import Campo from '../../../shared/components/Campo.jsx';
 import { homeDe } from '../../../shared/sesion/rutasPorRol.js';
 import { validarInicioSesion } from '../models/usuario.js';
@@ -8,6 +9,16 @@ import estilos from './InicioSesionPage.module.css';
 
 function avisoDesde(error) {
   return { mensaje: error.message, motivo: error.motivo, reactivable: error.codigo === 'CUENTA_DESACTIVADA' };
+}
+
+/**
+ * Quien venía de reservar un alojamiento vuelve a su detalle; solo se acepta una ruta interna del
+ * huésped, para que el estado de navegación nunca lleve a otro sitio ni a un panel ajeno al rol.
+ */
+function destinoTrasIniciar(usuario, estado) {
+  const destino = estado?.destino;
+  const esRutaDelHuesped = typeof destino === 'string' && destino.startsWith('/huesped/');
+  return usuario.rol === 'HUESPED' && esRutaDelHuesped ? destino : homeDe(usuario.rol);
 }
 
 export default function InicioSesionPage() {
@@ -38,7 +49,7 @@ export default function InicioSesionPage() {
     setEnviando(true);
     try {
       const usuario = await iniciarSesion({ correo: datos.correo.trim(), contrasena: datos.contrasena });
-      navegar(homeDe(usuario.rol), { replace: true });
+      navegar(destinoTrasIniciar(usuario, state), { replace: true });
     } catch (error) {
       setEnviando(false);
       setAviso(avisoDesde(error));
@@ -49,7 +60,7 @@ export default function InicioSesionPage() {
     setEnviando(true);
     try {
       const usuario = await reactivarCuenta({ correo: datos.correo.trim(), contrasena: datos.contrasena });
-      navegar(homeDe(usuario.rol), { replace: true });
+      navegar(destinoTrasIniciar(usuario, state), { replace: true });
     } catch (error) {
       setEnviando(false);
       setAviso(avisoDesde(error));
@@ -57,8 +68,7 @@ export default function InicioSesionPage() {
   }
 
   return (
-    <main className={estilos.pagina}>
-      <h1 className={estilos.titulo}>Inicia sesión</h1>
+    <PantallaAcceso titulo="Inicia sesión" entrada="izquierda">
       {!intento && state?.registrado && (
         <output className={estilos.exito}>Tu cuenta quedó creada. Ya puedes iniciar sesión.</output>
       )}
@@ -86,13 +96,14 @@ export default function InicioSesionPage() {
           value={datos.correo} onChange={cambiar} error={errores.correo} />
         <Campo id="contrasena" etiqueta="Contraseña" type="password" autoComplete="current-password"
           value={datos.contrasena} onChange={cambiar} error={errores.contrasena} />
-        <button type="submit" className={estilos.boton} disabled={enviando}>
-          {enviando ? 'Iniciando sesión…' : 'Iniciar sesión'}
-        </button>
+        <div className={estilos.acciones}>
+          <button type="submit" className={estilos.boton} disabled={enviando}>
+            {enviando ? 'Iniciando sesión…' : 'Iniciar sesión'}
+          </button>
+          <p className={estilos.pie}><Link to="/recuperar-contrasena">¿Olvidaste tu contraseña?</Link></p>
+          <p className={estilos.pie}>¿Aún no tienes cuenta? <Link to="/registro">Regístrate</Link></p>
+        </div>
       </form>
-
-      <p className={estilos.pie}><Link to="/recuperar-contrasena">¿Olvidaste tu contraseña?</Link></p>
-      <p className={estilos.pie}>¿Aún no tienes cuenta? <Link to="/registro">Crea una</Link></p>
-    </main>
+    </PantallaAcceso>
   );
 }

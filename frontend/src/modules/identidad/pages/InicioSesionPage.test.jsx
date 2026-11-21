@@ -19,7 +19,8 @@ function renderizar(estado) {
       <Routes>
         <Route path="/inicio-sesion" element={<InicioSesionPage />} />
         <Route path="/huesped" element={<p>Panel huesped</p>} />
-        <Route path="/anfitrion" element={<p>Panel anfitrion</p>} />
+        <Route path="/huesped/busqueda/:id" element={<p>Detalle del alojamiento</p>} />
+        <Route path="/anfitrion/publicaciones" element={<p>Panel anfitrion</p>} />
         <Route path="/administrador" element={<p>Panel administrador</p>} />
       </Routes>
     </MemoryRouter>,
@@ -224,5 +225,29 @@ describe('InicioSesionPage', () => {
       await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
       expect(screen.queryByRole('button', { name: /reactivar mi cuenta/i })).not.toBeInTheDocument();
     });
+  });
+
+  it('el huésped que venía de reservar vuelve al detalle de ese alojamiento', async () => {
+    iniciarSesion.mockResolvedValue({ rol: 'HUESPED' });
+    renderizar({ destino: '/huesped/busqueda/7' });
+    ingresar('a@b.co', 'Segura#2026');
+
+    expect(await screen.findByText('Detalle del alojamiento')).toBeInTheDocument();
+  });
+
+  it('ignora el destino si no es una ruta del huésped o si quien entra no es huésped', async () => {
+    iniciarSesion.mockResolvedValue({ rol: 'ANFITRION' });
+    renderizar({ destino: '/huesped/busqueda/7' });
+    ingresar('a@b.co', 'Segura#2026');
+
+    expect(await screen.findByText('Panel anfitrion')).toBeInTheDocument();
+  });
+
+  it('no sigue un destino que apunte fuera de las rutas del huésped', async () => {
+    iniciarSesion.mockResolvedValue({ rol: 'HUESPED' });
+    renderizar({ destino: '//sitio-externo.com' });
+    ingresar('a@b.co', 'Segura#2026');
+
+    expect(await screen.findByText('Panel huesped')).toBeInTheDocument();
   });
 });

@@ -1,54 +1,49 @@
-.pagina {
-  max-width: 28rem;
-  margin: 0 auto;
-  padding: var(--espacio-12) var(--espacio-4);
-}
-
-.titulo {
-  margin: 0 0 var(--espacio-6);
-  font-size: var(--texto-encabezado);
+.exito,
+.vencida {
+  display: block;
+  margin: 0 0 var(--espacio-4);
+  padding: var(--espacio-3) var(--espacio-4);
+  border-radius: 0.625rem;
+  background: rgb(255 255 255 / 92%);
+  color: var(--color-texto-oscuro, #2a2522);
 }
 
 .exito {
-  display: block;
-  margin: 0;
-  padding: var(--espacio-3) var(--espacio-4);
-  border-radius: var(--radio);
-  background: var(--color-exito-fondo);
-  color: var(--color-exito);
+  border-left: 4px solid #3f6b48;
 }
 
 .vencida {
-  display: block;
-  margin: 0;
-  padding: var(--espacio-3) var(--espacio-4);
-  border: 1px solid var(--color-borde);
-  border-radius: var(--radio);
-  background: var(--color-superficie);
-  color: var(--color-texto);
+  border-left: 4px solid #7a4a00;
 }
 
 .formulario {
   display: flex;
   flex-direction: column;
   gap: var(--espacio-4);
-  margin-top: var(--espacio-4);
+}
+
+.acciones {
+  display: grid;
+  justify-items: center;
+  gap: var(--espacio-4);
+  margin-top: var(--espacio-6);
 }
 
 .boton {
-  min-height: 2.75rem;
+  min-height: 3rem;
+  padding: 0 3rem;
   border: 0;
-  border-radius: var(--radio);
-  background: var(--color-terracota);
-  color: var(--color-sobre-terracota);
+  border-radius: 0.625rem;
+  background: #f3efec;
+  color: #2a2522;
   font: inherit;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
   transition: background-color var(--transicion);
 }
 
 .boton:hover:not(:disabled) {
-  background: var(--color-terracota-oscuro);
+  background: #fff;
 }
 
 .boton:disabled {
@@ -58,15 +53,19 @@
 
 .botonSecundario {
   min-height: 2.75rem;
-  margin-top: var(--espacio-3);
+  margin-bottom: var(--espacio-4);
   padding: 0 var(--espacio-4);
-  border: 1px solid var(--color-terracota);
-  border-radius: var(--radio);
-  background: var(--color-superficie);
-  color: var(--color-terracota);
+  border: 1.5px solid #fff;
+  border-radius: 0.625rem;
+  background: transparent;
+  color: #fff;
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+}
+
+.botonSecundario:hover:not(:disabled) {
+  background: rgb(255 255 255 / 15%);
 }
 
 .botonSecundario:disabled {
@@ -75,14 +74,16 @@
 }
 
 .aviso {
-  margin: var(--espacio-4) 0 0;
+  margin: 0 0 var(--espacio-4);
   padding: var(--espacio-3) var(--espacio-4);
-  border-radius: var(--radio);
-  background: var(--color-error-fondo);
-  color: var(--color-error);
+  border-radius: 0.625rem;
+  background: rgb(255 255 255 / 92%);
+  border-left: 4px solid #a3352a;
+  color: #7c2a21;
 }
 
 .pie {
-  margin: var(--espacio-4) 0 0;
-  color: var(--color-texto-secundario);
+  margin: 0;
+  font-size: var(--texto-pequeno);
+  text-align: center;
 }
