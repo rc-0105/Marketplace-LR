@@ -26,7 +26,7 @@ import org.springframework.scheduling.annotation.Scheduled;
  */
 class CierreReservasServiceTest {
 
-    // "Hoy" en Colombia; a las 20:00 UTC ya es el día siguiente en America/Bogota (UTC-5).
+    // "Hoy" en Colombia; a las 20:00 UTC todavía es el mismo día en America/Bogota (UTC-5).
     private static final Instant AHORA = Instant.parse("2026-12-01T20:00:00Z");
 
     private final ReservaRepository reservas = mock(ReservaRepository.class);
