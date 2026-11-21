@@ -8,16 +8,19 @@ import { actualizarConfiguracion, listarPoliticasCancelacion } from '../services
 import estilos from './ConfiguracionPublicacion.module.css';
 
 const MODOS = [
-  { valor: 'INMEDIATA', etiqueta: 'Reserva inmediata' },
-  { valor: 'APROBACION', etiqueta: 'Requiere mi aprobación' },
+  { valor: 'INMEDIATA', etiqueta: 'Reserva inmediata', descripcion: 'Se confirma al pagar' },
+  { valor: 'APROBACION', etiqueta: 'Requiere mi aprobación', descripcion: 'Tú decides cada solicitud' },
 ];
 
 /**
  * Condiciones de reserva de la publicación: tarifa de limpieza, modo de reserva,
  * política de cancelación y servicios adicionales (RF-20, RF-21, RF-22). Se
- * guardan por separado, sin tocar el resto.
+ * guardan por separado, sin tocar el resto. Con `parte` muestra solo una mitad: "precio" (tarifa de limpieza y
+ * servicios adicionales) o "reserva" (modo de reserva y política); sin ella, todo.
  */
-export default function ConfiguracionPublicacion({ publicacionId, publicacion, alGuardar }) {
+export default function ConfiguracionPublicacion({ publicacionId, publicacion, alGuardar, parte }) {
+  const verPrecio = parte !== 'reserva';
+  const verReserva = parte !== 'precio';
   const [politicas, setPoliticas] = useState([]);
   const [errorPoliticas, setErrorPoliticas] = useState(false);
   const [guardada, setGuardada] = useState(() => configuracionDesde(publicacion));
@@ -89,57 +92,70 @@ export default function ConfiguracionPublicacion({ publicacionId, publicacion, a
     <section className={estilos.seccion} aria-labelledby="titulo-condiciones">
       <h2 id="titulo-condiciones" className={estilos.titulo}>Condiciones de reserva</h2>
 
-      <Campo id="tarifa-limpieza" etiqueta="Tarifa de limpieza (COP)" inputMode="decimal"
-        value={configuracion.tarifaLimpieza} error={errorTarifa}
-        onChange={(evento) => cambiar('tarifaLimpieza', evento.target.value)} />
-
-      <fieldset className={estilos.opciones}>
-        <legend className={estilos.etiqueta}>Modo de reserva</legend>
-        {MODOS.map((modo) => (
-          <label key={modo.valor} className={estilos.opcion}>
-            <input type="radio" name="modo-reserva" value={modo.valor}
-              checked={configuracion.modoReserva === modo.valor}
-              onChange={() => cambiar('modoReserva', modo.valor)} />
-            {modo.etiqueta}
-          </label>
-        ))}
-      </fieldset>
-
-      <div className={estilos.campo}>
-        <label className={estilos.etiqueta} htmlFor="politica-cancelacion">Política de cancelación</label>
-        <select id="politica-cancelacion" className={estilos.control} value={configuracion.politica}
-          onChange={(evento) => cambiar('politica', evento.target.value)}>
-          <option value="">Sin definir</option>
-          {politicas.map((politica) => (
-            <option key={politica.id} value={String(politica.id)}>{politica.nombre}</option>
-          ))}
-        </select>
-        {politicaElegida && <p className={estilos.nota}>{politicaElegida.descripcion}</p>}
-        {errorPoliticas && <p role="alert" className={estilos.error}>No pudimos cargar las políticas de cancelación.</p>}
-      </div>
-
-      <h3 className={estilos.subtitulo}>Servicios adicionales</h3>
-      {configuracion.serviciosAdicionales.length === 0 ? (
-        <p className={estilos.nota}>Todavía no hay servicios adicionales.</p>
-      ) : (
-        <ul className={estilos.lista} aria-label="Servicios adicionales">
-          {configuracion.serviciosAdicionales.map((adicional, indice) => (
-            <li key={`${indice}-${adicional.nombre}`} className={estilos.adicional}>
-              <span>{adicional.nombre} · ${adicional.costo.toLocaleString('es-CO')}</span>
-              <button type="button" className={estilos.botonSecundario} onClick={() => quitar(indice)}
-                aria-label={`Quitar ${adicional.nombre}`}>Quitar</button>
-            </li>
-          ))}
-        </ul>
+      {verPrecio && (
+        <Campo id="tarifa-limpieza" etiqueta="Tarifa de limpieza (COP)" inputMode="decimal"
+          value={configuracion.tarifaLimpieza} error={errorTarifa}
+          onChange={(evento) => cambiar('tarifaLimpieza', evento.target.value)} />
       )}
-      <form className={estilos.agregar} onSubmit={agregar} noValidate>
-        <Campo id="nombre-adicional" etiqueta="Nombre del servicio adicional" value={nuevo.nombre}
-          error={erroresNuevo.nombre} onChange={(evento) => setNuevo({ ...nuevo, nombre: evento.target.value })} />
-        <Campo id="costo-adicional" etiqueta="Costo del servicio adicional (COP)" inputMode="decimal"
-          value={nuevo.costo} error={erroresNuevo.costo}
-          onChange={(evento) => setNuevo({ ...nuevo, costo: evento.target.value })} />
-        <button type="submit" className={estilos.botonSecundario}>Agregar servicio</button>
-      </form>
+
+      {verReserva && (
+        <>
+          <fieldset className={estilos.opciones}>
+            <legend className={estilos.etiqueta}>Modo de reserva</legend>
+            {MODOS.map((modo) => (
+              <label key={modo.valor} className={estilos.opcion}>
+                <input type="radio" name="modo-reserva" value={modo.valor}
+                  checked={configuracion.modoReserva === modo.valor}
+                  onChange={() => cambiar('modoReserva', modo.valor)} />
+                <span className={estilos.textoOpcion}>
+                  <span className={estilos.nombreOpcion}>{modo.etiqueta}</span>
+                  <span className={estilos.descripcionOpcion}>{modo.descripcion}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+
+          <div className={estilos.campo}>
+            <label className={estilos.etiqueta} htmlFor="politica-cancelacion">Política de cancelación</label>
+            <select id="politica-cancelacion" className={estilos.control} value={configuracion.politica}
+              onChange={(evento) => cambiar('politica', evento.target.value)}>
+              <option value="">Sin definir</option>
+              {politicas.map((politica) => (
+                <option key={politica.id} value={String(politica.id)}>{politica.nombre}</option>
+              ))}
+            </select>
+            {politicaElegida && <p className={estilos.nota}>{politicaElegida.descripcion}</p>}
+            {errorPoliticas && <p role="alert" className={estilos.error}>No pudimos cargar las políticas de cancelación.</p>}
+          </div>
+        </>
+      )}
+
+      {verPrecio && (
+        <>
+          <h3 className={estilos.subtitulo}>Servicios adicionales</h3>
+          {configuracion.serviciosAdicionales.length === 0 ? (
+            <p className={estilos.nota}>Todavía no hay servicios adicionales.</p>
+          ) : (
+            <ul className={estilos.lista} aria-label="Servicios adicionales">
+              {configuracion.serviciosAdicionales.map((adicional, indice) => (
+                <li key={`${indice}-${adicional.nombre}`} className={estilos.adicional}>
+                  <span>{adicional.nombre} · ${adicional.costo.toLocaleString('es-CO')}</span>
+                  <button type="button" className={estilos.botonSecundario} onClick={() => quitar(indice)}
+                    aria-label={`Quitar ${adicional.nombre}`}>Quitar</button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <form className={estilos.agregar} onSubmit={agregar} noValidate>
+            <Campo id="nombre-adicional" etiqueta="Nombre del servicio adicional" value={nuevo.nombre}
+              error={erroresNuevo.nombre} onChange={(evento) => setNuevo({ ...nuevo, nombre: evento.target.value })} />
+            <Campo id="costo-adicional" etiqueta="Costo del servicio adicional (COP)" inputMode="decimal"
+              value={nuevo.costo} error={erroresNuevo.costo}
+              onChange={(evento) => setNuevo({ ...nuevo, costo: evento.target.value })} />
+            <button type="submit" className={estilos.botonSecundario}>Agregar servicio</button>
+          </form>
+        </>
+      )}
 
       {sinGuardar && <p className={estilos.nota}>Hay cambios en las condiciones sin guardar.</p>}
       {mensaje && (
@@ -165,4 +181,5 @@ ConfiguracionPublicacion.propTypes = {
     })).isRequired,
   }).isRequired,
   alGuardar: PropTypes.func.isRequired,
+  parte: PropTypes.oneOf(['precio', 'reserva']),
 };

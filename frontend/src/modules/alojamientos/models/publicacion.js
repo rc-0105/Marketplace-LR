@@ -134,6 +134,24 @@ export function solicitudDesde(formulario, actuales = SIN_SERVICIOS_NI_IMAGENES)
 
 export const MAXIMO_IMAGENES = 10;
 
+export const TAMANO_MAXIMO_ARCHIVO = 5 * 1024 * 1024;
+const TIPOS_DE_ARCHIVO = ['image/png', 'image/jpeg'];
+
+/**
+ * Revisión previa de un archivo antes de subirlo; la API vuelve a validarlo por su contenido.
+ * @param {{name: string, type: string, size: number}} archivo
+ * @returns {string | undefined} mensaje de error, o nada si se puede subir
+ */
+export function errorDeArchivo(archivo) {
+  if (!TIPOS_DE_ARCHIVO.includes(archivo.type)) {
+    return `«${archivo.name}» no es PNG ni JPG.`;
+  }
+  if (archivo.size > TAMANO_MAXIMO_ARCHIVO) {
+    return `«${archivo.name}» pesa más de 5 MB.`;
+  }
+  return undefined;
+}
+
 /**
  * Mismo formato que exige la API para cada imagen: URL http o https de hasta 500 caracteres.
  * @param {string} url

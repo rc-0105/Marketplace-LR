@@ -35,7 +35,7 @@ describe('useSesion', () => {
 describe('homeDe', () => {
   it('lleva cada rol a su panel y usa el inicio para un rol desconocido', () => {
     expect(homeDe('HUESPED')).toBe('/huesped');
-    expect(homeDe('ANFITRION')).toBe('/anfitrion');
+    expect(homeDe('ANFITRION')).toBe('/anfitrion/publicaciones');
     expect(homeDe('ADMINISTRADOR')).toBe('/administrador');
     expect(homeDe('OTRO')).toBe('/');
   });

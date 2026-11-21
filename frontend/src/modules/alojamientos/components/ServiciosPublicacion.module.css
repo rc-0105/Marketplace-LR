@@ -1,33 +1,38 @@
 .seccion {
   display: flex;
   flex-direction: column;
-  gap: var(--espacio-3);
-  margin-top: var(--espacio-8);
-  padding-top: var(--espacio-6);
-  border-top: 1px solid var(--color-borde);
+  gap: var(--espacio-4);
 }
 
+/* El título del paso ya lo da la página; el encabezado se conserva solo para lectores de pantalla. */
 .titulo {
-  margin: 0;
-  font-size: var(--texto-titulo);
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .nota {
   margin: 0;
   color: var(--color-texto-secundario);
+  font-size: var(--texto-pequeno);
 }
 
 .opciones {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
-  gap: var(--espacio-2);
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: var(--espacio-3);
   margin: 0;
   padding: 0;
   border: 0;
 }
 
 .leyenda {
-  margin-bottom: var(--espacio-2);
+  margin-bottom: var(--espacio-3);
   font-size: var(--texto-pequeno);
   font-weight: 600;
 }
@@ -35,12 +40,27 @@
 .opcion {
   display: flex;
   align-items: center;
-  gap: var(--espacio-2);
-  min-height: 2.75rem;
+  gap: var(--espacio-3);
+  min-height: 3rem;
+  padding: 0 var(--espacio-4);
+  border: 1px solid var(--color-borde-control);
+  border-radius: 0.625rem;
+  cursor: pointer;
+  transition: background-color var(--transicion), border-color var(--transicion);
+}
+
+.opcion:hover {
+  background: var(--color-superficie);
+}
+
+.opcion:has(input:checked) {
+  border-color: #14110f;
+  background: #e4ded9;
+  font-weight: 500;
 }
 
 .opcion input {
-  accent-color: var(--color-terracota);
+  accent-color: #14110f;
 }
 
 .error,
@@ -62,15 +82,20 @@
 
 .boton {
   align-self: flex-start;
-  min-height: 2.75rem;
-  padding: 0 var(--espacio-4);
-  border: 1px solid var(--color-terracota);
-  border-radius: var(--radio);
-  background: var(--color-superficie);
-  color: var(--color-terracota);
+  min-height: 2.5rem;
+  padding: 0 var(--espacio-6);
+  border: 1.5px solid #2a2522;
+  border-radius: 999px;
+  background: transparent;
+  color: #2a2522;
   font: inherit;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
+  transition: background-color var(--transicion);
+}
+
+.boton:hover:not(:disabled) {
+  background: var(--color-superficie);
 }
 
 .boton:disabled {

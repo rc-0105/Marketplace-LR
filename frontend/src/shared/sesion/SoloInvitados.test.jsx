@@ -15,7 +15,7 @@ function renderizar() {
       <Routes>
         <Route path="/registro" element={<SoloInvitados><p>Formulario</p></SoloInvitados>} />
         <Route path="/huesped" element={<p>Panel huesped</p>} />
-        <Route path="/anfitrion" element={<p>Panel anfitrion</p>} />
+        <Route path="/anfitrion/publicaciones" element={<p>Panel anfitrion</p>} />
         <Route path="/administrador" element={<p>Panel administrador</p>} />
       </Routes>
     </MemoryRouter>,

@@ -1,0 +1,140 @@
+.lateral {
+  display: grid;
+  align-content: start;
+  gap: var(--espacio-6);
+}
+
+.pasos {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.paso {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--color-texto-secundario);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--transicion);
+}
+
+.paso:hover {
+  background: var(--color-superficie);
+}
+
+.pasoActual {
+  background: #e4ded9;
+  color: var(--color-texto);
+  font-weight: 500;
+}
+
+.indicador {
+  display: grid;
+  flex: 0 0 1.75rem;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.actual,
+.completo {
+  background: #14110f;
+  color: #fff;
+}
+
+.falta {
+  border: 2px solid #9a5b0b;
+  color: #6b4608;
+}
+
+.pendiente {
+  border: 1.5px solid var(--color-borde-control);
+  color: var(--color-texto-secundario);
+}
+
+.requisitos {
+  display: grid;
+  gap: var(--espacio-3);
+  padding: var(--espacio-6);
+  border: 1px solid var(--color-borde);
+  border-radius: 1rem;
+  background: var(--color-fondo);
+}
+
+.tituloRequisitos {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.texto {
+  margin: 0;
+  color: var(--color-texto-secundario);
+  font-size: var(--texto-pequeno);
+  line-height: 1.5;
+}
+
+.lista {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--texto-pequeno);
+}
+
+.item,
+.faltaItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.faltaItem {
+  color: #6b4608;
+  font-weight: 500;
+}
+
+.casilla {
+  display: grid;
+  flex: 0 0 1.25rem;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid #14110f;
+  border-radius: 50%;
+  background: #14110f;
+  color: #fff;
+  font-size: 0.7rem;
+}
+
+.casillaFalta {
+  border-color: #9a5b0b;
+  background: transparent;
+  color: #6b4608;
+}
+
+.casillaNeutra {
+  border-color: var(--color-borde-control);
+  background: transparent;
+}
+
+.nota {
+  margin: 0;
+  color: var(--color-texto-secundario);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}

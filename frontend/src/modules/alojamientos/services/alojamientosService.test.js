@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { get, post, put } from '../../../shared/services/http.js';
+import { get, post, put, subirArchivo } from '../../../shared/services/http.js';
 import {
-  activarPublicacion, actualizarConfiguracion, actualizarImagenes, actualizarServicios, aprobarPublicacion,
+  subirImagen, activarPublicacion, actualizarConfiguracion, actualizarImagenes, actualizarServicios, aprobarPublicacion,
   consultarPublicacion, crearPublicacion, devolverPublicacion, editarPublicacion, listarMisPublicaciones,
   listarPendientesDeRevision, listarPoliticasCancelacion, listarServicios, listarTiposAlojamiento, pausarPublicacion,
 } from './alojamientosService.js';
@@ -11,10 +11,22 @@ vi.mock('../../../shared/services/http.js', async (importOriginal) => ({
   get: vi.fn(),
   post: vi.fn(),
   put: vi.fn(),
+  subirArchivo: vi.fn(),
 }));
 
 describe('alojamientosService', () => {
   beforeEach(() => vi.resetAllMocks());
+
+  it('sube un archivo de imagen en el campo archivo y devuelve su URL pública', async () => {
+    vi.mocked(subirArchivo).mockResolvedValue({ url: '/api/v1/imagenes/abc' });
+    const foto = new File(['x'], 'foto.png', { type: 'image/png' });
+
+    await expect(subirImagen(5, foto)).resolves.toBe('/api/v1/imagenes/abc');
+
+    const [ruta, datos] = vi.mocked(subirArchivo).mock.calls[0];
+    expect(ruta).toBe('/api/v1/publicaciones/5/imagenes/archivo');
+    expect(datos.get('archivo')).toBe(foto);
+  });
 
   it('lista las publicaciones del anfitrión y las convierte al modelo del frontend', async () => {
     vi.mocked(get).mockResolvedValue([
