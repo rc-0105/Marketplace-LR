@@ -157,6 +157,18 @@ class PagoReservaServiceTest {
     }
 
     @Test
+    @DisplayName("SOF-83: una reserva en revisión manual ya fue pagada: responde 409 sin llamar a la pasarela")
+    void unaReservaEnRevisionNoSeVuelveAPagar() {
+        when(reservas.findById(RESERVA_ID))
+                .thenReturn(Optional.of(con(EstadoReserva.EN_REVISION_MANUAL, EstadoPago.APROBADO, "pi_1")));
+
+        assertThatThrownBy(() -> servicio.pagar(RESERVA_ID, HUESPED_ID, "pm_card_visa"))
+                .isInstanceOf(ReservaNoPagableException.class)
+                .hasMessage("Esta reserva ya está pagada.");
+        org.mockito.Mockito.verifyNoInteractions(pasarela);
+    }
+
+    @Test
     @DisplayName("Un rechazo que llega cuando otro intento ya confirmó responde 409 sin decir que las fechas quedaron libres")
     void unRechazoTardioNoAnunciaFechasLibres() {
         when(pasarela.cobrar(any())).thenReturn(new PasarelaPagos.CobroRechazado("card_declined"));

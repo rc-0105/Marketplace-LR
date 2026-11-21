@@ -1,6 +1,8 @@
 package co.edu.unbosque.marketplace.alojamientos.controllers;
 
+import co.edu.unbosque.marketplace.alojamientos.controllers.dto.BloquearPublicacionRequest;
 import co.edu.unbosque.marketplace.alojamientos.controllers.dto.DevolverPublicacionRequest;
+import co.edu.unbosque.marketplace.alojamientos.controllers.dto.PublicacionModeracionResponse;
 import co.edu.unbosque.marketplace.alojamientos.controllers.dto.PublicacionResponse;
 import co.edu.unbosque.marketplace.alojamientos.services.PublicacionService;
 import co.edu.unbosque.marketplace.compartido.seguridad.Permisos;
@@ -14,11 +16,13 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Revisión administrativa de publicaciones (RF-15): solo un administrador ve las
  * pendientes y decide si se publican o vuelven al anfitrión con observaciones.
+ * También bloquea una publicación engañosa (SOF-83, RF-56).
  */
 @RestController
 @RequestMapping("/api/v1/admin/publicaciones")
@@ -48,6 +52,23 @@ public class RevisionPublicacionController {
 	public PublicacionResponse devolver(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
 			@Valid @RequestBody DevolverPublicacionRequest data) {
 		return PublicacionResponse.desde(publicacionService.devolver(id, usuarioDe(jwt), data.observaciones()));
+	}
+
+	/** Publicaciones activas, pausadas o bloqueadas cuyo título contiene el texto, como máximo 50 (SOF-83). */
+	@GetMapping
+	public List<PublicacionModeracionResponse> listarParaModeracion(@RequestParam(defaultValue = "") String texto) {
+		return publicacionService.listarParaModeracion(texto).stream().map(PublicacionModeracionResponse::desde)
+				.toList();
+	}
+
+	/**
+	 * Bloquea una publicación activa o pausada con el motivo (SOF-83): sale de las búsquedas y sus reservas
+	 * futuras confirmadas pasan a revisión manual.
+	 */
+	@PostMapping("/{id}/bloquear")
+	public PublicacionResponse bloquear(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
+			@Valid @RequestBody BloquearPublicacionRequest data) {
+		return PublicacionResponse.desde(publicacionService.bloquear(id, usuarioDe(jwt), data.motivo()));
 	}
 
 	private static Long usuarioDe(Jwt jwt) {

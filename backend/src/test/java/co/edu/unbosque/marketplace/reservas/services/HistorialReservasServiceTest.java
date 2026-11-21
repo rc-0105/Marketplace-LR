@@ -135,7 +135,7 @@ class HistorialReservasServiceTest {
     }
 
     private static AlojamientoReservado alojamiento(Long id) {
-        return new AlojamientoReservado(id, "Casa en la playa", "Santa Marta", null, Map.of());
+        return new AlojamientoReservado(id, "Casa en la playa", "Santa Marta", null, Map.of(), null);
     }
 
     private static Reserva reserva(Long id, Long publicacionId, LocalDate llegada, LocalDate salida,

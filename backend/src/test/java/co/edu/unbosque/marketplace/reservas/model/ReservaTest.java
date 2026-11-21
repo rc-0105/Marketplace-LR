@@ -64,6 +64,15 @@ class ReservaTest {
         assertThat(reserva.ocupaNoches(VENCE.plusSeconds(3600))).isTrue();
     }
 
+    @Test
+    @DisplayName("SOF-83: una reserva EN_REVISION_MANUAL sigue ocupando sus noches mientras el administrador decide")
+    void unaEnRevisionManualOcupaSiempre() {
+        Reserva reserva = nueva();
+        ReflectionTestUtils.setField(reserva, "estado", EstadoReserva.EN_REVISION_MANUAL);
+
+        assertThat(reserva.ocupaNoches(VENCE.plusSeconds(3600))).isTrue();
+    }
+
     private static Reserva nueva() {
         return Reserva.nueva(30L, 7L, LLEGADA, SALIDA, 4, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE,
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ONE, Set.of(), VENCE);

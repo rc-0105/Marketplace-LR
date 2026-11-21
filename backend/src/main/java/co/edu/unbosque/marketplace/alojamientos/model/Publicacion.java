@@ -113,6 +113,13 @@ public class Publicacion {
 	@Column(name = "enviada_revision_en")
 	private Instant enviadaARevisionEn;
 
+	// Motivo y momento del bloqueo administrativo (SOF-83); el motivo lo ve el anfitrión.
+	@Column(name = "motivo_bloqueo", length = 500)
+	private String motivoBloqueo;
+
+	@Column(name = "bloqueada_en")
+	private Instant bloqueadaEn;
+
 	protected Publicacion() {
 		// Requerido por JPA.
 	}
@@ -298,6 +305,22 @@ public class Publicacion {
 		this.estado = EstadoPublicacion.ACTIVA;
 	}
 
+	/**
+	 * ACTIVA o PAUSADA a BLOQUEADA con el motivo del administrador (SOF-83): sale de las búsquedas y no admite
+	 * reservas nuevas.
+	 */
+	public void bloquear(String motivo, Instant ahora) {
+		if (estado != EstadoPublicacion.ACTIVA && estado != EstadoPublicacion.PAUSADA) {
+			throw new IllegalStateException("Solo una publicación activa o pausada se bloquea");
+		}
+		if (vacio(motivo)) {
+			throw new IllegalArgumentException("El bloqueo exige un motivo");
+		}
+		this.estado = EstadoPublicacion.BLOQUEADA;
+		this.motivoBloqueo = motivo;
+		this.bloqueadaEn = ahora;
+	}
+
 	private static void agregarSiFalta(List<String> faltantes, String campo, boolean falta) {
 		if (falta) {
 			faltantes.add(campo);
@@ -402,5 +425,13 @@ public class Publicacion {
 
 	public Instant getEnviadaARevisionEn() {
 		return enviadaARevisionEn;
+	}
+
+	public String getMotivoBloqueo() {
+		return motivoBloqueo;
+	}
+
+	public Instant getBloqueadaEn() {
+		return bloqueadaEn;
 	}
 }

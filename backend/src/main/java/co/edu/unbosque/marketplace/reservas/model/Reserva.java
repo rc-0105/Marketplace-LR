@@ -129,11 +129,11 @@ public class Reserva {
     }
 
     /**
-     * Si ocupa noches en {@code ahora}: una CONFIRMADA siempre, una PENDIENTE solo mientras su apartado no
-     * haya vencido (el instante de vencimiento ya no cuenta). Es la regla que las consultas replican.
+     * Si ocupa noches en {@code ahora}: una CONFIRMADA o EN_REVISION_MANUAL siempre, una PENDIENTE solo mientras
+     * su apartado no haya vencido (el instante de vencimiento ya no cuenta). Es la regla que las consultas replican.
      */
     public boolean ocupaNoches(Instant ahora) {
-        return estado == EstadoReserva.CONFIRMADA
+        return estado == EstadoReserva.CONFIRMADA || estado == EstadoReserva.EN_REVISION_MANUAL
                 || (estado == EstadoReserva.PENDIENTE && venceEn.isAfter(ahora));
     }
 

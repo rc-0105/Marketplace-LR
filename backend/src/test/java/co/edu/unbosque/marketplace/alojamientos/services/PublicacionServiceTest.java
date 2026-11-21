@@ -29,6 +29,7 @@ import co.edu.unbosque.marketplace.alojamientos.repository.AnfitrionDePublicacio
 import co.edu.unbosque.marketplace.alojamientos.repository.PublicacionRepository;
 import co.edu.unbosque.marketplace.alojamientos.repository.ServicioRepository;
 import co.edu.unbosque.marketplace.alojamientos.repository.TipoAlojamientoRepository;
+import co.edu.unbosque.marketplace.compartido.consultas.RevisionReservasPublicacion;
 import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
@@ -62,8 +63,9 @@ class PublicacionServiceTest {
     private final TipoAlojamientoRepository tipos = mock(TipoAlojamientoRepository.class);
     private final PoliticaCancelacionRepository politicas = mock(PoliticaCancelacionRepository.class);
     private final Notificador notificador = mock(Notificador.class);
+    private final RevisionReservasPublicacion revisionReservas = mock(RevisionReservasPublicacion.class);
     private final PublicacionService servicio = new PublicacionService(publicaciones, catalogo, tipos, politicas,
-            publicador, notificador);
+            publicador, notificador, revisionReservas);
 
     private static final Long MODERADA_ID = 2L;
     private static final Long POLITICA_INEXISTENTE_ID = 99L;
@@ -966,6 +968,108 @@ class PublicacionServiceTest {
                 .isInstanceOf(PublicacionNoEncontradaException.class);
         assertThatThrownBy(() -> servicio.devolver(PUBLICACION_ID, ADMINISTRADOR_ID, "Motivo"))
                 .isInstanceOf(PublicacionNoEncontradaException.class);
+    }
+
+    @Test
+    @DisplayName("SOF-83 AC1: bloquear una publicación activa la deja BLOQUEADA con el motivo y la audita como acción administrativa")
+    void bloquearActivaLaDejaBloqueada() {
+        Publicacion activa = publicacionEn(EstadoPublicacion.ACTIVA);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(activa));
+
+        Publicacion bloqueada = servicio.bloquear(PUBLICACION_ID, ADMINISTRADOR_ID, "  Fotos que no son del lugar  ");
+
+        assertThat(bloqueada.getEstado()).isEqualTo(EstadoPublicacion.BLOQUEADA);
+        assertThat(bloqueada.getMotivoBloqueo()).isEqualTo("Fotos que no son del lugar");
+        assertThat(bloqueada.getBloqueadaEn()).isNotNull();
+        verify(publicaciones).save(activa);
+        EventoCritico evento = eventoPublicado();
+        assertThat(evento.usuario()).isEqualTo(String.valueOf(ADMINISTRADOR_ID));
+        assertThat(evento.accion()).isEqualTo(AccionCritica.ACCION_ADMINISTRATIVA);
+        assertThat(evento.datos()).containsEntry("operacion", "bloquear");
+    }
+
+    @Test
+    @DisplayName("SOF-83 AC1: el anfitrión recibe que su publicación quedó bloqueada y el motivo")
+    void bloquearNotificaAlAnfitrionConElMotivo() {
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(publicacionEn(EstadoPublicacion.PAUSADA)));
+
+        servicio.bloquear(PUBLICACION_ID, ADMINISTRADOR_ID, "Fotos que no son del lugar");
+
+        verify(notificador).notificar(estadoNotificado(
+                "Tu publicación «Casa en la playa» ahora está bloqueada. Motivo: Fotos que no son del lugar"));
+    }
+
+    @Test
+    @DisplayName("SOF-83 AC2: al bloquear, las reservas futuras confirmadas de la publicación pasan a revisión manual")
+    void bloquearEnviaLasReservasARevision() {
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(publicacionEn(EstadoPublicacion.ACTIVA)));
+
+        servicio.bloquear(PUBLICACION_ID, ADMINISTRADOR_ID, "Fotos que no son del lugar");
+
+        verify(revisionReservas).enviarARevision(PUBLICACION_ID);
+    }
+
+    @Test
+    @DisplayName("SOF-83: bloquear una publicación que no está activa ni pausada responde 409 y no cambia nada")
+    void bloquearEnOtroEstadoSeRechaza() {
+        for (EstadoPublicacion estado : List.of(EstadoPublicacion.BORRADOR, EstadoPublicacion.PENDIENTE_REVISION,
+                EstadoPublicacion.BLOQUEADA)) {
+            Publicacion publicacion = publicacionEn(estado);
+            when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(publicacion));
+
+            assertThatThrownBy(() -> servicio.bloquear(PUBLICACION_ID, ADMINISTRADOR_ID, "Motivo"))
+                    .isInstanceOf(CambioEstadoNoPermitidoException.class)
+                    .hasMessage("Solo se puede bloquear una publicación activa o pausada.");
+            assertThat(publicacion.getEstado()).isEqualTo(estado);
+        }
+        verify(publicaciones, never()).save(any(Publicacion.class));
+        verify(revisionReservas, never()).enviarARevision(any());
+        verify(notificador, never()).notificar(any());
+    }
+
+    @Test
+    @DisplayName("SOF-83: bloquear una publicación que no existe lanza 404")
+    void bloquearInexistenteLanza404() {
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.bloquear(PUBLICACION_ID, ADMINISTRADOR_ID, "Motivo"))
+                .isInstanceOf(PublicacionNoEncontradaException.class);
+    }
+
+    @Test
+    @DisplayName("SOF-83 AC4: el anfitrión no puede activar su publicación bloqueada; se le indica contactar a soporte")
+    void activarBloqueadaSeRechaza() {
+        Publicacion bloqueada = publicacionEn(EstadoPublicacion.BLOQUEADA);
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(bloqueada));
+
+        assertThatThrownBy(() -> servicio.activar(PUBLICACION_ID, ANFITRION_ID))
+                .isInstanceOf(CambioEstadoNoPermitidoException.class)
+                .hasMessage("Esta publicación fue bloqueada por un administrador. Contacta a soporte para revisarla.");
+        assertThat(bloqueada.getEstado()).isEqualTo(EstadoPublicacion.BLOQUEADA);
+        verify(publicaciones, never()).save(any(Publicacion.class));
+        verify(notificador, never()).notificar(any());
+    }
+
+    @Test
+    @DisplayName("SOF-83: pausar una publicación bloqueada sigue respondiendo 409 como cualquier otra no activa")
+    void pausarBloqueadaSeRechaza() {
+        when(publicaciones.findById(PUBLICACION_ID)).thenReturn(Optional.of(publicacionEn(EstadoPublicacion.BLOQUEADA)));
+
+        assertThatThrownBy(() -> servicio.pausar(PUBLICACION_ID, ANFITRION_ID))
+                .isInstanceOf(CambioEstadoNoPermitidoException.class)
+                .hasMessage("Solo se puede pausar una publicación activa.");
+        verify(publicaciones, never()).save(any(Publicacion.class));
+    }
+
+    @Test
+    @DisplayName("SOF-83: la moderación busca por título de forma literal entre activas, pausadas y bloqueadas")
+    void listarParaModeracionBuscaLiteral() {
+        servicio.listarParaModeracion("  50%_casa  ");
+
+        verify(publicaciones).buscarParaModeracion(org.mockito.ArgumentMatchers.eq("50\\%\\_casa"),
+                org.mockito.ArgumentMatchers.eq(List.of(EstadoPublicacion.ACTIVA, EstadoPublicacion.PAUSADA,
+                        EstadoPublicacion.BLOQUEADA)),
+                org.mockito.ArgumentMatchers.eq(org.springframework.data.domain.PageRequest.of(0, 50)));
     }
 
     private static SolicitudConfiguracion.ServicioAdicional adicional(String nombre, String costo) {

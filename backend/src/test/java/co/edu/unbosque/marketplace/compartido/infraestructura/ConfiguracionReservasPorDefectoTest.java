@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasCalendario;
 import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasFuturas;
 import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasPeriodo;
+import co.edu.unbosque.marketplace.compartido.consultas.RevisionReservasPublicacion;
 import co.edu.unbosque.marketplace.compartido.consultas.ReservaOcupada;
 import java.time.LocalDate;
 import java.util.List;
@@ -90,6 +91,24 @@ class ConfiguracionReservasPorDefectoTest {
             ConsultaReservasCalendario puerto = ctx.getBean(ConsultaReservasCalendario.class);
             assertThat(puerto.publicacionesOcupadas(List.of(10L, 11L, 12L),
                     LocalDate.of(2026, 12, 3), LocalDate.of(2026, 12, 6))).isEmpty();
+        });
+    }
+
+    @Test
+    @DisplayName("SOF-83: sin otra implementación, bloquear una publicación no mueve ninguna reserva a revisión")
+    void sinOtroBeanNingunaReservaPasaARevision() {
+        contexto.run(ctx -> {
+            assertThat(ctx).hasSingleBean(RevisionReservasPublicacion.class);
+            assertThat(ctx.getBean(RevisionReservasPublicacion.class).enviarARevision(30L)).isZero();
+        });
+    }
+
+    @Test
+    @DisplayName("SOF-83: una implementación real de la revisión reemplaza al bean por defecto")
+    void laRevisionRealReemplazaAlPorDefecto() {
+        contexto.withBean(RevisionReservasPublicacion.class, () -> publicacion -> 2).run(ctx -> {
+            assertThat(ctx).hasSingleBean(RevisionReservasPublicacion.class);
+            assertThat(ctx.getBean(RevisionReservasPublicacion.class).enviarARevision(30L)).isEqualTo(2);
         });
     }
 }

@@ -67,7 +67,8 @@ public class PagoReservaService {
     public Reserva pagar(Long reservaId, Long huespedId, String metodoPago) {
         Reserva reserva = reservas.findById(reservaId).orElseThrow(ReservaNoEncontradaException::new);
         Propiedad.exigirPropietario(reserva.getHuespedId(), huespedId);
-        if (reserva.getEstado() == EstadoReserva.CONFIRMADA) {
+        // EN_REVISION_MANUAL (SOF-83) es una CONFIRMADA cuya publicación se bloqueó: también está pagada.
+        if (reserva.getEstado() == EstadoReserva.CONFIRMADA || reserva.getEstado() == EstadoReserva.EN_REVISION_MANUAL) {
             throw new ReservaNoPagableException("Esta reserva ya está pagada.");
         }
         if (!reserva.ocupaNoches(Instant.now(reloj))) {
