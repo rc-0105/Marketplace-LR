@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import CampanaNotificaciones from '../../modules/notificaciones/components/CampanaNotificaciones.jsx';
 import { homeDe } from '../sesion/rutasPorRol.js';
 import { useSesion } from '../sesion/useSesion.js';
@@ -8,15 +8,13 @@ import estilos from './Encabezado.module.css';
 
 /**
  * Encabezado común de todas las páginas con la marca: sin sesión lleva al inicio
- * público y con sesión al panel del rol. Con sesión, fuera del panel, ofrece además
- * "Volver a mi panel" para salir de cualquier pantalla.
+ * público y con sesión al panel del rol, desde cualquier pantalla.
  * Con sesión ofrece "Mi cuenta" y "Cerrar sesión", que delega en `alCerrarSesion`;
  * al huésped además le ofrece "Mis reservas", al anfitrión "Mis publicaciones" y al administrador
  * "Revisar publicaciones". Con sesión, cualquier rol ve además la campana de notificaciones.
  */
 export default function Encabezado({ alCerrarSesion }) {
   const sesion = useSesion();
-  const { pathname } = useLocation();
   const [cerrando, setCerrando] = useState(false);
   const panel = sesion ? homeDe(sesion.usuario.rol) : null;
 
@@ -38,11 +36,6 @@ export default function Encabezado({ alCerrarSesion }) {
       </Link>
       {sesion && (
         <div className={estilos.acciones}>
-          {pathname !== panel && (
-            <Link to={panel} className={estilos.volver}>
-              <span aria-hidden="true">←</span> Volver a mi panel
-            </Link>
-          )}
           {sesion.usuario.rol === 'HUESPED' && (
             <Link to="/huesped/reservas" className={estilos.enlace}>Mis reservas</Link>
           )}

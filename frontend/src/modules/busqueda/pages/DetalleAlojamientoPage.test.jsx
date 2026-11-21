@@ -2,10 +2,12 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi } from '../../../shared/services/http.js';
+import { consultarResenas } from '../../resenas/services/resenaService.js';
 import { consultarDetalle } from '../services/busquedaService.js';
 import DetalleAlojamientoPage from './DetalleAlojamientoPage.jsx';
 
 vi.mock('../services/busquedaService.js', () => ({ consultarDetalle: vi.fn() }));
+vi.mock('../../resenas/services/resenaService.js', () => ({ consultarResenas: vi.fn() }));
 
 const DETALLE = {
   id: 5,
@@ -35,7 +37,10 @@ function abrir(ruta = '/huesped/busqueda/5') {
 }
 
 describe('DetalleAlojamientoPage', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(consultarResenas).mockResolvedValue({ promedio: null, resenas: [] });
+  });
 
   it('muestra imágenes, descripción, servicios, reglas, capacidad, precio, política y calendario', async () => {
     vi.mocked(consultarDetalle).mockResolvedValue(DETALLE);
@@ -108,5 +113,29 @@ describe('DetalleAlojamientoPage', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos cargar el alojamiento');
     expect(screen.queryByText('Alojamiento no disponible')).not.toBeInTheDocument();
+  });
+
+  it('muestra la sección de reseñas con las reseñas visibles de la publicación', async () => {
+    vi.mocked(consultarDetalle).mockResolvedValue({ ...DETALLE, calificacionPromedio: 4.5 });
+    vi.mocked(consultarResenas).mockResolvedValue({
+      promedio: 4.5,
+      resenas: [
+        { id: 1, reservaId: 11, autor: 'Ana Gómez', calificacion: 4, contenido: 'Muy cómodo', fecha: '2026-01-10T10:00:00Z' },
+      ],
+    });
+
+    abrir();
+
+    expect(await screen.findByRole('heading', { name: 'Reseñas' })).toBeInTheDocument();
+    expect(await screen.findByText('Muy cómodo')).toBeInTheDocument();
+    expect(consultarResenas).toHaveBeenCalledWith(5);
+  });
+
+  it('si la publicación no tiene reseñas lo indica en la sección', async () => {
+    vi.mocked(consultarDetalle).mockResolvedValue(DETALLE);
+
+    abrir();
+
+    expect(await screen.findByText('Esta publicación aún no tiene reseñas.')).toBeInTheDocument();
   });
 });

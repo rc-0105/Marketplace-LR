@@ -110,7 +110,7 @@ export default function CotizadorEstancia({
   }
 
   return (
-    <section>
+    <section className={estilos.tarjeta}>
       <h2 className={estilos.seccion}>Cotiza tu estancia</h2>
       <form className={estilos.formulario} onSubmit={cotizar} noValidate>
         <Campo id="llegada" etiqueta="Llegada" type="date" value={fechas.llegada} onChange={cambiarFecha}

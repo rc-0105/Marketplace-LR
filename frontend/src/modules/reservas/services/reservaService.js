@@ -53,10 +53,11 @@ export async function crearReserva({ publicacionId, llegada, salida, serviciosAd
  * (en ambos la reserva sigue apartada y se puede reintentar). El ErrorApi se propaga.
  * @param {number} reservaId
  * @param {string} metodoPago tarjeta de prueba, por ejemplo 'pm_card_visa'
+ * @param {string} [clave] UUID del intento; reutilizarlo si se reintenta el mismo pago
  * @returns {Promise<import('../models/reserva.js').Reserva>}
  */
-export async function pagarReserva(reservaId, metodoPago) {
-  return reservaDesdeApi(await post(`${RUTA}/${reservaId}/pago`, { metodoPago }));
+export async function pagarReserva(reservaId, metodoPago, clave = crypto.randomUUID()) {
+  return reservaDesdeApi(await post(`${RUTA}/${reservaId}/pago`, { metodoPago }, { 'Idempotency-Key': clave }));
 }
 
 /**

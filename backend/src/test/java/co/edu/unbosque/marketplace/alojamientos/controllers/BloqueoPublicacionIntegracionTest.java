@@ -29,7 +29,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 /**
  * Bloqueo administrativo de una publicación engañosa (SOF-83, HU-38): token → autorización → service →
- * PostgreSQL, con la migración V29 aplicada. Las reservas se siembran con JdbcTemplate en el estado que cada
+ * PostgreSQL, con la migración V31 aplicada. Las reservas se siembran con JdbcTemplate en el estado que cada
  * caso necesita.
  */
 @SpringBootTest
@@ -143,6 +143,7 @@ class BloqueoPublicacionIntegracionTest {
 
         mvc.perform(post("/api/v1/reservas/{id}/pago", pendiente)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + iniciarSesion("ana@correo.com"))
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON).content("""
                                 {"metodoPago": "pm_card_visa"}
                                 """))

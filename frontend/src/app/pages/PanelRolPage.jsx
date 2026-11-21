@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import ResumenRevision from '../../modules/alojamientos/components/ResumenRevision.jsx';
 import { useSesion } from '../../shared/sesion/useSesion.js';
+import InicioHuespedPage from './InicioHuespedPage.jsx';
 import estilos from './PanelRolPage.module.css';
 
 const NOMBRE_ROL = {
@@ -47,6 +48,7 @@ export default function PanelRolPage() {
   const sesion = useSesion();
   if (!sesion) return null;
   const { usuario } = sesion;
+  if (usuario.rol === 'HUESPED') return <InicioHuespedPage nombre={usuario.nombre} />;
   const esAdministrador = usuario.rol === 'ADMINISTRADOR';
 
   return (
@@ -56,15 +58,7 @@ export default function PanelRolPage() {
       {esAdministrador ? (
         <HerramientasAdministrador />
       ) : (
-        <>
-          <p className={estilos.nota}>Tu panel está en construcción. Pronto verás aquí tus herramientas.</p>
-          {usuario.rol === 'HUESPED' && (
-            <>
-              <Link to="/huesped/busqueda" className={estilos.enlace}>Buscar alojamiento</Link>
-              <Link to="/huesped/reservas" className={estilos.enlace}>Ver mis reservas</Link>
-            </>
-          )}
-        </>
+        <p className={estilos.nota}>Tu panel está en construcción. Pronto verás aquí tus herramientas.</p>
       )}
     </main>
   );

@@ -105,6 +105,16 @@ public class CuentaService {
         return usuarios.findIdsByIdInAndEstado(usuarioIds, EstadoCuenta.RESTRINGIDA);
     }
 
+    /** El nombre de cada usuario recibido, para mostrar al autor de una reseña (SOF-81). */
+    @Transactional(readOnly = true)
+    public Map<Long, String> nombresDe(Collection<Long> usuarioIds) {
+        Map<Long, String> nombres = new HashMap<>();
+        for (Usuario usuario : usuarios.findAllById(usuarioIds)) {
+            nombres.put(usuario.getId(), usuario.getNombre());
+        }
+        return nombres;
+    }
+
     /** El dueño desactiva su cuenta. Orden: contraseña, estado ACTIVA, reservas y recién entonces la transición. */
     public void desactivar(Long usuarioId, String contrasena) {
         Usuario usuario = confirmarDueno(usuarioId, contrasena, DESACTIVAR);

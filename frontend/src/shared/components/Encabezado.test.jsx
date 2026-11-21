@@ -51,24 +51,12 @@ describe('Encabezado', () => {
     ['HUESPED', '/mi-cuenta', '/huesped'],
     ['ANFITRION', '/anfitrion/publicaciones/nueva', '/anfitrion/publicaciones'],
     ['ADMINISTRADOR', '/administrador/publicaciones', '/administrador'],
-  ])('a un %s en %s le ofrece volver a su panel', (rol, ruta, panel) => {
+  ])('a un %s en %s no le ofrece "Volver a mi panel": la marca ya lleva a su panel', (rol, ruta, panel) => {
     iniciar(rol);
     renderizar(vi.fn(), ruta);
 
-    expect(screen.getByRole('link', { name: 'Volver a mi panel' })).toHaveAttribute('href', panel);
-  });
-
-  it('en su propio panel no ofrece volver al panel', () => {
-    iniciar('ANFITRION');
-    renderizar(vi.fn(), '/anfitrion/publicaciones');
-
-    expect(screen.queryByRole('link', { name: 'Volver a mi panel' })).not.toBeInTheDocument();
-  });
-
-  it('sin sesión no ofrece volver al panel', () => {
-    renderizar(vi.fn(), '/registro');
-
-    expect(screen.queryByRole('link', { name: 'Volver a mi panel' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Volver a mi panel/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Inversiones LR, ir a tu panel' })).toHaveAttribute('href', panel);
   });
 
   it('con sesión muestra el botón de cerrar sesión', () => {

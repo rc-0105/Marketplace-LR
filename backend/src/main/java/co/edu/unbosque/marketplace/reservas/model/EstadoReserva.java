@@ -7,7 +7,12 @@ package co.edu.unbosque.marketplace.reservas.model;
  * Ocupan noches las CONFIRMADA, las EN_REVISION_MANUAL y las PENDIENTE con el apartado vigente.
  * EN_REVISION_MANUAL es una CONFIRMADA cuya publicación fue bloqueada (SOF-83): espera a que un administrador
  * la confirme o la cancele con devolución.
+ *
+ * <p>COMPLETADA (SOF-78, RF-50) es el estado terminal de una CONFIRMADA cuya fecha de salida ya
+ * pasó: la tarea programada de {@link co.edu.unbosque.marketplace.reservas.services.CierreReservasService}
+ * la cierra, lo que habilita la reseña y la saca de la restricción de exclusión, igual que CANCELADA
+ * y VENCIDA.
  */
 public enum EstadoReserva {
-    PENDIENTE, CONFIRMADA, CANCELADA, VENCIDA, EN_REVISION_MANUAL
+    PENDIENTE, CONFIRMADA, CANCELADA, VENCIDA, COMPLETADA, EN_REVISION_MANUAL
 }

@@ -23,10 +23,14 @@ function iniciar(rol) {
   guardarSesion({ token: 't', expiraEn, usuario: { id: 1, nombre: 'Ana', correo: 'a@b.co', rol, activa: true } });
 }
 
-// Cada rol vuelve a su inicio: el anfitrión a Mis publicaciones, los demás a su panel.
+// Cada rol vuelve a su inicio: el anfitrión a Mis publicaciones, el huésped a su ventana principal
+// (el saludo con el buscador) y el administrador a su panel.
 function esperarInicioDe(rol, nombre) {
   if (rol === 'ANFITRION') {
     expect(screen.getByRole('heading', { name: 'Mis publicaciones' })).toBeInTheDocument();
+  } else if (rol === 'HUESPED') {
+    expect(screen.getByRole('heading', { name: 'Hola, Ana' })).toBeInTheDocument();
+    expect(screen.getByRole('form', { name: 'Buscar alojamientos' })).toBeInTheDocument();
   } else {
     expect(screen.getByText(`Ingresaste como ${nombre}.`)).toBeInTheDocument();
   }
@@ -87,12 +91,12 @@ describe('App', () => {
   });
 
   it.each([
-    ['HUESPED', '/huesped'],
-    ['ADMINISTRADOR', '/administrador'],
-  ])('muestra el panel de %s en su ruta', (rol, ruta) => {
+    ['HUESPED', '/huesped', 'Huésped'],
+    ['ADMINISTRADOR', '/administrador', 'Administrador'],
+  ])('muestra el panel de %s en su ruta', (rol, ruta, nombre) => {
     iniciar(rol);
     renderizarEn(ruta);
-    expect(screen.getByText(/^Ingresaste como/)).toBeInTheDocument();
+    esperarInicioDe(rol, nombre);
   });
 
   it('el inicio del anfitrión es Mis publicaciones: /anfitrion lleva directo ahí', async () => {
@@ -106,7 +110,7 @@ describe('App', () => {
   it('un huésped que entra a /anfitrion vuelve a su panel', () => {
     iniciar('HUESPED');
     renderizarEn('/anfitrion');
-    expect(screen.getByText(/^Ingresaste como/)).toBeInTheDocument();
+    esperarInicioDe('HUESPED', 'Huésped');
   });
 
   it.each(['HUESPED', 'ANFITRION', 'ADMINISTRADOR'])('muestra Mi cuenta a un %s con sesión', (rol) => {
@@ -227,7 +231,7 @@ describe('App', () => {
   it('un rol ajeno vuelve a su propio panel', () => {
     iniciar('HUESPED');
     renderizarEn('/administrador');
-    expect(screen.getByText('Ingresaste como Huésped.')).toBeInTheDocument();
+    esperarInicioDe('HUESPED', 'Huésped');
   });
 
   it.each(['/inicio-sesion', '/registro', '/recuperar-contrasena'])('con sesión %s lleva al panel del rol', (ruta) => {

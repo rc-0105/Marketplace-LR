@@ -72,6 +72,11 @@
   color: var(--color-texto-secundario);
 }
 
+.COMPLETADA {
+  background: var(--color-exito-fondo);
+  color: var(--color-exito);
+}
+
 .bloque {
   display: grid;
   gap: var(--espacio-4);

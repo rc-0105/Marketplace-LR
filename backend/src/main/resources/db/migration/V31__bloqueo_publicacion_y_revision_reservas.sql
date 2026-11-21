@@ -16,10 +16,10 @@ ALTER TABLE publicacion DROP CONSTRAINT publicacion_estado_check,
 -- Las reservas futuras CONFIRMADA de la publicación bloqueada pasan a EN_REVISION_MANUAL hasta que el
 -- administrador las confirme o las cancele con devolución. Mientras tanto siguen ocupando sus noches: la
 -- restricción de exclusión de V22 se recrea igual, con el estado nuevo en su condición. El CHECK de estado
--- conserva el nombre que PostgreSQL le dio en V21.
+-- conserva el nombre que PostgreSQL le dio en V21 y los estados que tenía tras V29 (COMPLETADA, SOF-78).
 ALTER TABLE reserva DROP CONSTRAINT IF EXISTS reserva_estado_check,
     ADD CONSTRAINT reserva_estado_check
-        CHECK (estado IN ('PENDIENTE', 'CONFIRMADA', 'CANCELADA', 'VENCIDA', 'EN_REVISION_MANUAL'));
+        CHECK (estado IN ('PENDIENTE', 'CONFIRMADA', 'CANCELADA', 'VENCIDA', 'COMPLETADA', 'EN_REVISION_MANUAL'));
 
 ALTER TABLE reserva DROP CONSTRAINT reserva_sin_cruce;
 ALTER TABLE reserva ADD CONSTRAINT reserva_sin_cruce

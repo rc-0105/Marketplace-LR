@@ -365,6 +365,60 @@ class ReservaRepositoryIntegracionTest {
         assertThat(guardar(publicacionId, "2026-12-10", "2026-12-14", EstadoReserva.PENDIENTE).getId()).isNotNull();
     }
 
+    @Test
+    @DisplayName("AC1: completarConEstanciaTerminada pasa a COMPLETADA la CONFIRMADA cuya salida ya pasó")
+    @Transactional
+    void completarConEstanciaTerminadaCierraLaConfirmadaConSalidaPasada() {
+        Reserva terminada = guardar(publicacionId, "2026-11-10", "2026-11-14", EstadoReserva.CONFIRMADA);
+        Reserva mismoDiaDeSalida = guardar(publicacionId, "2026-11-16", "2026-11-20", EstadoReserva.CONFIRMADA);
+
+        assertThat(reservas.completarConEstanciaTerminada(LocalDate.of(2026, 11, 20))).isEqualTo(2);
+
+        entidades.clear();
+        assertThat(reservas.findById(terminada.getId())).get().extracting(Reserva::getEstado)
+                .isEqualTo(EstadoReserva.COMPLETADA);
+        assertThat(reservas.findById(mismoDiaDeSalida.getId())).get().extracting(Reserva::getEstado)
+                .isEqualTo(EstadoReserva.COMPLETADA);
+    }
+
+    @Test
+    @DisplayName("AC3: completarConEstanciaTerminada nunca toca una CANCELADA, VENCIDA ni PENDIENTE")
+    @Transactional
+    void completarConEstanciaTerminadaNoTocaOtrosEstados() {
+        Reserva cancelada = guardar(publicacionId, "2026-11-10", "2026-11-14", EstadoReserva.CANCELADA);
+        Reserva vencida = guardar(publicacionId, "2026-11-10", "2026-11-14", EstadoReserva.VENCIDA);
+        Reserva pendiente = guardar(publicacionId, "2026-11-10", "2026-11-14", EstadoReserva.PENDIENTE,
+                AHORA.minusSeconds(1));
+        Reserva confirmadaFutura = guardar(publicacionId, "2026-12-10", "2026-12-14", EstadoReserva.CONFIRMADA);
+
+        assertThat(reservas.completarConEstanciaTerminada(LocalDate.of(2026, 11, 20))).isZero();
+
+        entidades.clear();
+        assertThat(reservas.findById(cancelada.getId())).get().extracting(Reserva::getEstado)
+                .isEqualTo(EstadoReserva.CANCELADA);
+        assertThat(reservas.findById(vencida.getId())).get().extracting(Reserva::getEstado)
+                .isEqualTo(EstadoReserva.VENCIDA);
+        assertThat(reservas.findById(pendiente.getId())).get().extracting(Reserva::getEstado)
+                .isEqualTo(EstadoReserva.PENDIENTE);
+        assertThat(reservas.findById(confirmadaFutura.getId())).get().extracting(Reserva::getEstado)
+                .isEqualTo(EstadoReserva.CONFIRMADA);
+    }
+
+    @Test
+    @DisplayName("Una COMPLETADA ya no ocupa noches: libera el rango para otra reserva")
+    @Transactional
+    void unaCompletadaLiberaElRangoEnLaBaseDeDatos() {
+        Reserva completada = guardar(publicacionId, "2026-12-10", "2026-12-14", EstadoReserva.CONFIRMADA);
+        reservas.completarConEstanciaTerminada(LocalDate.of(2026, 12, 16));
+        entidades.clear();
+
+        assertThat(ocupantesDe(publicacionId)).isEmpty();
+        assertThat(guardar(publicacionId, "2026-12-10", "2026-12-14", EstadoReserva.PENDIENTE).getId())
+                .isNotNull();
+        assertThat(reservas.findById(completada.getId())).get().extracting(Reserva::getEstado)
+                .isEqualTo(EstadoReserva.COMPLETADA);
+    }
+
     private List<Reserva> ocupantesDe(Long id) {
         return reservas.findOcupantes(id, DESDE, HASTA, AHORA);
     }

@@ -237,6 +237,7 @@ class CancelacionReservaIntegracionTest {
     private long reservarYPagar(String token) throws Exception {
         long id = reservar(token);
         mvc.perform(post("/api/v1/reservas/{id}/pago", id).header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON).content("""
                                 {"metodoPago": "pm_card_visa"}
                                 """))

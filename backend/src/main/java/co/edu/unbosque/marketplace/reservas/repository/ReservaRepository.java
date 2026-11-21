@@ -154,4 +154,13 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
             + " where r.id = :id"
             + " and r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.EN_REVISION_MANUAL")
     int cancelarRevision(@Param("id") Long id);
+
+    // Cierre de reservas (SOF-78, RF-50): una CONFIRMADA cuya salida ya pasó queda COMPLETADA, lo que la
+    // saca de la restricción de exclusión (igual que CANCELADA y VENCIDA) y habilita la reseña. Nunca toca
+    // una PENDIENTE, CANCELADA ni VENCIDA: el cierre solo cuenta las estancias que sí se cumplieron.
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Reserva r set r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.COMPLETADA"
+            + " where r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.CONFIRMADA"
+            + " and r.salida <= :hoy")
+    int completarConEstanciaTerminada(@Param("hoy") LocalDate hoy);
 }

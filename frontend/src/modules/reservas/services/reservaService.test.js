@@ -100,12 +100,25 @@ describe('pagarReserva', () => {
       id: 7, estado: 'CONFIRMADA', total: '470000.00', estadoPago: 'APROBADO', transaccionId: 'pi_123',
     });
 
-    const reserva = await pagarReserva(7, 'pm_card_visa');
+    const clave = '0b6a1c2e-3f4d-4a5b-8c6d-7e8f9a0b1c2d';
+    const reserva = await pagarReserva(7, 'pm_card_visa', clave);
 
-    expect(post).toHaveBeenCalledWith('/api/v1/reservas/7/pago', { metodoPago: 'pm_card_visa' });
+    expect(post).toHaveBeenCalledWith('/api/v1/reservas/7/pago', { metodoPago: 'pm_card_visa' },
+      { 'Idempotency-Key': clave });
     expect(reserva).toEqual(expect.objectContaining({
       id: 7, estado: 'CONFIRMADA', estadoPago: 'APROBADO', transaccionId: 'pi_123',
     }));
+  });
+
+  it('sin clave envía un UUID nuevo en cada llamada', async () => {
+    vi.mocked(post).mockResolvedValue({ id: 7 });
+    await pagarReserva(7, 'pm_card_visa');
+    await pagarReserva(7, 'pm_card_visa');
+
+    const claves = vi.mocked(post).mock.calls.map(([, , cabeceras]) => cabeceras?.['Idempotency-Key']);
+    const uuid = expect.stringMatching(/^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/);
+    expect(claves).toEqual([uuid, uuid]);
+    expect(claves[0]).not.toBe(claves[1]);
   });
 });
 
