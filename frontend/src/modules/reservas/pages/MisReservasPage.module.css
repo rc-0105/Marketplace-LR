@@ -1,0 +1,165 @@
+.pagina {
+  display: grid;
+  gap: var(--espacio-6);
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: var(--espacio-8) var(--espacio-4) var(--espacio-12);
+}
+
+.titulo {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.subtitulo {
+  margin: var(--espacio-2) 0 0;
+  color: var(--color-texto-secundario);
+}
+
+.seccion {
+  display: grid;
+  gap: var(--espacio-3);
+}
+
+.tituloSeccion {
+  margin: 0;
+  font-size: var(--texto-titulo);
+  font-weight: 500;
+}
+
+.lista {
+  display: grid;
+  gap: var(--espacio-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Foto, datos y total en una fila; en pantallas angostas el total baja. */
+.tarjeta {
+  display: grid;
+  grid-template-columns: 6rem 1fr auto;
+  gap: var(--espacio-4);
+  align-items: center;
+  padding: var(--espacio-3);
+  border: 1px solid var(--color-borde);
+  border-radius: 1rem;
+  background: var(--color-superficie);
+}
+
+@media (max-width: 36rem) {
+  .tarjeta {
+    grid-template-columns: 5rem 1fr;
+  }
+
+  .cierre {
+    grid-column: 1 / -1;
+  }
+}
+
+.foto,
+.sinFoto {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 0.5rem;
+}
+
+.foto {
+  object-fit: cover;
+}
+
+.sinFoto {
+  display: grid;
+  place-items: center;
+  background: var(--color-bloqueado-fondo);
+  color: var(--color-texto-secundario);
+  font-size: var(--texto-pequeno);
+}
+
+.texto {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.nombre {
+  margin: 0;
+  font-size: var(--texto-base);
+  font-weight: 500;
+}
+
+.detalle {
+  margin: 0;
+  color: var(--color-texto-secundario);
+  font-size: var(--texto-pequeno);
+}
+
+.cierre {
+  display: grid;
+  gap: var(--espacio-2);
+  justify-items: end;
+}
+
+.total {
+  margin: 0;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.estado {
+  justify-self: start;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.PENDIENTE {
+  background: #f6e7c8;
+  color: #6b4a12;
+}
+
+.CONFIRMADA {
+  background: var(--color-exito-fondo);
+  color: var(--color-exito);
+}
+
+.CANCELADA {
+  background: var(--color-error-fondo);
+  color: var(--color-error);
+}
+
+.VENCIDA {
+  background: var(--color-bloqueado-fondo);
+  color: var(--color-texto-secundario);
+}
+
+.enlace {
+  color: var(--color-terracota-oscuro);
+  font-weight: 500;
+}
+
+.vacio {
+  display: grid;
+  gap: var(--espacio-2);
+  justify-items: start;
+}
+
+.nota {
+  margin: 0;
+  color: var(--color-texto-secundario);
+}
+
+.error {
+  margin: 0;
+  padding: var(--espacio-2) var(--espacio-3);
+  border-radius: var(--radio);
+  background: var(--color-error-fondo);
+  color: var(--color-error);
+  font-size: var(--texto-pequeno);
+}

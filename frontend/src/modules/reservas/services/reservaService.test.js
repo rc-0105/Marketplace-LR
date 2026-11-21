@@ -1,8 +1,40 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { post } from '../../../shared/services/http.js';
-import { cancelarReserva, crearReserva, pagarReserva } from './reservaService.js';
+import { get, post } from '../../../shared/services/http.js';
+import {
+  cancelarReserva, consultarReserva, crearReserva, listarMisReservas, pagarReserva,
+} from './reservaService.js';
 
-vi.mock('../../../shared/services/http.js', () => ({ post: vi.fn() }));
+vi.mock('../../../shared/services/http.js', () => ({ get: vi.fn(), post: vi.fn() }));
+
+describe('listarMisReservas', () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  it('pide mis reservas y devuelve las futuras y las pasadas convertidas', async () => {
+    vi.mocked(get).mockResolvedValue({
+      futuras: [{ id: 2, estado: 'CONFIRMADA', total: '220000.00' }],
+      pasadas: [{ id: 1, estado: 'CANCELADA', total: '200000.00' }],
+    });
+
+    const mias = await listarMisReservas();
+
+    expect(get).toHaveBeenCalledWith('/api/v1/reservas/mias');
+    expect(mias.futuras).toEqual([expect.objectContaining({ id: 2, estado: 'CONFIRMADA', total: 220000 })]);
+    expect(mias.pasadas).toEqual([expect.objectContaining({ id: 1, estado: 'CANCELADA', total: 200000 })]);
+  });
+});
+
+describe('consultarReserva', () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  it('pide la reserva por su id y devuelve el detalle convertido', async () => {
+    vi.mocked(get).mockResolvedValue({ id: 7, estado: 'CONFIRMADA', total: '470000.00', serviciosAdicionales: [] });
+
+    const detalle = await consultarReserva(7);
+
+    expect(get).toHaveBeenCalledWith('/api/v1/reservas/7');
+    expect(detalle).toEqual(expect.objectContaining({ id: 7, estado: 'CONFIRMADA', total: 470000 }));
+  });
+});
 
 describe('crearReserva', () => {
   beforeEach(() => vi.resetAllMocks());

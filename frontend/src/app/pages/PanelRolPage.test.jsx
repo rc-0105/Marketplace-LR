@@ -64,6 +64,13 @@ describe('PanelRolPage', () => {
     expect(screen.getByRole('link', { name: 'Buscar alojamiento' })).toHaveAttribute('href', '/huesped/busqueda');
   });
 
+  it('al huésped le ofrece ver sus reservas', () => {
+    iniciar('HUESPED');
+    renderizar();
+
+    expect(screen.getByRole('link', { name: 'Ver mis reservas' })).toHaveAttribute('href', '/huesped/reservas');
+  });
+
   it.each(['HUESPED', 'ANFITRION'])('a un %s no le muestra las herramientas del administrador', (rol) => {
     iniciar(rol);
     renderizar();
