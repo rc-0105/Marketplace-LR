@@ -1,28 +1,68 @@
 .pagina {
-  max-width: 72rem;
+  max-width: 76rem;
   margin: 0 auto;
   padding: var(--espacio-12) var(--espacio-4);
 }
 
+.cabecera {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-4);
+}
+
+.icono {
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  flex-shrink: 0;
+  border-radius: 1rem;
+  background: var(--color-superficie);
+  color: var(--color-terracota);
+}
+
+.icono svg {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
 .titulo {
-  margin: 0 0 var(--espacio-2);
-  font-size: var(--texto-encabezado);
+  margin: 0 0 var(--espacio-1);
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  font-weight: 300;
+  letter-spacing: -0.02em;
 }
 
 .nota {
-  display: block;
+  margin: 0;
   color: var(--color-texto-secundario);
 }
 
+.cargando,
+.vacio {
+  display: block;
+  padding: var(--espacio-8) var(--espacio-4);
+  border: 1px dashed var(--color-borde-control);
+  border-radius: 1rem;
+  color: var(--color-texto-secundario);
+  text-align: center;
+}
+
 .error {
+  margin: 0;
   padding: var(--espacio-3) var(--espacio-4);
   border-radius: var(--radio);
   background: var(--color-error-fondo);
   color: var(--color-error);
 }
 
+/* La tabla es una tarjeta con filas alternadas */
 .contenedorTabla {
   overflow-x: auto;
+  border: 1px solid var(--color-borde);
+  border-radius: 1.25rem;
+  background: #fff;
+  box-shadow: 0 2px 6px rgb(43 33 28 / 5%);
 }
 
 .tabla {
@@ -42,7 +82,7 @@
 
 .tabla th,
 .tabla td {
-  padding: var(--espacio-2) var(--espacio-3);
+  padding: var(--espacio-3) var(--espacio-4);
   border-bottom: 1px solid var(--color-borde);
   text-align: left;
   white-space: nowrap;
@@ -50,36 +90,124 @@
 
 .tabla th {
   background: var(--color-superficie);
-  font-weight: 600;
+  color: var(--color-texto-secundario);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
+.tabla tbody tr:nth-child(even) {
+  background: var(--color-fondo);
+}
+
+.tabla tbody tr {
+  transition: background-color var(--transicion);
+}
+
+.tabla tbody tr:hover {
+  background: var(--color-superficie);
+}
+
+.tabla tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.tabla td a {
+  color: var(--color-terracota-oscuro);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.tabla td a:hover {
+  text-decoration: underline;
+}
+
+/* Evento y resultado como etiquetas */
+.accion {
+  padding: 2px var(--espacio-2);
+  border-radius: 0.375rem;
+  background: var(--color-superficie);
+  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.75rem;
+}
+
+.exito,
+.fallo {
+  padding: 2px var(--espacio-3);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.exito {
+  background: var(--color-exito-fondo);
+  color: var(--color-exito);
+}
+
+.fallo {
+  background: var(--color-error-fondo);
+  color: var(--color-error);
+}
+
+/* Paginación */
 .paginacion {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: var(--espacio-4);
-  margin-top: var(--espacio-4);
+  margin-top: var(--espacio-6);
   color: var(--color-texto-secundario);
 }
 
+.numeroPagina {
+  padding: var(--espacio-1) var(--espacio-4);
+  border: 1px solid var(--color-borde);
+  border-radius: 999px;
+  background: var(--color-superficie);
+  color: var(--color-texto);
+  font-size: var(--texto-pequeno);
+  font-weight: 600;
+}
+
 .secundario {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espacio-2);
   min-height: 2.75rem;
   padding: 0 var(--espacio-4);
-  border: 1px solid var(--color-terracota);
-  border-radius: var(--radio);
-  background: transparent;
-  color: var(--color-terracota);
+  border: 1px solid var(--color-borde-control);
+  border-radius: 999px;
+  background: var(--color-fondo);
+  color: var(--color-texto);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color var(--transicion);
+  transition: background-color var(--transicion), border-color var(--transicion), color var(--transicion);
+}
+
+.secundario svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.atras {
+  transform: rotate(180deg);
 }
 
 .secundario:hover:not(:disabled) {
-  background: var(--color-superficie);
+  border-color: var(--color-terracota);
+  background: var(--color-terracota);
+  color: var(--color-sobre-terracota);
+}
+
+.secundario:focus-visible {
+  outline: 2px solid var(--color-terracota);
+  outline-offset: 2px;
 }
 
 .secundario:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }

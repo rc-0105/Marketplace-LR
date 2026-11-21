@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Icono from '../../../shared/components/Icono.jsx';
 import { errorDeMotivo, MOTIVO_MAXIMO } from '../models/resena.js';
 import { listarResenasParaModerar, ocultarResena } from '../services/resenaService.js';
 import estilos from './ModeracionResenasPage.module.css';
@@ -58,12 +59,23 @@ export default function ModeracionResenasPage() {
 
   return (
     <main className={estilos.pagina}>
-      <h1 className={estilos.titulo}>Moderación de reseñas</h1>
-      <p className={estilos.nota}>Oculta las reseñas que incumplen las políticas indicando el motivo.</p>
+      <header className={estilos.cabecera}>
+        <div>
+          <h1 className={estilos.titulo}>Moderación de reseñas</h1>
+          <p className={estilos.nota}>Oculta las reseñas que incumplen las políticas indicando el motivo.</p>
+        </div>
+        {resenas?.length > 0 && <span className={estilos.contador}>{resenas.length} visibles</span>}
+      </header>
       <output className={confirmacion ? estilos.confirmacion : undefined}>{confirmacion}</output>
       {errorCarga && <p role="alert" className={estilos.error}>{errorCarga}</p>}
       {!errorCarga && resenas === null && <p className={estilos.nota}>Cargando reseñas…</p>}
-      {resenas?.length === 0 && <p className={estilos.nota}>No hay reseñas visibles para moderar.</p>}
+      {resenas?.length === 0 && (
+        <div className={estilos.vacio}>
+          <span className={estilos.vacioIcono}><Icono nombre="resenas" /></span>
+          <p className={estilos.vacioTexto}>No hay reseñas visibles para moderar.</p>
+          <p className={estilos.nota}>Las reseñas nuevas de los huéspedes aparecerán aquí.</p>
+        </div>
+      )}
       {resenas?.length > 0 && (
         <ul className={estilos.lista}>
           {resenas.map((resena) => {
@@ -71,19 +83,35 @@ export default function ModeracionResenasPage() {
             const errorMotivo = erroresMotivo[resena.id];
             return (
               <li key={resena.id} className={estilos.tarjeta}>
-                <h2 className={estilos.nombre}>{resena.autor}</h2>
-                <p className={estilos.detalle}>
-                  {resena.calificacion} de 5 · Alojamiento {resena.publicacionId} ·{' '}
-                  {new Date(resena.fecha).toLocaleDateString('es-CO', FORMATO_FECHA)}
-                </p>
-                <p className={estilos.contenido}>{resena.contenido}</p>
+                <div className={estilos.resena}>
+                  <div className={estilos.autor}>
+                    <span className={estilos.avatar} aria-hidden="true">
+                      {resena.autor.trim().charAt(0).toUpperCase()}
+                    </span>
+                    <div className={estilos.datosAutor}>
+                      <h2 className={estilos.nombre}>{resena.autor}</h2>
+                      <p className={estilos.detalle}>
+                        {resena.calificacion} de 5 · Alojamiento {resena.publicacionId} ·{' '}
+                        {new Date(resena.fecha).toLocaleDateString('es-CO', FORMATO_FECHA)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className={estilos.estrellas} aria-hidden="true">
+                    {[1, 2, 3, 4, 5].map((numero) => (
+                      <Icono key={numero} nombre="resenas"
+                        className={numero <= resena.calificacion ? estilos.estrellaLlena : estilos.estrella} />
+                    ))}
+                  </div>
+                  <p className={estilos.contenido}>{resena.contenido}</p>
+                </div>
                 {errores[resena.id] && <p role="alert" className={estilos.error}>{errores[resena.id]}</p>}
                 <form className={estilos.moderacion} onSubmit={(evento) => ocultar(evento, resena)} noValidate>
                   <div className={estilos.campo}>
                     <label className={estilos.etiqueta} htmlFor={idMotivo}>
                       Motivo para ocultar la reseña de {resena.autor}
                     </label>
-                    <textarea id={idMotivo} className={estilos.control} rows={2} maxLength={MOTIVO_MAXIMO}
+                    <textarea id={idMotivo} className={estilos.control} rows={3} maxLength={MOTIVO_MAXIMO}
+                      placeholder="Explica qué política incumple."
                       value={motivos[resena.id] ?? ''}
                       aria-invalid={errorMotivo ? true : undefined}
                       aria-describedby={errorMotivo ? `${idMotivo}-error` : undefined}
@@ -94,6 +122,7 @@ export default function ModeracionResenasPage() {
                   </div>
                   <button type="submit" className={estilos.ocultar} disabled={enCurso === resena.id}
                     aria-label={`Ocultar la reseña de ${resena.autor}`}>
+                    <Icono nombre="ocultar" />
                     {enCurso === resena.id ? 'Ocultando…' : 'Ocultar'}
                   </button>
                 </form>

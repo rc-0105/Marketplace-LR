@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { listarPendientesDeRevision } from '../services/alojamientosService.js';
-import estilos from './ResumenRevision.module.css';
+import Icono from '../../../shared/components/Icono.jsx';
+import estilos from '../../../shared/styles/TarjetaHerramienta.module.css';
 
 const MENSAJE_ERROR = 'No pudimos consultar las publicaciones pendientes.';
 
@@ -37,11 +38,19 @@ export default function ResumenRevision() {
     texto = resumenDe(cantidad);
   }
 
+  const hayPendientes = cantidad > 0;
+
   return (
-    <section className={estilos.tarjeta} aria-labelledby="resumen-revision-titulo">
+    <section className={hayPendientes ? `${estilos.tarjeta} ${estilos.destacada}` : estilos.tarjeta}
+      aria-labelledby="resumen-revision-titulo">
+      <span className={estilos.icono}><Icono nombre="revisar" /></span>
+      {hayPendientes && <span className={estilos.insignia} aria-hidden="true">{cantidad}</span>}
       <h3 id="resumen-revision-titulo" className={estilos.titulo}>Revisión de publicaciones</h3>
-      <p className={cantidad > 0 ? estilos.pendientes : estilos.texto}>{texto}</p>
-      <Link to="/administrador/publicaciones" className={estilos.enlace}>Revisar publicaciones</Link>
+      <p className={hayPendientes ? estilos.pendientes : estilos.nota}>{texto}</p>
+      <Link to="/administrador/publicaciones" className={estilos.enlace}>
+        Revisar publicaciones
+        <Icono nombre="flecha" />
+      </Link>
     </section>
   );
 }

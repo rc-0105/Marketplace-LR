@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import Icono from '../../../shared/components/Icono.jsx';
 import FiltrosAuditoria from '../components/FiltrosAuditoria.jsx';
 import { formatearFechaBogota } from '../models/eventoAuditoria.js';
 import { listar } from '../services/auditoriaService.js';
@@ -65,13 +66,18 @@ export default function AuditoriaPage() {
 
   return (
     <main className={estilos.pagina}>
-      <h1 className={estilos.titulo}>Auditoría</h1>
-      <p className={estilos.nota}>Eventos críticos registrados en la plataforma, del más reciente al más antiguo.</p>
+      <header className={estilos.cabecera}>
+        <span className={estilos.icono}><Icono nombre="auditoria" /></span>
+        <div>
+          <h1 className={estilos.titulo}>Auditoría</h1>
+          <p className={estilos.nota}>Eventos críticos registrados en la plataforma, del más reciente al más antiguo.</p>
+        </div>
+      </header>
       <FiltrosAuditoria key={JSON.stringify(filtros)} valores={filtros} alAplicar={aplicar} />
       {error && <p role="alert" className={estilos.error}>{error}</p>}
-      {!error && resultado === null && <output className={estilos.nota}>Cargando eventos…</output>}
+      {!error && resultado === null && <output className={estilos.cargando}>Cargando eventos…</output>}
       {!error && resultado !== null && eventos.length === 0 && (
-        <output className={estilos.nota}>Sin resultados: no hay eventos de auditoría con esos criterios.</output>
+        <output className={estilos.vacio}>Sin resultados: no hay eventos de auditoría con esos criterios.</output>
       )}
       {!error && eventos.length > 0 && (
         <div className={estilos.contenedorTabla}>
@@ -97,10 +103,14 @@ export default function AuditoriaPage() {
                     </Link>
                   </td>
                   <td>{evento.usuario ?? 'Sin usuario'}</td>
-                  <td>{evento.accion}</td>
+                  <td><span className={estilos.accion}>{evento.accion}</span></td>
                   <td>{evento.entidad}</td>
                   <td>{evento.entidadId ?? 'Sin id'}</td>
-                  <td>{NOMBRE_RESULTADO[evento.resultado] ?? evento.resultado}</td>
+                  <td>
+                    <span className={evento.resultado === 'EXITO' ? estilos.exito : estilos.fallo}>
+                      {NOMBRE_RESULTADO[evento.resultado] ?? evento.resultado}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -110,12 +120,14 @@ export default function AuditoriaPage() {
       <nav className={estilos.paginacion} aria-label="Paginación">
         <button type="button" className={estilos.secundario} disabled={pagina <= 0 || !!error}
           onClick={() => irAPagina(pagina - 1)}>
+          <Icono nombre="flecha" className={estilos.atras} />
           Anterior
         </button>
-        <span>{totalPaginas > 0 ? `Página ${pagina + 1} de ${totalPaginas}` : 'Sin páginas'}</span>
+        <span className={estilos.numeroPagina}>{totalPaginas > 0 ? `Página ${pagina + 1} de ${totalPaginas}` : 'Sin páginas'}</span>
         <button type="button" className={estilos.secundario} disabled={pagina + 1 >= totalPaginas || !!error}
           onClick={() => irAPagina(pagina + 1)}>
           Siguiente
+          <Icono nombre="flecha" />
         </button>
       </nav>
     </main>
