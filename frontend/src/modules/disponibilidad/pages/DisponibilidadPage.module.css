@@ -1,5 +1,5 @@
 .pagina {
-  max-width: 48rem;
+  max-width: 72rem;
   margin: 0 auto;
   padding: var(--espacio-12) var(--espacio-4);
 }
@@ -19,8 +19,39 @@
   font-size: var(--texto-titulo);
 }
 
+.contenido {
+  display: grid;
+  gap: var(--espacio-2);
+}
+
+.gestion {
+  display: grid;
+  min-width: 0;
+}
+
+.calendario {
+  min-width: 0;
+}
+
+@media (min-width: 64rem) {
+  .contenido {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 4fr);
+    gap: var(--espacio-6);
+    align-items: start;
+  }
+
+  .calendario {
+    position: sticky;
+    top: var(--espacio-6);
+  }
+}
+
 .seccion {
   margin-top: var(--espacio-8);
+  padding: var(--espacio-6);
+  border: 1px solid var(--color-borde);
+  border-radius: calc(var(--radio) * 2);
+  background: var(--color-superficie);
 }
 
 .nota {
@@ -37,6 +68,7 @@
 
 .lista {
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
   gap: var(--espacio-4);
   margin: 0;
   padding: 0;
@@ -46,12 +78,14 @@
 .tarjeta {
   padding: var(--espacio-4);
   border: 1px solid var(--color-borde);
+  border-left: 4px solid var(--color-exito);
   border-radius: var(--radio);
-  background: var(--color-superficie);
+  background: var(--color-fondo);
 }
 
 .rango {
   margin: 0;
+  font-size: var(--texto-base);
   font-weight: 600;
 }
 
@@ -112,4 +146,62 @@
 .peligro:disabled {
   opacity: 0.6;
   cursor: wait;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espacio-2);
+  margin: var(--espacio-1) 0 0;
+  color: var(--color-texto-secundario);
+  font-size: var(--texto-pequeno);
+}
+
+.chip {
+  padding: 2px var(--espacio-3);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.chipPROXIMO {
+  background: var(--color-exito-fondo);
+  color: var(--color-exito);
+}
+
+.chipEN_CURSO {
+  background: var(--color-reservado-fondo);
+  color: var(--color-reservado);
+}
+
+.chipPASADO {
+  background: var(--color-bloqueado-fondo);
+  color: var(--color-texto-secundario);
+}
+
+.PASADO {
+  border-left-color: var(--color-borde-control);
+  opacity: 0.75;
+}
+
+.EN_CURSO {
+  border-left-color: var(--color-reservado);
+}
+
+.eliminar {
+  min-height: 2.75rem;
+  padding: 0 var(--espacio-4);
+  border: none;
+  border-radius: var(--radio);
+  background: transparent;
+  color: var(--color-error);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transicion);
+}
+
+.eliminar:hover:not(:disabled) {
+  background: var(--color-error-fondo);
 }
