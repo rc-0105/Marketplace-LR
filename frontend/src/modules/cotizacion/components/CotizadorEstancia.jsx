@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import Campo from '../../../shared/components/Campo.jsx';
+import PagoReserva from '../../reservas/components/PagoReserva.jsx';
 import { crearReserva } from '../../reservas/services/reservaService.js';
 import { cotizarEstancia } from '../services/cotizacionService.js';
 import estilos from './CotizadorEstancia.module.css';
@@ -31,6 +32,8 @@ export default function CotizadorEstancia({
   const [reservando, setReservando] = useState(false);
   const [mensajeReserva, setMensajeReserva] = useState(null);
   const [errorReserva, setErrorReserva] = useState(null);
+  // La reserva PENDIENTE recién creada, que es la que se paga (SOF-34).
+  const [reserva, setReserva] = useState(null);
   // Cada edición o cálculo invalida las respuestas en vuelo: una cotización tardía no debe reaparecer.
   const solicitud = useRef(0);
 
@@ -40,6 +43,7 @@ export default function CotizadorEstancia({
     setCalculando(false);
     setMensajeReserva(null);
     setErrorReserva(null);
+    setReserva(null);
   }
 
   function cambiarFecha(evento) {
@@ -74,7 +78,7 @@ export default function CotizadorEstancia({
     setReservando(true);
     try {
       const { llegada, salida, servicios } = cotizada;
-      await crearReserva({ publicacionId, llegada, salida, serviciosAdicionalesIds: servicios });
+      setReserva(await crearReserva({ publicacionId, llegada, salida, serviciosAdicionalesIds: servicios }));
       setMensajeReserva(MENSAJE_RESERVA_CREADA);
     } catch (error) {
       setErrorReserva(error.estado >= 400 && error.estado < 500 ? error.message : MENSAJE_ERROR_RESERVA);
@@ -141,11 +145,14 @@ export default function CotizadorEstancia({
             <div><dt>Descuentos</dt><dd>{FORMATO_PESOS.format(cotizada.cotizacion.descuento)}</dd></div>
             <div className={estilos.total}><dt>Total</dt><dd>{FORMATO_PESOS.format(cotizada.cotizacion.total)}</dd></div>
           </dl>
-          <button type="button" className={estilos.reservar} onClick={confirmarReserva} disabled={reservando}>
-            {reservando ? 'Confirmando…' : 'Confirmar reserva'}
-          </button>
+          {!reserva && (
+            <button type="button" className={estilos.reservar} onClick={confirmarReserva} disabled={reservando}>
+              {reservando ? 'Confirmando…' : 'Confirmar reserva'}
+            </button>
+          )}
           {mensajeReserva && <output className={estilos.exito}>{mensajeReserva}</output>}
           {errorReserva && <p role="alert" className={estilos.error}>{errorReserva}</p>}
+          {reserva && <PagoReserva reservaId={reserva.id} total={reserva.total} />}
         </>
       )}
     </section>

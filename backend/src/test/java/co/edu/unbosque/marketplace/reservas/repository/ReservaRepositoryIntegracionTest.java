@@ -8,6 +8,7 @@ import co.edu.unbosque.marketplace.alojamientos.repository.PublicacionRepository
 import co.edu.unbosque.marketplace.identidad.model.Rol;
 import co.edu.unbosque.marketplace.identidad.model.Usuario;
 import co.edu.unbosque.marketplace.identidad.repository.UsuarioRepository;
+import co.edu.unbosque.marketplace.reservas.model.EstadoPago;
 import co.edu.unbosque.marketplace.reservas.model.EstadoReserva;
 import co.edu.unbosque.marketplace.reservas.model.Reserva;
 import java.math.BigDecimal;
@@ -204,6 +205,145 @@ class ReservaRepositoryIntegracionTest {
                 .isEqualTo(Set.of());
         assertThat(reservas.findById(con.getId())).get().extracting(Reserva::getServiciosAdicionalesIds)
                 .isEqualTo(Set.of(7L, 11L));
+    }
+
+    @Test
+    @DisplayName("Una reserva nueva se guarda sin pago y sin identificador de transacción (SOF-34)")
+    void unaReservaNuevaNaceSinPago() {
+        Reserva guardada = guardar(publicacionId, "2026-12-10", "2026-12-14", EstadoReserva.PENDIENTE);
+        entidades.clear();
+
+        Reserva leida = reservas.findById(guardada.getId()).orElseThrow();
+        assertThat(leida.getEstadoPago()).isEqualTo(EstadoPago.SIN_PAGO);
+        assertThat(leida.getTransaccionId()).isNull();
+    }
+
+    @Test
+    @DisplayName("confirmarPago confirma una PENDIENTE y guarda la transacción; sobre otra ya no toca nada")
+    @Transactional
+    void confirmarPagoSoloConfirmaUnaPendiente() {
+        Reserva pendiente = guardar(publicacionId, "2026-12-10", "2026-12-12", EstadoReserva.PENDIENTE);
+        Reserva vencida = guardar(publicacionId, "2026-12-12", "2026-12-14", EstadoReserva.VENCIDA);
+
+        assertThat(reservas.confirmarPago(pendiente.getId(), "pi_123")).isEqualTo(1);
+        assertThat(reservas.confirmarPago(pendiente.getId(), "pi_otro")).isZero();
+        assertThat(reservas.confirmarPago(vencida.getId(), "pi_456")).isZero();
+
+        entidades.clear();
+        Reserva confirmada = reservas.findById(pendiente.getId()).orElseThrow();
+        assertThat(confirmada.getEstado()).isEqualTo(EstadoReserva.CONFIRMADA);
+        assertThat(confirmada.getEstadoPago()).isEqualTo(EstadoPago.APROBADO);
+        assertThat(confirmada.getTransaccionId()).isEqualTo("pi_123");
+        Reserva sinTocar = reservas.findById(vencida.getId()).orElseThrow();
+        assertThat(sinTocar.getEstado()).isEqualTo(EstadoReserva.VENCIDA);
+        assertThat(sinTocar.getEstadoPago()).isEqualTo(EstadoPago.SIN_PAGO);
+        assertThat(sinTocar.getTransaccionId()).isNull();
+    }
+
+    @Test
+    @DisplayName("rechazarPago cancela la PENDIENTE y libera las noches para otra reserva")
+    @Transactional
+    void rechazarPagoCancelaYLiberaLasNoches() {
+        Reserva pendiente = guardar(publicacionId, "2026-12-10", "2026-12-14", EstadoReserva.PENDIENTE);
+
+        assertThat(reservas.rechazarPago(pendiente.getId())).isEqualTo(1);
+        assertThat(reservas.rechazarPago(pendiente.getId())).isZero();
+
+        entidades.clear();
+        Reserva rechazada = reservas.findById(pendiente.getId()).orElseThrow();
+        assertThat(rechazada.getEstado()).isEqualTo(EstadoReserva.CANCELADA);
+        assertThat(rechazada.getEstadoPago()).isEqualTo(EstadoPago.RECHAZADO);
+        assertThat(guardar(publicacionId, "2026-12-10", "2026-12-14", EstadoReserva.PENDIENTE).getId()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("registrarErrorPago deja la reserva PENDIENTE con el pago en ERROR, sin tocar un pago ya resuelto")
+    @Transactional
+    void registrarErrorPagoMantieneLaPendiente() {
+        Reserva pendiente = guardar(publicacionId, "2026-12-10", "2026-12-12", EstadoReserva.PENDIENTE);
+        Reserva rechazada = guardar(publicacionId, "2026-12-12", "2026-12-14", EstadoReserva.PENDIENTE);
+        reservas.rechazarPago(rechazada.getId());
+
+        assertThat(reservas.registrarErrorPago(pendiente.getId())).isEqualTo(1);
+        assertThat(reservas.registrarErrorPago(rechazada.getId())).isZero();
+
+        entidades.clear();
+        Reserva conError = reservas.findById(pendiente.getId()).orElseThrow();
+        assertThat(conError.getEstado()).isEqualTo(EstadoReserva.PENDIENTE);
+        assertThat(conError.getEstadoPago()).isEqualTo(EstadoPago.ERROR);
+        assertThat(reservas.findById(rechazada.getId())).get().extracting(Reserva::getEstadoPago)
+                .isEqualTo(EstadoPago.RECHAZADO);
+    }
+
+    @Test
+    @DisplayName("Conciliación: lista solo las reservas con el pago en ERROR, en orden")
+    @Transactional
+    void listaLasReservasConElPagoEnError() {
+        Reserva primera = guardar(publicacionId, "2026-12-10", "2026-12-12", EstadoReserva.PENDIENTE);
+        Reserva sinError = guardar(publicacionId, "2026-12-12", "2026-12-14", EstadoReserva.PENDIENTE);
+        Reserva segunda = guardar(publicacionId, "2026-12-14", "2026-12-16", EstadoReserva.PENDIENTE);
+        reservas.registrarErrorPago(primera.getId());
+        reservas.registrarErrorPago(segunda.getId());
+        entidades.clear();
+
+        assertThat(reservas.findByEstadoPagoOrderById(EstadoPago.ERROR)).extracting(Reserva::getId)
+                .containsExactly(primera.getId(), segunda.getId())
+                .doesNotContain(sinError.getId());
+    }
+
+    @Test
+    @DisplayName("Conciliación: marcarReembolsado guarda la transacción de una reserva no confirmada con el pago en ERROR")
+    @Transactional
+    void marcarReembolsadoGuardaLaTransaccion() {
+        Reserva vencida = guardar(publicacionId, "2026-12-10", "2026-12-12", EstadoReserva.VENCIDA);
+        Reserva sinError = guardar(publicacionId, "2026-12-12", "2026-12-14", EstadoReserva.VENCIDA);
+        assertThat(reservas.registrarErrorPago(vencida.getId())).isEqualTo(1);
+
+        assertThat(reservas.marcarReembolsado(vencida.getId(), "pi_9")).isEqualTo(1);
+        assertThat(reservas.marcarReembolsado(sinError.getId(), "pi_10")).isZero();
+
+        entidades.clear();
+        Reserva reembolsada = reservas.findById(vencida.getId()).orElseThrow();
+        assertThat(reembolsada.getEstado()).isEqualTo(EstadoReserva.VENCIDA);
+        assertThat(reembolsada.getEstadoPago()).isEqualTo(EstadoPago.REEMBOLSADO);
+        assertThat(reembolsada.getTransaccionId()).isEqualTo("pi_9");
+        assertThat(reservas.findById(sinError.getId())).get().extracting(Reserva::getEstadoPago)
+                .isEqualTo(EstadoPago.SIN_PAGO);
+    }
+
+    @Test
+    @DisplayName("Conciliación: marcarNoCobrado cierra un pago en ERROR sin transacción y no toca una confirmada")
+    @Transactional
+    void marcarNoCobradoCierraElError() {
+        Reserva pendiente = guardar(publicacionId, "2026-12-10", "2026-12-12", EstadoReserva.PENDIENTE);
+        Reserva confirmada = guardar(publicacionId, "2026-12-12", "2026-12-14", EstadoReserva.PENDIENTE);
+        reservas.registrarErrorPago(pendiente.getId());
+        reservas.confirmarPago(confirmada.getId(), "pi_1");
+
+        assertThat(reservas.marcarNoCobrado(pendiente.getId())).isEqualTo(1);
+        assertThat(reservas.marcarNoCobrado(confirmada.getId())).isZero();
+
+        entidades.clear();
+        assertThat(reservas.findById(pendiente.getId())).get().extracting(Reserva::getEstadoPago)
+                .isEqualTo(EstadoPago.NO_COBRADO);
+        assertThat(reservas.findById(confirmada.getId())).get().extracting(Reserva::getEstadoPago)
+                .isEqualTo(EstadoPago.APROBADO);
+    }
+
+    @Test
+    @DisplayName("registrarErrorPago marca ERROR aunque el apartado haya vencido mientras se esperaba a la pasarela")
+    @Transactional
+    void registrarErrorPagoAlcanzaAUnaReservaYaVencida() {
+        Reserva vencida = guardar(publicacionId, "2026-12-10", "2026-12-12", EstadoReserva.VENCIDA);
+        Reserva confirmada = guardar(publicacionId, "2026-12-12", "2026-12-14", EstadoReserva.PENDIENTE);
+        reservas.confirmarPago(confirmada.getId(), "pi_1");
+
+        assertThat(reservas.registrarErrorPago(vencida.getId())).isEqualTo(1);
+        assertThat(reservas.registrarErrorPago(confirmada.getId())).isZero();
+
+        entidades.clear();
+        assertThat(reservas.findById(vencida.getId())).get().extracting(Reserva::getEstadoPago)
+                .isEqualTo(EstadoPago.ERROR);
     }
 
     private List<Reserva> ocupantesDe(Long id) {

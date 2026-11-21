@@ -143,7 +143,7 @@ describe('CotizadorEstancia', () => {
 
   it('confirma la reserva con la publicación, las fechas y los adicionales ya cotizados', async () => {
     vi.mocked(cotizarEstancia).mockResolvedValueOnce(SIN_SERVICIOS).mockResolvedValueOnce(CON_DESAYUNO);
-    vi.mocked(crearReserva).mockResolvedValue({ id: 1, estado: 'PENDIENTE' });
+    vi.mocked(crearReserva).mockResolvedValue({ id: 1, estado: 'PENDIENTE', total: 470000 });
     abrir();
     cotizar();
     await desglose();
@@ -157,6 +157,20 @@ describe('CotizadorEstancia', () => {
       publicacionId: 5, llegada: '2026-12-10', salida: '2026-12-14', serviciosAdicionalesIds: [1],
     }));
     expect(await screen.findByRole('status')).toHaveTextContent('Reserva creada, queda pendiente de pago.');
+  });
+
+  it('con la reserva creada ofrece pagarla por su total en lugar de volver a confirmarla', async () => {
+    vi.mocked(cotizarEstancia).mockResolvedValue(SIN_SERVICIOS);
+    vi.mocked(crearReserva).mockResolvedValue({ id: 1, estado: 'PENDIENTE', total: 470000 });
+    abrir();
+    cotizar();
+    await desglose();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar reserva' }));
+
+    const pago = await screen.findByRole('region', { name: 'Pago de la reserva' });
+    expect(within(pago).getByRole('button', { name: /Pagar/ })).toHaveTextContent(/470\.000/);
+    expect(screen.queryByRole('button', { name: 'Confirmar reserva' })).not.toBeInTheDocument();
   });
 
   it('si otro huésped ya reservó esas fechas, muestra el mensaje de conflicto de la API', async () => {
@@ -215,7 +229,7 @@ describe('CotizadorEstancia', () => {
 
   it('al editar una fecha limpia el resultado de la reserva anterior', async () => {
     vi.mocked(cotizarEstancia).mockResolvedValue(SIN_SERVICIOS);
-    vi.mocked(crearReserva).mockResolvedValue({ id: 1, estado: 'PENDIENTE' });
+    vi.mocked(crearReserva).mockResolvedValue({ id: 1, estado: 'PENDIENTE', total: 470000 });
     abrir();
     cotizar();
     await desglose();
@@ -231,7 +245,7 @@ describe('CotizadorEstancia', () => {
     let resolverRecalculo;
     vi.mocked(cotizarEstancia).mockResolvedValueOnce(SIN_SERVICIOS)
       .mockReturnValueOnce(new Promise((resolver) => { resolverRecalculo = resolver; }));
-    vi.mocked(crearReserva).mockResolvedValue({ id: 1, estado: 'PENDIENTE' });
+    vi.mocked(crearReserva).mockResolvedValue({ id: 1, estado: 'PENDIENTE', total: 470000 });
     abrir();
     cotizar();
     await desglose();

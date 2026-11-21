@@ -6,13 +6,13 @@ describe('reservaDesdeApi', () => {
     const reserva = reservaDesdeApi({
       id: 12, publicacionId: 5, llegada: '2026-12-10', salida: '2026-12-14', estado: 'PENDIENTE', noches: 4,
       precioBase: '400000.00', tarifaLimpieza: '30000.00', tarifaServicio: '40000.00', descuento: '0.00',
-      totalServiciosAdicionales: '15000.00', total: '485000.00',
+      totalServiciosAdicionales: '15000.00', total: '485000.00', estadoPago: 'SIN_PAGO', transaccionId: null,
     });
 
     expect(reserva).toEqual({
       id: 12, publicacionId: 5, llegada: '2026-12-10', salida: '2026-12-14', estado: 'PENDIENTE', noches: 4,
       precioBase: 400000, tarifaLimpieza: 30000, tarifaServicio: 40000, descuento: 0,
-      totalServiciosAdicionales: 15000, total: 485000,
+      totalServiciosAdicionales: 15000, total: 485000, estadoPago: 'SIN_PAGO', transaccionId: null,
     });
   });
 
@@ -25,5 +25,12 @@ describe('reservaDesdeApi', () => {
 
     expect(reserva.id).toBe(1);
     expect(reserva.estado).toBe('PENDIENTE');
+  });
+
+  it('conserva el estado del pago y la transacción de una reserva pagada', () => {
+    const reserva = reservaDesdeApi({ id: 1, estado: 'CONFIRMADA', estadoPago: 'APROBADO', transaccionId: 'pi_123' });
+
+    expect(reserva.estadoPago).toBe('APROBADO');
+    expect(reserva.transaccionId).toBe('pi_123');
   });
 });

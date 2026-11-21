@@ -1,5 +1,6 @@
 package co.edu.unbosque.marketplace.reservas.repository;
 
+import co.edu.unbosque.marketplace.reservas.model.EstadoPago;
 import co.edu.unbosque.marketplace.reservas.model.Reserva;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -60,4 +61,48 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
             + " where r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE"
             + " and r.venceEn <= :ahora")
     int vencerCaducados(@Param("ahora") Instant ahora);
+
+    // Pago aprobado (SOF-34): confirma solo si sigue PENDIENTE. Devuelve 0 si el apartado ya venció o si otro
+    // intento la resolvió primero; quien llama decide qué hacer con el cobro que quedó sin reserva.
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Reserva r set r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.CONFIRMADA,"
+            + " r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.APROBADO,"
+            + " r.transaccionId = :transaccionId where r.id = :id"
+            + " and r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE")
+    int confirmarPago(@Param("id") Long id, @Param("transaccionId") String transaccionId);
+
+    // Pago rechazado: la PENDIENTE pasa a CANCELADA, lo que libera sus noches en la restricción de exclusión.
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Reserva r set r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.CANCELADA,"
+            + " r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.RECHAZADO where r.id = :id"
+            + " and r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE")
+    int rechazarPago(@Param("id") Long id);
+
+    // La pasarela no respondió, falló, o un reembolso no se completó: el resultado del cobro no se conoce y la
+    // conciliación debe resolverlo. Se marca aunque la reserva ya no esté PENDIENTE (el apartado pudo vencer
+    // mientras se esperaba a la pasarela); solo se respeta un pago ya resuelto.
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Reserva r set r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.ERROR"
+            + " where r.id = :id"
+            + " and r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.SIN_PAGO")
+    int registrarErrorPago(@Param("id") Long id);
+
+    // Conciliación (SOF-34): los pagos que quedaron en ERROR, en el orden en que se crearon las reservas.
+    List<Reserva> findByEstadoPagoOrderById(EstadoPago estadoPago);
+
+    // La pasarela cobró una reserva que ya no estaba PENDIENTE y el cobro se devolvió.
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Reserva r set r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.REEMBOLSADO,"
+            + " r.transaccionId = :transaccionId where r.id = :id"
+            + " and r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.ERROR"
+            + " and r.estado <> co.edu.unbosque.marketplace.reservas.model.EstadoReserva.CONFIRMADA")
+    int marcarReembolsado(@Param("id") Long id, @Param("transaccionId") String transaccionId);
+
+    // La pasarela nunca cobró ese pago en ERROR.
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Reserva r set r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.NO_COBRADO"
+            + " where r.id = :id"
+            + " and r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.ERROR"
+            + " and r.estado <> co.edu.unbosque.marketplace.reservas.model.EstadoReserva.CONFIRMADA")
+    int marcarNoCobrado(@Param("id") Long id);
 }

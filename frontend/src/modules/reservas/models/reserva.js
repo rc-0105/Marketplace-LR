@@ -1,11 +1,13 @@
 /**
- * Reserva confirmada sobre una cotización vigente (SOF-33).
+ * Reserva sobre una cotización vigente (SOF-33) con el estado de su pago (SOF-34).
  * @typedef {Object} Reserva
  * @property {number} id
  * @property {number} publicacionId
  * @property {string} llegada fecha en formato AAAA-MM-DD
  * @property {string} salida fecha en formato AAAA-MM-DD
- * @property {'PENDIENTE'|'CONFIRMADA'|'CANCELADA'} estado
+ * @property {'PENDIENTE'|'CONFIRMADA'|'CANCELADA'|'VENCIDA'} estado
+ * @property {'SIN_PAGO'|'APROBADO'|'RECHAZADO'|'ERROR'|'REEMBOLSADO'|'NO_COBRADO'} estadoPago
+ * @property {string|null} transaccionId identificador de la transacción en la pasarela, si se aprobó o se reembolsó
  * @property {number} noches
  * @property {number} precioBase
  * @property {number} tarifaLimpieza
@@ -16,7 +18,7 @@
  */
 
 /**
- * Convierte la respuesta de POST /api/v1/reservas; los importes llegan como número o texto.
+ * Convierte la respuesta de POST /api/v1/reservas y de su pago; los importes llegan como número o texto.
  * @param {Record<string, any>} dato
  * @returns {Reserva}
  */
@@ -34,5 +36,7 @@ export function reservaDesdeApi(dato) {
     descuento: Number(dato.descuento),
     totalServiciosAdicionales: Number(dato.totalServiciosAdicionales),
     total: Number(dato.total),
+    estadoPago: dato.estadoPago,
+    transaccionId: dato.transaccionId ?? null,
   };
 }

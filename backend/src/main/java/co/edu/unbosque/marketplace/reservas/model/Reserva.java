@@ -82,6 +82,15 @@ public class Reserva {
     @Column(name = "creado_en", nullable = false, insertable = false, updatable = false)
     private Instant creadoEn;
 
+    // El pago lo cambian solo las actualizaciones condicionales de ReservaRepository (SOF-34): así dos
+    // intentos simultáneos, o el vencimiento del apartado, no pisan el resultado del otro.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "estado_pago", nullable = false, length = 20)
+    private EstadoPago estadoPago;
+
+    @Column(name = "transaccion_id")
+    private String transaccionId;
+
     protected Reserva() {
         // Requerido por JPA.
     }
@@ -104,6 +113,7 @@ public class Reserva {
         this.total = total;
         this.serviciosAdicionalesIds = Set.copyOf(serviciosAdicionalesIds);
         this.venceEn = venceEn;
+        this.estadoPago = EstadoPago.SIN_PAGO;
     }
 
     /**
@@ -125,6 +135,16 @@ public class Reserva {
     public boolean ocupaNoches(Instant ahora) {
         return estado == EstadoReserva.CONFIRMADA
                 || (estado == EstadoReserva.PENDIENTE && venceEn.isAfter(ahora));
+    }
+
+    /**
+     * Referencia única del pago en la pasarela (SOF-34): clave de idempotencia de todos sus cobros y dato con
+     * que la conciliación los busca. Lleva el instante de creación además del id, porque los ids se repiten
+     * entre bases de datos (otro entorno con la misma clave de prueba, o la misma base tras reiniciarla) y un
+     * cobro de esas reservas no debe confundirse con el de esta. Requiere la reserva leída de la base.
+     */
+    public String referenciaPago() {
+        return "reserva-" + id + "-" + creadoEn.toEpochMilli();
     }
 
     /** El apartado se agotó sin confirmarse: pasa a VENCIDA y libera las noches. */
@@ -194,5 +214,13 @@ public class Reserva {
 
     public Instant getCreadoEn() {
         return creadoEn;
+    }
+
+    public EstadoPago getEstadoPago() {
+        return estadoPago;
+    }
+
+    public String getTransaccionId() {
+        return transaccionId;
     }
 }

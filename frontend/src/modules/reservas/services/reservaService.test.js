@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { post } from '../../../shared/services/http.js';
-import { crearReserva } from './reservaService.js';
+import { crearReserva, pagarReserva } from './reservaService.js';
 
 vi.mock('../../../shared/services/http.js', () => ({ post: vi.fn() }));
 
@@ -34,5 +34,22 @@ describe('crearReserva', () => {
     const reserva = await crearReserva({ publicacionId: 5, llegada: '2026-12-10', salida: '2026-12-14' });
 
     expect(reserva).toEqual(expect.objectContaining({ id: 1, estado: 'PENDIENTE', total: 470000 }));
+  });
+});
+
+describe('pagarReserva', () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  it('envía el método de pago de prueba a la ruta de pago de la reserva y devuelve la reserva convertida', async () => {
+    vi.mocked(post).mockResolvedValue({
+      id: 7, estado: 'CONFIRMADA', total: '470000.00', estadoPago: 'APROBADO', transaccionId: 'pi_123',
+    });
+
+    const reserva = await pagarReserva(7, 'pm_card_visa');
+
+    expect(post).toHaveBeenCalledWith('/api/v1/reservas/7/pago', { metodoPago: 'pm_card_visa' });
+    expect(reserva).toEqual(expect.objectContaining({
+      id: 7, estado: 'CONFIRMADA', estadoPago: 'APROBADO', transaccionId: 'pi_123',
+    }));
   });
 });
