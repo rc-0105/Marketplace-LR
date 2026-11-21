@@ -39,9 +39,10 @@ async function leerJson(respuesta) {
 
 async function solicitar(ruta, opciones) {
   const sesion = obtenerSesion();
-  const headers = { Accept: 'application/json' };
+  const { cabeceras = {}, ...peticion } = opciones;
+  const headers = { ...cabeceras, Accept: 'application/json' };
   // Con un archivo el navegador fija el Content-Type con su separador (boundary): no se debe pisar.
-  if (!(opciones.body instanceof FormData)) {
+  if (!(peticion.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
   if (sesion) {
@@ -50,7 +51,7 @@ async function solicitar(ruta, opciones) {
 
   let respuesta;
   try {
-    respuesta = await fetch(ruta, { ...opciones, headers });
+    respuesta = await fetch(ruta, { ...peticion, headers });
   } catch {
     throw new ErrorApi(0, MENSAJE_SIN_CONEXION);
   }
@@ -73,8 +74,9 @@ export function get(ruta) {
   return solicitar(ruta, { method: 'GET' });
 }
 
-export function post(ruta, cuerpo) {
-  return solicitar(ruta, { method: 'POST', body: JSON.stringify(cuerpo) });
+/** `cabeceras` agrega cabeceras propias de la operación, como `Idempotency-Key`. */
+export function post(ruta, cuerpo, cabeceras = {}) {
+  return solicitar(ruta, { method: 'POST', body: JSON.stringify(cuerpo), cabeceras });
 }
 
 /** Envía un archivo como multipart: `datos` es un FormData con el archivo ya adjunto. */

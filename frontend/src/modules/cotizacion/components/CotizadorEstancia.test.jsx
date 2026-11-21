@@ -155,8 +155,46 @@ describe('CotizadorEstancia', () => {
 
     await waitFor(() => expect(crearReserva).toHaveBeenCalledWith({
       publicacionId: 5, llegada: '2026-12-10', salida: '2026-12-14', serviciosAdicionalesIds: [1],
-    }));
+    }, expect.any(String)));
     expect(await screen.findByRole('status')).toHaveTextContent('Reserva creada, queda pendiente de pago.');
+  });
+
+  it('al reintentar la confirmación tras un error reusa la misma clave de idempotencia (SOF-77)', async () => {
+    vi.mocked(cotizarEstancia).mockResolvedValue(SIN_SERVICIOS);
+    vi.mocked(crearReserva).mockRejectedValueOnce(new ErrorApi(0, 'Sin conexión'))
+      .mockResolvedValueOnce({ id: 1, estado: 'PENDIENTE', total: 470000 });
+    abrir();
+    cotizar();
+    await desglose();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar reserva' }));
+    await screen.findByRole('alert');
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar reserva' }));
+
+    await waitFor(() => expect(crearReserva).toHaveBeenCalledTimes(2));
+    const [[, primera], [, segunda]] = vi.mocked(crearReserva).mock.calls;
+    expect(primera).toEqual(expect.any(String));
+    expect(segunda).toBe(primera);
+  });
+
+  it('una nueva cotización confirma con otra clave de idempotencia (SOF-77)', async () => {
+    vi.mocked(cotizarEstancia).mockResolvedValueOnce(SIN_SERVICIOS).mockResolvedValueOnce(CON_DESAYUNO);
+    vi.mocked(crearReserva).mockRejectedValue(new ErrorApi(500, 'Error'));
+    abrir();
+    cotizar();
+    await desglose();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar reserva' }));
+    await screen.findByRole('alert');
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /Desayuno/ }));
+    await waitFor(() => expect(within(screen.getByLabelText('Desglose de la cotización')).getByText('Desayuno'))
+      .toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar reserva' }));
+
+    await waitFor(() => expect(crearReserva).toHaveBeenCalledTimes(2));
+    const [[, primera], [, segunda]] = vi.mocked(crearReserva).mock.calls;
+    expect(segunda).toEqual(expect.any(String));
+    expect(segunda).not.toBe(primera);
   });
 
   it('con la reserva creada ofrece pagarla por su total en lugar de volver a confirmarla', async () => {
@@ -259,7 +297,7 @@ describe('CotizadorEstancia', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar reserva' }));
     await waitFor(() => expect(crearReserva).toHaveBeenCalledWith({
       publicacionId: 5, llegada: '2026-12-10', salida: '2026-12-14', serviciosAdicionalesIds: [1],
-    }));
+    }, expect.any(String)));
   });
 
   it('una respuesta tardía de una cotización anterior no reaparece si ya se editaron las fechas', async () => {

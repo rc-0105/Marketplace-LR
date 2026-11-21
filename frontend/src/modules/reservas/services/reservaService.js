@@ -7,12 +7,18 @@ const RUTA = '/api/v1/reservas';
  * Confirma la reserva sobre la cotización vigente de la estancia (SOF-33). Si otro huésped ya
  * reservó esas fechas la API responde 409, y si la cotización ya no es vigente (la publicación
  * cambió o un servicio adicional ya no existe), 400. El ErrorApi se propaga.
+ *
+ * La clave de idempotencia (SOF-77) identifica el intento: reintentar con la misma clave devuelve la
+ * misma reserva en lugar de crear otra. Quien reintenta debe pasar la clave del primer intento.
  * @param {{publicacionId: number, llegada: string, salida: string, serviciosAdicionalesIds?: number[]}} datos
  *   fechas en formato AAAA-MM-DD; serviciosAdicionalesIds son los ids que el huésped agregó
+ * @param {string} [claveIdempotencia] UUID del intento; si falta se genera uno nuevo
  * @returns {Promise<import('../models/reserva.js').Reserva>}
  */
-export async function crearReserva({ publicacionId, llegada, salida, serviciosAdicionalesIds = [] }) {
-  return reservaDesdeApi(await post(RUTA, { publicacionId, llegada, salida, serviciosAdicionalesIds }));
+export async function crearReserva({ publicacionId, llegada, salida, serviciosAdicionalesIds = [] },
+  claveIdempotencia = crypto.randomUUID()) {
+  return reservaDesdeApi(await post(RUTA, { publicacionId, llegada, salida, serviciosAdicionalesIds },
+    { 'Idempotency-Key': claveIdempotencia }));
 }
 
 /**
