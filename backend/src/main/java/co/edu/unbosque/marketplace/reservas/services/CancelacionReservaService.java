@@ -6,6 +6,7 @@ import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
 import co.edu.unbosque.marketplace.compartido.exceptions.AccesoDenegadoException;
+import co.edu.unbosque.marketplace.compartido.notificaciones.TipoNotificacion;
 import co.edu.unbosque.marketplace.reservas.exceptions.ReservaNoCancelableException;
 import co.edu.unbosque.marketplace.reservas.exceptions.ReservaNoEncontradaException;
 import co.edu.unbosque.marketplace.reservas.model.Cancelacion;
@@ -25,8 +26,8 @@ import org.springframework.stereotype.Service;
  * Cancelación de una reserva CONFIRMADA por su huésped titular o por el anfitrión de la publicación
  * (SOF-75, HU-30, RF-46/RF-48). El valor de devolución es siempre el 100% del total de la reserva: el
  * cálculo por política de cancelación (porcentajes parciales según anticipación) es SOF-76, fuera de
- * alcance acá. Como todavía no existe el módulo de notificaciones, si cancela el anfitrión la auditoría
- * distingue quién canceló (AC3) para que una futura notificación al huésped pueda apoyarse en ese dato.
+ * alcance acá. La auditoría distingue quién canceló (AC3); huésped y anfitrión reciben la notificación
+ * (SOF-37).
  */
 @Service
 public class CancelacionReservaService {
@@ -39,14 +40,17 @@ public class CancelacionReservaService {
     private final PublicacionService publicaciones;
     private final RegistroReservas registro;
     private final PublicadorEventos publicador;
+    private final NotificacionesReserva notificaciones;
     private final Clock reloj;
 
     public CancelacionReservaService(ReservaRepository reservas, PublicacionService publicaciones,
-            RegistroReservas registro, PublicadorEventos publicador, Clock reloj) {
+            RegistroReservas registro, PublicadorEventos publicador, NotificacionesReserva notificaciones,
+            Clock reloj) {
         this.reservas = reservas;
         this.publicaciones = publicaciones;
         this.registro = registro;
         this.publicador = publicador;
+        this.notificaciones = notificaciones;
         this.reloj = reloj;
     }
 
@@ -85,6 +89,7 @@ public class CancelacionReservaService {
                 "canceladoPor", esAnfitrion ? "ANFITRION" : "HUESPED",
                 "motivo", motivo,
                 "valorDevolucion", valorDevolucion.toPlainString()));
+        notificaciones.notificar(reserva, TipoNotificacion.RESERVA_CANCELADA);
         return cancelacion;
     }
 

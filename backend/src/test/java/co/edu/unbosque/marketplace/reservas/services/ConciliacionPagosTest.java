@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
+import co.edu.unbosque.marketplace.compartido.notificaciones.TipoNotificacion;
 import co.edu.unbosque.marketplace.reservas.model.EstadoPago;
 import co.edu.unbosque.marketplace.reservas.model.EstadoReserva;
 import co.edu.unbosque.marketplace.reservas.model.Reserva;
@@ -43,8 +44,9 @@ class ConciliacionPagosTest {
     private final RegistroReservas registro = mock(RegistroReservas.class);
     private final PasarelaPagos pasarela = mock(PasarelaPagos.class);
     private final PublicadorEventos publicador = mock(PublicadorEventos.class);
+    private final NotificacionesReserva notificaciones = mock(NotificacionesReserva.class);
     private final ConciliacionPagos conciliacion = new ConciliacionPagos(reservas, registro, pasarela, publicador,
-            Clock.fixed(AHORA, ZoneOffset.UTC), 60);
+            notificaciones, Clock.fixed(AHORA, ZoneOffset.UTC), 60);
 
     @Test
     @DisplayName("Si la pasarela sí cobró y la reserva sigue PENDIENTE, la confirma con esa transacción")
@@ -59,6 +61,8 @@ class ConciliacionPagosTest {
         verify(registro).confirmarPago(1L, "pi_1");
         verify(pasarela, never()).reembolsar(anyString());
         assertThat(auditado().datos()).containsEntry("resultado", "confirmado");
+        // SOF-37: la confirmación por conciliación también avisa al huésped y al anfitrión.
+        verify(notificaciones).notificar(reserva, TipoNotificacion.RESERVA_CONFIRMADA);
     }
 
     @Test
@@ -75,6 +79,7 @@ class ConciliacionPagosTest {
         verify(pasarela).reembolsar("pi_2");
         verify(registro).marcarReembolsado(2L, "pi_2");
         assertThat(auditado().datos()).containsEntry("resultado", "reembolsado");
+        verify(notificaciones, never()).notificar(any(), any());
     }
 
     @Test

@@ -25,6 +25,9 @@ import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
+import co.edu.unbosque.marketplace.compartido.notificaciones.Notificador;
+import co.edu.unbosque.marketplace.compartido.notificaciones.NuevaNotificacion;
+import co.edu.unbosque.marketplace.compartido.notificaciones.TipoNotificacion;
 import co.edu.unbosque.marketplace.compartido.seguridad.Propiedad;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -55,14 +58,17 @@ public class PublicacionService {
     private final TipoAlojamientoRepository tipos;
     private final PoliticaCancelacionRepository politicas;
     private final PublicadorEventos publicador;
+    private final Notificador notificador;
 
     public PublicacionService(PublicacionRepository publicaciones, ServicioRepository catalogo,
-            TipoAlojamientoRepository tipos, PoliticaCancelacionRepository politicas, PublicadorEventos publicador) {
+            TipoAlojamientoRepository tipos, PoliticaCancelacionRepository politicas, PublicadorEventos publicador,
+            Notificador notificador) {
         this.publicaciones = publicaciones;
         this.catalogo = catalogo;
         this.tipos = tipos;
         this.politicas = politicas;
         this.publicador = publicador;
+        this.notificador = notificador;
     }
 
     /** Guarda la publicación en BORRADOR a nombre del anfitrión autenticado. */
@@ -204,6 +210,7 @@ public class PublicacionService {
         };
         Publicacion guardada = publicaciones.save(publicacion);
         auditar(publicacionId, anfitrionId, false, operacion);
+        notificarEstado(publicacionId, guardada, "");
         return guardada;
     }
 
@@ -217,6 +224,7 @@ public class PublicacionService {
         publicacion.pausar();
         Publicacion guardada = publicaciones.save(publicacion);
         auditar(publicacionId, anfitrionId, false, "pausar");
+        notificarEstado(publicacionId, guardada, "");
         return guardada;
     }
 
@@ -297,6 +305,7 @@ public class PublicacionService {
         publicacion.aprobar();
         Publicacion guardada = publicaciones.save(publicacion);
         auditar(publicacionId, administradorId, true, "aprobar");
+        notificarEstado(publicacionId, guardada, "");
         return guardada;
     }
 
@@ -310,6 +319,7 @@ public class PublicacionService {
         publicacion.devolver(observaciones.trim());
         Publicacion guardada = publicaciones.save(publicacion);
         auditar(publicacionId, administradorId, true, "devolver");
+        notificarEstado(publicacionId, guardada, " Revisa las observaciones del administrador.");
         return guardada;
     }
 
@@ -337,6 +347,23 @@ public class PublicacionService {
         AccionCritica accion = esAdministrador ? AccionCritica.ACCION_ADMINISTRATIVA : AccionCritica.PUBLICACION;
         publicador.publicar(new EventoCritico(String.valueOf(usuarioId), accion, ENTIDAD, String.valueOf(publicacionId),
                 ResultadoEvento.EXITO, Instant.now(), Map.of("operacion", operacion)));
+    }
+
+    // SOF-37 AC2: el anfitrión dueño recibe el nuevo estado, también cuando el cambio lo hizo él mismo.
+    private void notificarEstado(Long publicacionId, Publicacion publicacion, String complemento) {
+        notificador.notificar(new NuevaNotificacion(publicacion.getAnfitrionId(), TipoNotificacion.PUBLICACION_ESTADO,
+                "Tu publicación «%s» ahora está %s.%s".formatted(publicacion.getTitulo(),
+                        nombreLegible(publicacion.getEstado()), complemento),
+                ENTIDAD, publicacionId));
+    }
+
+    private static String nombreLegible(EstadoPublicacion estado) {
+        return switch (estado) {
+        case BORRADOR -> "borrador";
+        case PENDIENTE_REVISION -> "pendiente de revisión";
+        case ACTIVA -> "activa";
+        case PAUSADA -> "pausada";
+        };
     }
 
     private DatosBorrador datosDe(SolicitudBorrador solicitud) {

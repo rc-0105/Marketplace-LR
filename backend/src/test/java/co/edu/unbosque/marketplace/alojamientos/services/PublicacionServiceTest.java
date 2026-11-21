@@ -34,6 +34,9 @@ import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
 import co.edu.unbosque.marketplace.compartido.exceptions.AccesoDenegadoException;
+import co.edu.unbosque.marketplace.compartido.notificaciones.Notificador;
+import co.edu.unbosque.marketplace.compartido.notificaciones.NuevaNotificacion;
+import co.edu.unbosque.marketplace.compartido.notificaciones.TipoNotificacion;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -58,8 +61,9 @@ class PublicacionServiceTest {
     private final ServicioRepository catalogo = mock(ServicioRepository.class);
     private final TipoAlojamientoRepository tipos = mock(TipoAlojamientoRepository.class);
     private final PoliticaCancelacionRepository politicas = mock(PoliticaCancelacionRepository.class);
+    private final Notificador notificador = mock(Notificador.class);
     private final PublicacionService servicio = new PublicacionService(publicaciones, catalogo, tipos, politicas,
-            publicador);
+            publicador, notificador);
 
     private static final Long MODERADA_ID = 2L;
     private static final Long POLITICA_INEXISTENTE_ID = 99L;
@@ -712,6 +716,7 @@ class PublicacionServiceTest {
         EventoCritico evento = eventoPublicado();
         assertThat(evento.accion()).isEqualTo(AccionCritica.PUBLICACION);
         assertThat(evento.datos()).containsEntry("operacion", "enviar_a_revision");
+        verify(notificador).notificar(estadoNotificado("Tu publicación «Casa en la playa» ahora está pendiente de revisión."));
     }
 
     @Test
@@ -740,6 +745,7 @@ class PublicacionServiceTest {
         assertThat(reactivada.getEstado()).isEqualTo(EstadoPublicacion.ACTIVA);
         verify(publicaciones).save(pausada);
         assertThat(eventoPublicado().datos()).containsEntry("operacion", "reactivar");
+        verify(notificador).notificar(estadoNotificado("Tu publicación «Casa en la playa» ahora está activa."));
     }
 
     @Test
@@ -756,6 +762,7 @@ class PublicacionServiceTest {
                 .isInstanceOf(CambioEstadoNoPermitidoException.class)
                 .hasMessage("La publicación ya está activa.");
         verify(publicaciones, never()).save(any(Publicacion.class));
+        verify(notificador, never()).notificar(any());
     }
 
     @Test
@@ -769,6 +776,7 @@ class PublicacionServiceTest {
         assertThat(pausada.getEstado()).isEqualTo(EstadoPublicacion.PAUSADA);
         verify(publicaciones).save(activa);
         assertThat(eventoPublicado().datos()).containsEntry("operacion", "pausar");
+        verify(notificador).notificar(estadoNotificado("Tu publicación «Casa en la playa» ahora está pausada."));
     }
 
     @Test
@@ -910,6 +918,7 @@ class PublicacionServiceTest {
         assertThat(evento.usuario()).isEqualTo(String.valueOf(ADMINISTRADOR_ID));
         assertThat(evento.accion()).isEqualTo(AccionCritica.ACCION_ADMINISTRATIVA);
         assertThat(evento.datos()).containsEntry("operacion", "aprobar");
+        verify(notificador).notificar(estadoNotificado("Tu publicación «Casa en la playa» ahora está activa."));
     }
 
     @Test
@@ -926,6 +935,8 @@ class PublicacionServiceTest {
         EventoCritico evento = eventoPublicado();
         assertThat(evento.accion()).isEqualTo(AccionCritica.ACCION_ADMINISTRATIVA);
         assertThat(evento.datos()).containsEntry("operacion", "devolver");
+        verify(notificador).notificar(estadoNotificado("Tu publicación «Casa en la playa» ahora está borrador. "
+                + "Revisa las observaciones del administrador."));
     }
 
     @Test
@@ -943,6 +954,7 @@ class PublicacionServiceTest {
         assertThat(activa.getEstado()).isEqualTo(EstadoPublicacion.ACTIVA);
         verify(publicaciones, never()).save(any(Publicacion.class));
         verify(publicador, never()).publicar(any(EventoCritico.class));
+        verify(notificador, never()).notificar(any());
     }
 
     @Test
@@ -994,6 +1006,12 @@ class PublicacionServiceTest {
         ArgumentCaptor<EventoCritico> captor = ArgumentCaptor.forClass(EventoCritico.class);
         verify(publicador).publicar(captor.capture());
         return captor.getValue();
+    }
+
+    // SOF-37 AC2: el anfitrión dueño recibe el nuevo estado de su publicación.
+    private static NuevaNotificacion estadoNotificado(String mensaje) {
+        return new NuevaNotificacion(ANFITRION_ID, TipoNotificacion.PUBLICACION_ESTADO, mensaje, "Publicacion",
+                PUBLICACION_ID);
     }
 
     private static AccesoDePublicacion accesoDe(Long anfitrionId, EstadoPublicacion estado) {
