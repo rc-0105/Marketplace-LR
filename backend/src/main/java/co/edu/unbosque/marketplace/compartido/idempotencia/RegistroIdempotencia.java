@@ -33,6 +33,24 @@ public class RegistroIdempotencia {
             RETURNING reclamo
             """;
 
+    private static final String BUSCAR = """
+            SELECT estado, huella, codigo_estado, cuerpo, creada_en, vence_en
+            FROM clave_idempotencia WHERE usuario_id = :usuario AND clave = :clave
+            """;
+
+    private static final String COMPLETAR = """
+            UPDATE clave_idempotencia
+            SET estado = 'COMPLETADA', codigo_estado = :codigo, cuerpo = :cuerpo,
+                vence_en = creada_en + make_interval(secs => :vigencia)
+            WHERE usuario_id = :usuario AND clave = :clave AND reclamo = :reclamo
+            """;
+
+    private static final String LIBERAR = """
+            DELETE FROM clave_idempotencia WHERE usuario_id = :usuario AND clave = :clave AND reclamo = :reclamo
+            """;
+
+    private static final String ELIMINAR_VENCIDAS = "DELETE FROM clave_idempotencia WHERE vence_en <= :ahora";
+
     private final NamedParameterJdbcTemplate jdbc;
 
     public RegistroIdempotencia(NamedParameterJdbcTemplate jdbc) {
@@ -54,6 +72,52 @@ public class RegistroIdempotencia {
                 .addValue("lease", utc(ahora.plus(lease)));
         List<UUID> reclamos = jdbc.query(RECLAMAR, parametros, (rs, fila) -> rs.getObject("reclamo", UUID.class));
         return reclamos.stream().findFirst();
+    }
+
+    /** Lee la fila de la clave, vigente o no; el servicio decide qué hacer con ella. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    public Optional<RegistroClave> buscar(Long usuarioId, UUID clave) {
+        MapSqlParameterSource parametros = new MapSqlParameterSource()
+                .addValue("usuario", usuarioId)
+                .addValue("clave", clave);
+        return jdbc.query(BUSCAR, parametros, (rs, fila) -> new RegistroClave(
+                RegistroClave.Estado.valueOf(rs.getString("estado")), rs.getString("huella"),
+                rs.getObject("codigo_estado", Integer.class), rs.getString("cuerpo"),
+                rs.getObject("creada_en", OffsetDateTime.class).toInstant(),
+                rs.getObject("vence_en", OffsetDateTime.class).toInstant())).stream().findFirst();
+    }
+
+    /**
+     * Pasa la fila a COMPLETADA guardando la respuesta; vence a {@code creada_en + vigencia}. Solo si el
+     * reclamo es el propio: devuelve false si otro intento la tomó o ya no existe.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean completar(Long usuarioId, UUID clave, UUID reclamo, int codigoEstado, String cuerpo,
+            Duration vigencia) {
+        MapSqlParameterSource parametros = new MapSqlParameterSource()
+                .addValue("usuario", usuarioId)
+                .addValue("clave", clave)
+                .addValue("reclamo", reclamo)
+                .addValue("codigo", codigoEstado)
+                .addValue("cuerpo", cuerpo)
+                .addValue("vigencia", (double) vigencia.toSeconds());
+        return jdbc.update(COMPLETAR, parametros) > 0;
+    }
+
+    /** Elimina la fila para que un reintento vuelva a ejecutar; solo si el reclamo es el propio. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean liberar(Long usuarioId, UUID clave, UUID reclamo) {
+        MapSqlParameterSource parametros = new MapSqlParameterSource()
+                .addValue("usuario", usuarioId)
+                .addValue("clave", clave)
+                .addValue("reclamo", reclamo);
+        return jdbc.update(LIBERAR, parametros) > 0;
+    }
+
+    /** Borra las filas vencidas (incluidas las EN_PROCESO huérfanas) y devuelve cuántas eliminó. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int eliminarVencidas(Instant ahora) {
+        return jdbc.update(ELIMINAR_VENCIDAS, new MapSqlParameterSource("ahora", utc(ahora)));
     }
 
     private static OffsetDateTime utc(Instant instante) {
