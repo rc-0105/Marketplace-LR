@@ -63,6 +63,12 @@ jwt:
 marketplace:
   reservas:
     minutos-apartado: ${RESERVAS_MINUTOS_APARTADO:15}
+  # Idempotencia (SOF-77, HU-32): la respuesta de una clave se replica durante horas-vigencia; una clave
+  # EN_PROCESO se considera huérfana pasados segundos-reclamo; segundos-reintento es el Retry-After del 409.
+  idempotencia:
+    horas-vigencia: ${IDEMPOTENCIA_HORAS_VIGENCIA:24}
+    segundos-reclamo: 120
+    segundos-reintento: 2
 
 # Envío del código de recuperación (RF-05). Con "log" el código se escribe en la
 # consola; con "smtp" se envía por correo usando spring.mail. Las credenciales

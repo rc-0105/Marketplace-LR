@@ -1,6 +1,7 @@
 package co.edu.unbosque.marketplace.compartido.idempotencia;
 
 import co.edu.unbosque.marketplace.compartido.idempotencia.exceptions.ClaveIdempotenciaInvalidaException;
+import co.edu.unbosque.marketplace.compartido.idempotencia.exceptions.ClaveIdempotenciaReutilizadaException;
 import co.edu.unbosque.marketplace.compartido.idempotencia.exceptions.SolicitudEnProcesoException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,6 +16,8 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -27,6 +30,8 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class ServicioIdempotencia {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ServicioIdempotencia.class);
 
     public static final String CABECERA = "Idempotency-Key";
 
@@ -58,6 +63,10 @@ public class ServicioIdempotencia {
      */
     public <T> RespuestaIdempotente ejecutar(SolicitudIdempotente solicitud, HttpStatus exito,
             Supplier<T> operacion) {
+        if (!exito.is2xxSuccessful()) {
+            // Solo se guardan respuestas 2xx (D10); los fallos viajan como excepciones y liberan la clave.
+            throw new IllegalArgumentException("El código de éxito debe ser 2xx: " + exito.value());
+        }
         UUID clave = validar(solicitud.clave());
         String huella = huella(solicitud.operacion(), solicitud.contenidoCanonico());
         // Dos vueltas: si quien tenía la clave la libera entre el reclamo y la lectura, se reclama otra vez.
@@ -77,14 +86,46 @@ public class ServicioIdempotencia {
 
     private <T> RespuestaIdempotente ejecutarReclamado(SolicitudIdempotente solicitud, UUID clave, UUID reclamo,
             HttpStatus exito, Supplier<T> operacion) {
-        T resultado = operacion.get();
-        String cuerpo = serializar(resultado);
-        registro.completar(solicitud.usuarioId(), clave, reclamo, exito.value(), cuerpo, vigencia);
+        String cuerpo;
+        try {
+            cuerpo = serializar(operacion.get());
+        } catch (RuntimeException error) {
+            liberar(solicitud, clave, reclamo, error);
+            throw error;
+        }
+        cerrar(solicitud, clave, reclamo, exito, cuerpo);
         return new RespuestaIdempotente(exito.value(), cuerpo, false);
     }
 
+    // La operación ya tuvo efecto: un fallo al cerrar no puede ocultar el éxito ni ejecutarla de nuevo. La
+    // clave queda EN_PROCESO hasta que venza el lease y, si el usuario reintenta, choca con su propia reserva
+    // (brecha D6, documentada en ADR-007).
+    private void cerrar(SolicitudIdempotente solicitud, UUID clave, UUID reclamo, HttpStatus exito, String cuerpo) {
+        try {
+            if (!registro.completar(solicitud.usuarioId(), clave, reclamo, exito.value(), cuerpo, vigencia)) {
+                LOG.error("No se pudo completar la clave de idempotencia {} del usuario {}: el reclamo ya no es "
+                        + "el vigente.", clave, solicitud.usuarioId());
+            }
+        } catch (RuntimeException error) {
+            LOG.error("Falló el cierre de la clave de idempotencia {} del usuario {}; la operación ya se ejecutó.",
+                    clave, solicitud.usuarioId(), error);
+        }
+    }
+
+    private void liberar(SolicitudIdempotente solicitud, UUID clave, UUID reclamo, RuntimeException original) {
+        try {
+            registro.liberar(solicitud.usuarioId(), clave, reclamo);
+        } catch (RuntimeException error) {
+            original.addSuppressed(error);
+        }
+    }
+
+    // La huella distinta se evalúa antes que el estado: es un error del cliente, no una espera (D12).
     private RespuestaIdempotente resolver(RegistroClave existente, String huella) {
-        if (existente.estado() == RegistroClave.Estado.COMPLETADA && existente.huella().equals(huella)) {
+        if (!existente.huella().equals(huella)) {
+            throw new ClaveIdempotenciaReutilizadaException();
+        }
+        if (existente.estado() == RegistroClave.Estado.COMPLETADA) {
             return new RespuestaIdempotente(existente.codigoEstado(), existente.cuerpo(), true);
         }
         throw new SolicitudEnProcesoException(segundosReintento);

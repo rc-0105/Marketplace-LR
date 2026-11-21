@@ -13,7 +13,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import co.edu.unbosque.marketplace.compartido.idempotencia.exceptions.ClaveIdempotenciaInvalidaException;
+import co.edu.unbosque.marketplace.compartido.idempotencia.exceptions.ClaveIdempotenciaReutilizadaException;
+import co.edu.unbosque.marketplace.compartido.idempotencia.exceptions.SolicitudEnProcesoException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Duration;
@@ -30,6 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 
 /** Orquestación de la idempotencia con el registro simulado y un reloj fijo (SOF-77). */
@@ -215,5 +222,243 @@ class ServicioIdempotenciaTest {
         assertThat(respuesta.replicada()).isFalse();
         assertThat(respuesta.cuerpo()).isEqualTo("{\"id\":9}");
         verify(registro, times(2)).reclamar(any(), any(), anyString(), any(), any());
+    }
+
+    private RegistroClave enProceso(String huella) {
+        return new RegistroClave(RegistroClave.Estado.EN_PROCESO, huella, null, null, AHORA.minusSeconds(10),
+                AHORA.plusSeconds(110));
+    }
+
+    @Test
+    @DisplayName("Huella distinta sobre una fila COMPLETADA: 422, sin ejecutar ni tocar la fila")
+    void huellaDistintaCompletada() {
+        claveTomada();
+        when(registro.buscar(2L, CLAVE_UUID))
+                .thenReturn(Optional.of(completada("f".repeat(64), AHORA.plus(VIGENCIA))));
+        AtomicInteger ejecuciones = new AtomicInteger();
+
+        assertThatThrownBy(() -> servicio.ejecutar(solicitud(), HttpStatus.CREATED, ejecuciones::incrementAndGet))
+                .isInstanceOf(ClaveIdempotenciaReutilizadaException.class);
+
+        assertThat(ejecuciones).hasValue(0);
+        verify(registro, never()).completar(any(), any(), any(), anyInt(), anyString(), any());
+        verify(registro, never()).liberar(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Huella distinta sobre una fila EN_PROCESO: 422 y no 409 (la huella se evalúa primero)")
+    void huellaDistintaEnProceso() {
+        claveTomada();
+        when(registro.buscar(2L, CLAVE_UUID)).thenReturn(Optional.of(enProceso("f".repeat(64))));
+
+        assertThatThrownBy(() -> servicio.ejecutar(solicitud(), HttpStatus.CREATED, () -> "x"))
+                .isInstanceOf(ClaveIdempotenciaReutilizadaException.class);
+    }
+
+    @Test
+    @DisplayName("Misma huella con la fila EN_PROCESO: 409 con los segundos de reintento, sin ejecutar")
+    void enProceso() {
+        claveTomada();
+        when(registro.buscar(2L, CLAVE_UUID)).thenReturn(Optional.of(enProceso(huellaEsperada())));
+        AtomicInteger ejecuciones = new AtomicInteger();
+
+        assertThatThrownBy(() -> servicio.ejecutar(solicitud(), HttpStatus.CREATED, ejecuciones::incrementAndGet))
+                .isInstanceOfSatisfying(SolicitudEnProcesoException.class,
+                        error -> assertThat(error.getSegundosReintento()).isEqualTo(2));
+        assertThat(ejecuciones).hasValue(0);
+    }
+
+    @Test
+    @DisplayName("Si tras reintentar sigue sin fila ni reclamo, responde 409 en proceso")
+    void dosVueltasSinExito() {
+        claveTomada();
+        when(registro.buscar(2L, CLAVE_UUID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.ejecutar(solicitud(), HttpStatus.CREATED, () -> "x"))
+                .isInstanceOf(SolicitudEnProcesoException.class);
+        verify(registro, times(2)).reclamar(any(), any(), anyString(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Otra clave del mismo usuario y la misma clave de otro usuario se reclaman como primera vez")
+    void alcancePorUsuarioYClave() {
+        when(registro.reclamar(any(), any(), anyString(), any(), any())).thenReturn(Optional.of(reclamo));
+        when(registro.completar(any(), any(), any(), anyInt(), anyString(), any())).thenReturn(true);
+        String otraClave = "11111111-2222-4333-8444-555555555555";
+
+        servicio.ejecutar(new SolicitudIdempotente(2L, otraClave, OPERACION, CONTENIDO), HttpStatus.CREATED,
+                () -> "a");
+        servicio.ejecutar(new SolicitudIdempotente(4L, CLAVE, OPERACION, CONTENIDO), HttpStatus.CREATED, () -> "b");
+
+        verify(registro).reclamar(eq(2L), eq(UUID.fromString(otraClave)), anyString(), any(), any());
+        verify(registro).reclamar(eq(4L), eq(CLAVE_UUID), anyString(), any(), any());
+        verify(registro, never()).buscar(any(), any());
+    }
+
+    private void reclamoOtorgado() {
+        when(registro.reclamar(any(), any(), anyString(), any(), any())).thenReturn(Optional.of(reclamo));
+    }
+
+    @Test
+    @DisplayName("Si la operación lanza una excepción de negocio libera el reclamo y relanza la misma instancia")
+    void liberaAnteExcepcionDeNegocio() {
+        reclamoOtorgado();
+        SolicitudEnProcesoException fallo = new SolicitudEnProcesoException(3);
+
+        assertThatThrownBy(() -> servicio.ejecutar(solicitud(), HttpStatus.CREATED, () -> {
+            throw fallo;
+        })).isSameAs(fallo);
+
+        verify(registro).liberar(2L, CLAVE_UUID, reclamo);
+        verify(registro, never()).completar(any(), any(), any(), anyInt(), anyString(), any());
+    }
+
+    @Test
+    @DisplayName("Ante una RuntimeException inesperada libera el reclamo y la propaga intacta")
+    void liberaAnteExcepcionInesperada() {
+        reclamoOtorgado();
+        IllegalStateException fallo = new IllegalStateException("falló");
+
+        assertThatThrownBy(() -> servicio.ejecutar(solicitud(), HttpStatus.CREATED, () -> {
+            throw fallo;
+        })).isSameAs(fallo);
+
+        verify(registro).liberar(2L, CLAVE_UUID, reclamo);
+    }
+
+    @Test
+    @DisplayName("Si liberar también falla, se relanza el error original de la operación")
+    void falloAlLiberarNoOcultaElOriginal() {
+        reclamoOtorgado();
+        when(registro.liberar(any(), any(), any())).thenThrow(new IllegalStateException("base caída"));
+        IllegalArgumentException original = new IllegalArgumentException("original");
+
+        assertThatThrownBy(() -> servicio.ejecutar(solicitud(), HttpStatus.CREATED, () -> {
+            throw original;
+        })).isSameAs(original);
+    }
+
+    @Test
+    @DisplayName("Un código de éxito que no es 2xx se rechaza antes de reclamar")
+    void exitoNo2xx() {
+        assertThatThrownBy(() -> servicio.ejecutar(solicitud(), HttpStatus.BAD_REQUEST, () -> "x"))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verifyNoMoreInteractions(registro);
+    }
+
+    @Test
+    @DisplayName("Si completar lanza, registra ERROR y devuelve el resultado exitoso sin repetir la operación")
+    void completarLanza() {
+        reclamoOtorgado();
+        when(registro.completar(any(), any(), any(), anyInt(), anyString(), any()))
+                .thenThrow(new IllegalStateException("base caída"));
+        AtomicInteger ejecuciones = new AtomicInteger();
+
+        ListAppender<ILoggingEvent> log = capturarLog();
+        RespuestaIdempotente respuesta = servicio.ejecutar(solicitud(), HttpStatus.CREATED, () -> {
+            ejecuciones.incrementAndGet();
+            return Map.of("id", 7);
+        });
+
+        assertThat(respuesta.codigoEstado()).isEqualTo(201);
+        assertThat(respuesta.cuerpo()).isEqualTo("{\"id\":7}");
+        assertThat(ejecuciones).hasValue(1);
+        assertThat(log.list).extracting(ILoggingEvent::getLevel).contains(Level.ERROR);
+        verify(registro, never()).liberar(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Si completar devuelve false (reclamo perdido) registra ERROR y entrega el éxito")
+    void completarDevuelveFalse() {
+        reclamoOtorgado();
+        when(registro.completar(any(), any(), any(), anyInt(), anyString(), any())).thenReturn(false);
+
+        ListAppender<ILoggingEvent> log = capturarLog();
+        RespuestaIdempotente respuesta = servicio.ejecutar(solicitud(), HttpStatus.CREATED, () -> Map.of("id", 7));
+
+        assertThat(respuesta.replicada()).isFalse();
+        assertThat(log.list).extracting(ILoggingEvent::getLevel).contains(Level.ERROR);
+    }
+
+    private static ListAppender<ILoggingEvent> capturarLog() {
+        Logger logger = (Logger) LoggerFactory.getLogger(ServicioIdempotencia.class);
+        ListAppender<ILoggingEvent> eventos = new ListAppender<>();
+        eventos.start();
+        logger.addAppender(eventos);
+        return eventos;
+    }
+
+    @Test
+    @DisplayName("La huella es SHA-256 en hexadecimal minúscula de 64 caracteres y es determinista")
+    void huellaTieneElFormatoEsperado() {
+        String huella = ServicioIdempotencia.huella(OPERACION, CONTENIDO);
+
+        assertThat(huella).hasSize(64).matches("[0-9a-f]{64}");
+        assertThat(ServicioIdempotencia.huella(OPERACION, CONTENIDO)).isEqualTo(huella);
+        assertThat(huella).isEqualTo("7ed4a12a546d817d74ba9d2c0850ac6e7e93c27f822882a99190c75c8db1a735");
+    }
+
+    @Test
+    @DisplayName("La operación forma parte de la huella: la misma clave en otra operación no coincide")
+    void laOperacionCambiaLaHuella() {
+        assertThat(ServicioIdempotencia.huella("POST /reservas", CONTENIDO))
+                .isNotEqualTo(ServicioIdempotencia.huella("POST /pagos", CONTENIDO));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"11|2026-12-10|2026-12-13|7,8", "10|2026-12-11|2026-12-13|7,8",
+            "10|2026-12-10|2026-12-14|7,8", "10|2026-12-10|2026-12-13|7", "10|2026-12-10|2026-12-13|7,8,9",
+            "10|2026-12-10|2026-12-13|"})
+    @DisplayName("Cualquier diferencia en el contenido canónico cambia la huella")
+    void elContenidoCambiaLaHuella(String otroContenido) {
+        assertThat(ServicioIdempotencia.huella(OPERACION, otroContenido))
+                .isNotEqualTo(ServicioIdempotencia.huella(OPERACION, CONTENIDO));
+    }
+
+    @Test
+    @DisplayName("Contenidos iguales dan la misma huella aunque sean objetos distintos")
+    void contenidosIgualesMismaHuella() {
+        assertThat(ServicioIdempotencia.huella(new String(OPERACION), new String(CONTENIDO)))
+                .isEqualTo(ServicioIdempotencia.huella(OPERACION, CONTENIDO));
+    }
+
+    @Test
+    @DisplayName("El reclamo se pide con el instante del reloj y el lease configurado")
+    void reclamoUsaElRelojYElLease() {
+        ServicioIdempotencia configurado = new ServicioIdempotencia(registro, Clock.fixed(AHORA, ZoneOffset.UTC),
+                new ObjectMapper(), 24, 30, 2);
+        reclamoOtorgado();
+        when(registro.completar(any(), any(), any(), anyInt(), anyString(), any())).thenReturn(true);
+
+        configurado.ejecutar(solicitud(), HttpStatus.CREATED, () -> "x");
+
+        verify(registro).reclamar(eq(2L), eq(CLAVE_UUID), eq(huellaEsperada()), eq(AHORA), eq(Duration.ofSeconds(30)));
+    }
+
+    @Test
+    @DisplayName("La vigencia en horas es configurable: con 1 hora se completa con una hora")
+    void vigenciaConfigurable() {
+        ServicioIdempotencia configurado = new ServicioIdempotencia(registro, Clock.fixed(AHORA, ZoneOffset.UTC),
+                new ObjectMapper(), 1, 120, 2);
+        reclamoOtorgado();
+        when(registro.completar(any(), any(), any(), anyInt(), anyString(), any())).thenReturn(true);
+
+        configurado.ejecutar(solicitud(), HttpStatus.CREATED, () -> "x");
+
+        verify(registro).completar(2L, CLAVE_UUID, reclamo, 201, "\"x\"", Duration.ofHours(1));
+    }
+
+    @Test
+    @DisplayName("El instante del reclamo sigue al reloj: 24 horas después se reclama con esa hora")
+    void elRelojAvanza() {
+        Instant manana = AHORA.plus(VIGENCIA);
+        ServicioIdempotencia adelantado = servicioConReloj(Clock.fixed(manana, ZoneOffset.UTC));
+        reclamoOtorgado();
+        when(registro.completar(any(), any(), any(), anyInt(), anyString(), any())).thenReturn(true);
+
+        adelantado.ejecutar(solicitud(), HttpStatus.CREATED, () -> "x");
+
+        verify(registro).reclamar(any(), any(), anyString(), eq(manana), eq(LEASE));
     }
 }
