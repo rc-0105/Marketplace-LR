@@ -6,6 +6,7 @@ import co.edu.unbosque.marketplace.alojamientos.services.PublicacionService;
 import co.edu.unbosque.marketplace.busqueda.exceptions.BusquedaInvalidaException;
 import co.edu.unbosque.marketplace.disponibilidad.services.DisponibilidadService;
 import co.edu.unbosque.marketplace.identidad.services.CuentaService;
+import co.edu.unbosque.marketplace.resenas.services.ConsultaResenasService;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -27,12 +28,14 @@ public class BusquedaService {
     private final PublicacionService publicaciones;
     private final DisponibilidadService disponibilidad;
     private final CuentaService cuentas;
+    private final ConsultaResenasService resenas;
 
     public BusquedaService(PublicacionService publicaciones, DisponibilidadService disponibilidad,
-            CuentaService cuentas) {
+            CuentaService cuentas, ConsultaResenasService resenas) {
         this.publicaciones = publicaciones;
         this.disponibilidad = disponibilidad;
         this.cuentas = cuentas;
+        this.resenas = resenas;
     }
 
     /**
@@ -100,10 +103,14 @@ public class BusquedaService {
         return resultado;
     }
 
-    /** Detalle de una publicación ACTIVA con su calendario; si no está activa, 404 y no consulta el calendario. */
+    /**
+     * Detalle de una publicación ACTIVA con su calendario y su calificación promedio; si no está activa, 404 y no
+     * consulta el calendario ni las reseñas.
+     */
     public DetalleBusqueda detalle(Long publicacionId) {
         DetalleAlojamiento alojamiento = publicaciones.consultarActiva(publicacionId);
-        return new DetalleBusqueda(alojamiento, disponibilidad.listarLibres(publicacionId));
+        return new DetalleBusqueda(alojamiento, disponibilidad.listarLibres(publicacionId),
+                resenas.promedio(publicacionId));
     }
 
     private boolean cumpleFiltros(CandidatoBusqueda candidato, FiltrosBusqueda filtros) {
