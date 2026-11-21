@@ -1,5 +1,5 @@
 import { post } from '../../../shared/services/http.js';
-import { reservaDesdeApi } from '../models/reserva.js';
+import { cancelacionDesdeApi, reservaDesdeApi } from '../models/reserva.js';
 
 const RUTA = '/api/v1/reservas';
 
@@ -31,4 +31,16 @@ export async function crearReserva({ publicacionId, llegada, salida, serviciosAd
  */
 export async function pagarReserva(reservaId, metodoPago) {
   return reservaDesdeApi(await post(`${RUTA}/${reservaId}/pago`, { metodoPago }));
+}
+
+/**
+ * Cancela la reserva CONFIRMADA indicando un motivo (SOF-75, HU-30). La cancela el huésped titular o el
+ * anfitrión de la publicación; cualquier otro usuario recibe 403. El valor de devolución es siempre el 100%
+ * del total. El ErrorApi se propaga.
+ * @param {number} reservaId
+ * @param {string} motivo
+ * @returns {Promise<import('../models/reserva.js').Cancelacion>}
+ */
+export async function cancelarReserva(reservaId, motivo) {
+  return cancelacionDesdeApi(await post(`${RUTA}/${reservaId}/cancelacion`, { motivo }));
 }

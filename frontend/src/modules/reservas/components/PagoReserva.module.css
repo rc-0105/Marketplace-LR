@@ -48,6 +48,47 @@
   cursor: progress;
 }
 
+.cancelacion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--espacio-3);
+}
+
+.campo textarea {
+  min-height: 2.75rem;
+  padding: var(--espacio-2) var(--espacio-3);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  background: var(--color-superficie);
+  color: inherit;
+  font: inherit;
+  resize: vertical;
+}
+
+.cancelar {
+  min-height: 2.75rem;
+  padding: 0 var(--espacio-4);
+  border: 1px solid var(--color-borde-control);
+  border-radius: var(--radio);
+  background: transparent;
+  color: var(--color-texto);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transicion);
+}
+
+.cancelar:hover:not(:disabled) {
+  background: var(--color-error-fondo);
+  color: var(--color-error);
+  border-color: var(--color-error);
+}
+
+.cancelar:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
 .exito {
   display: block;
   padding: var(--espacio-3) var(--espacio-4);

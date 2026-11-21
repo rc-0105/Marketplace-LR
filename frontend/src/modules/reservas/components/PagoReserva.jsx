@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
-import { pagarReserva } from '../services/reservaService.js';
+import { cancelarReserva, pagarReserva } from '../services/reservaService.js';
 import estilos from './PagoReserva.module.css';
 
 const MENSAJE_ERROR = 'No pudimos procesar el pago. Intenta de nuevo.';
+const MENSAJE_ERROR_CANCELACION = 'No pudimos cancelar la reserva. Intenta de nuevo.';
 const FORMATO_PESOS = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
 // Tarjetas de prueba de Stripe: ninguna hace un cobro real (SOF-34).
@@ -29,6 +30,12 @@ export default function PagoReserva({ reservaId, total }) {
   // para que la pasarela devuelva ese cobro y no abra otro.
   const [tarjetaFija, setTarjetaFija] = useState(false);
 
+  // Cancelación de la reserva ya CONFIRMADA (SOF-75, HU-30): solo se ofrece tras el pago aprobado.
+  const [motivo, setMotivo] = useState('');
+  const [cancelando, setCancelando] = useState(false);
+  const [cancelacion, setCancelacion] = useState(null);
+  const [errorCancelacion, setErrorCancelacion] = useState(null);
+
   async function pagar() {
     setError(null);
     setPagando(true);
@@ -43,6 +50,19 @@ export default function PagoReserva({ reservaId, total }) {
       if (falla.estado === 502 || falla.estado === 504) setTarjetaFija(true);
     } finally {
       setPagando(false);
+    }
+  }
+
+  async function cancelar() {
+    setErrorCancelacion(null);
+    setCancelando(true);
+    try {
+      setCancelacion(await cancelarReserva(reservaId, motivo));
+    } catch (falla) {
+      // Solo los 4xx traen un mensaje pensado para el usuario; un 5xx o sin conexión, el aviso genérico.
+      setErrorCancelacion(falla.estado >= 400 && falla.estado < 500 ? falla.message : MENSAJE_ERROR_CANCELACION);
+    } finally {
+      setCancelando(false);
     }
   }
 
@@ -69,6 +89,25 @@ export default function PagoReserva({ reservaId, total }) {
         </output>
       )}
       {error && <p role="alert" className={estilos.error}>{error}</p>}
+      {aprobada && !cancelacion && (
+        <div className={estilos.cancelacion}>
+          <label className={estilos.campo}>
+            Motivo de la cancelación
+            <textarea value={motivo} onChange={(evento) => setMotivo(evento.target.value)} disabled={cancelando}
+              maxLength={500} />
+          </label>
+          <button type="button" className={estilos.cancelar} onClick={cancelar}
+                  disabled={cancelando || !motivo.trim()}>
+            {cancelando ? 'Cancelando…' : 'Cancelar reserva'}
+          </button>
+        </div>
+      )}
+      {cancelacion && (
+        <output className={estilos.exito}>
+          Reserva cancelada: se devuelve {FORMATO_PESOS.format(cancelacion.valorDevolucion)}.
+        </output>
+      )}
+      {errorCancelacion && <p role="alert" className={estilos.error}>{errorCancelacion}</p>}
     </section>
   );
 }

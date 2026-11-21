@@ -40,3 +40,28 @@ export function reservaDesdeApi(dato) {
     transaccionId: dato.transaccionId ?? null,
   };
 }
+
+/**
+ * Resultado de cancelar una reserva (SOF-75): el valor de devolución es siempre el 100% del total.
+ * @typedef {Object} Cancelacion
+ * @property {number} reservaId
+ * @property {string} estado estado final de la reserva, 'CANCELADA'
+ * @property {string} motivo
+ * @property {number} valorDevolucion
+ * @property {string} fecha instante en que se registró la cancelación
+ */
+
+/**
+ * Convierte la respuesta de POST /api/v1/reservas/{id}/cancelacion; el importe llega como número o texto.
+ * @param {Record<string, any>} dato
+ * @returns {Cancelacion}
+ */
+export function cancelacionDesdeApi(dato) {
+  return {
+    reservaId: dato.reservaId,
+    estado: dato.estado,
+    motivo: dato.motivo,
+    valorDevolucion: Number(dato.valorDevolucion),
+    fecha: dato.fecha,
+  };
+}
