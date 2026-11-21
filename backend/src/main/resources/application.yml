@@ -63,6 +63,11 @@ jwt:
 marketplace:
   reservas:
     minutos-apartado: ${RESERVAS_MINUTOS_APARTADO:15}
+    # Cierre de reservas (SOF-78, RF-50): cada este intervalo, pasa a COMPLETADA toda reserva
+    # CONFIRMADA cuya fecha de salida ya pasó, lo que habilita la reseña y la saca de la
+    # restricción de exclusión (una vez al día por defecto).
+    cierre:
+      intervalo-horas: ${RESERVAS_CIERRE_INTERVALO_HORAS:24}
   # Idempotencia (SOF-77, HU-32): la respuesta de una clave se replica durante horas-vigencia; una clave
   # EN_PROCESO se considera huérfana pasados segundos-reclamo; segundos-reintento es el Retry-After del 409.
   idempotencia:
