@@ -60,10 +60,12 @@ export async function pagarReserva(reservaId, metodoPago, clave = crypto.randomU
   return reservaDesdeApi(await post(`${RUTA}/${reservaId}/pago`, { metodoPago }, { 'Idempotency-Key': clave }));
 }
 
+export function anticiparCancelacion(reservaId) {
+  return get(`${RUTA}/${reservaId}/cancelacion/previsualizacion`);
+}
+
 /**
- * Cancela la reserva CONFIRMADA indicando un motivo (SOF-75, HU-30). La cancela el huésped titular o el
- * anfitrión de la publicación; cualquier otro usuario recibe 403. El valor de devolución es siempre el 100%
- * del total. El ErrorApi se propaga.
+ * Cancela la reserva CONFIRMADA y devuelve el resultado de la solicitud de reembolso.
  * @param {number} reservaId
  * @param {string} motivo
  * @returns {Promise<import('../models/reserva.js').Cancelacion>}
