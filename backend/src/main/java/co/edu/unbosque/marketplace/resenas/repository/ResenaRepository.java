@@ -12,4 +12,7 @@ public interface ResenaRepository extends JpaRepository<Resena, Long> {
 
     /** Las reseñas de una publicación con ese estado, de la más reciente a la más antigua (SOF-81). */
     List<Resena> findByPublicacionIdAndEstadoOrderByFechaDesc(Long publicacionId, EstadoResena estado);
+
+    /** Todas las reseñas con ese estado, de la más reciente a la más antigua (SOF-82). */
+    List<Resena> findByEstadoOrderByFechaDesc(EstadoResena estado);
 }

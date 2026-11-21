@@ -18,6 +18,7 @@ import CalendarioPage from '../modules/disponibilidad/pages/CalendarioPage.jsx';
 import DisponibilidadPage from '../modules/disponibilidad/pages/DisponibilidadPage.jsx';
 import DetalleReservaPage from '../modules/reservas/pages/DetalleReservaPage.jsx';
 import MisReservasPage from '../modules/reservas/pages/MisReservasPage.jsx';
+import ModeracionResenasPage from '../modules/resenas/pages/ModeracionResenasPage.jsx';
 import NotificacionesPage from '../modules/notificaciones/pages/NotificacionesPage.jsx';
 import InicioPage from './pages/InicioPage.jsx';
 import PanelRolPage from './pages/PanelRolPage.jsx';
@@ -76,6 +77,8 @@ export default function App() {
           element={<RutaProtegida rol="ADMINISTRADOR"><RevisionPublicacionesPage /></RutaProtegida>} />
         <Route path="/administrador/moderacion"
           element={<RutaProtegida rol="ADMINISTRADOR"><ModeracionPage /></RutaProtegida>} />
+        <Route path="/administrador/resenas"
+          element={<RutaProtegida rol="ADMINISTRADOR"><ModeracionResenasPage /></RutaProtegida>} />
         <Route path="/administrador/usuarios"
           element={<RutaProtegida rol="ADMINISTRADOR"><AdministracionUsuariosPage /></RutaProtegida>} />
         <Route path="/administrador/auditoria"

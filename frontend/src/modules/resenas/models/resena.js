@@ -68,3 +68,47 @@ export function resenasPublicacionDesdeApi(dato) {
     })),
   };
 }
+
+export const MOTIVO_MAXIMO = 500;
+
+/**
+ * Reseña visible en el listado de moderación del administrador (SOF-82, HU-37).
+ * @typedef {Object} ResenaParaModerar
+ * @property {number} id
+ * @property {number} publicacionId alojamiento reseñado
+ * @property {string} autor nombre del huésped
+ * @property {number} calificacion de 1 a 5
+ * @property {string} contenido
+ * @property {string} fecha instante ISO en que se publicó
+ */
+
+/**
+ * Convierte la respuesta de GET /api/v1/admin/resenas.
+ * @param {Record<string, any>[]} datos
+ * @returns {ResenaParaModerar[]}
+ */
+export function resenasParaModerarDesdeApi(datos) {
+  return datos.map((resena) => ({
+    id: resena.id,
+    publicacionId: resena.publicacionId,
+    autor: resena.autor,
+    calificacion: resena.calificacion,
+    contenido: resena.contenido,
+    fecha: resena.fecha,
+  }));
+}
+
+/**
+ * Error del motivo con que se oculta una reseña, o null si es válido.
+ * @param {string} texto
+ * @returns {string | null}
+ */
+export function errorDeMotivo(texto) {
+  if (!texto.trim()) {
+    return 'Indica el motivo para ocultar la reseña.';
+  }
+  if (texto.trim().length > MOTIVO_MAXIMO) {
+    return `El motivo admite máximo ${MOTIVO_MAXIMO} caracteres.`;
+  }
+  return null;
+}
