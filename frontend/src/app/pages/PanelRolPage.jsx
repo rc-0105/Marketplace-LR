@@ -22,6 +22,11 @@ function HerramientasAdministrador() {
           <p className={estilos.nota}>Bloquea publicaciones engañosas y resuelve las reservas que quedan en revisión.</p>
           <Link to="/administrador/moderacion" className={estilos.enlace}>Moderar publicaciones</Link>
         </section>
+        <section className={estilos.tarjeta} aria-labelledby="dashboard-titulo">
+          <h3 id="dashboard-titulo" className={estilos.tituloTarjeta}>Indicadores</h3>
+          <p className={estilos.nota}>Mide la operación: usuarios, publicaciones, reservas, ingresos y demanda.</p>
+          <Link to="/administrador/dashboard" className={estilos.enlace}>Ver dashboard</Link>
+        </section>
         <section className={estilos.tarjeta} aria-labelledby="usuarios-titulo">
           <h3 id="usuarios-titulo" className={estilos.tituloTarjeta}>Usuarios</h3>
           <p className={estilos.nota}>Restringe las cuentas que incumplen las políticas o rehabilítalas.</p>
