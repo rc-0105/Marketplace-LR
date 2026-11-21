@@ -6,10 +6,13 @@ import co.edu.unbosque.marketplace.compartido.seguridad.Permisos;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.CancelacionResponse;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.CancelarReservaRequest;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.CrearReservaRequest;
+import co.edu.unbosque.marketplace.reservas.controllers.dto.DetalleReservaResponse;
+import co.edu.unbosque.marketplace.reservas.controllers.dto.MisReservasResponse;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.PagarReservaRequest;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.ReservaResponse;
 import co.edu.unbosque.marketplace.reservas.model.Cancelacion;
 import co.edu.unbosque.marketplace.reservas.services.CancelacionReservaService;
+import co.edu.unbosque.marketplace.reservas.services.HistorialReservasService;
 import co.edu.unbosque.marketplace.reservas.services.PagoReservaService;
 import co.edu.unbosque.marketplace.reservas.services.ReservaService;
 import jakarta.validation.Valid;
@@ -19,6 +22,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -26,7 +30,10 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Confirmación de una reserva sobre una cotización vigente (SOF-33) y su pago (SOF-34) para el huésped. */
+/**
+ * Confirmación de una reserva sobre una cotización vigente (SOF-33), su pago (SOF-34), su cancelación (SOF-75)
+ * y el estado e historial de las reservas (SOF-35) para el huésped.
+ */
 @RestController
 @RequestMapping("/api/v1/reservas")
 @PreAuthorize(Permisos.HUESPED)
@@ -38,13 +45,16 @@ public class ReservaController {
     private final PagoReservaService pagoService;
     private final CancelacionReservaService cancelacionService;
     private final ServicioIdempotencia idempotencia;
+    private final HistorialReservasService historialService;
 
     public ReservaController(ReservaService reservaService, PagoReservaService pagoService,
-            CancelacionReservaService cancelacionService, ServicioIdempotencia idempotencia) {
+            CancelacionReservaService cancelacionService, ServicioIdempotencia idempotencia,
+            HistorialReservasService historialService) {
         this.reservaService = reservaService;
         this.pagoService = pagoService;
         this.cancelacionService = cancelacionService;
         this.idempotencia = idempotencia;
+        this.historialService = historialService;
     }
 
     /**
@@ -72,6 +82,19 @@ public class ReservaController {
                         .collect(Collectors.joining(","));
         return "publicacion=" + data.publicacionId() + ";llegada=" + data.llegada() + ";salida=" + data.salida()
                 + ";servicios=" + servicios;
+    }
+
+    /** Las reservas del huésped autenticado, futuras y pasadas, con su estado actual (SOF-35, RF-38). */
+    @GetMapping("/mias")
+    public MisReservasResponse mias(@AuthenticationPrincipal Jwt jwt) {
+        // El huésped sale del token: no hay forma de pedir las reservas de otro.
+        return MisReservasResponse.desde(historialService.mias(Long.valueOf(jwt.getSubject())));
+    }
+
+    /** Una reserva del huésped autenticado con su alojamiento, desglose y estado (SOF-35, RF-38). */
+    @GetMapping("/{id}")
+    public DetalleReservaResponse detalle(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        return DetalleReservaResponse.desde(historialService.detalle(id, Long.valueOf(jwt.getSubject())));
     }
 
     /** Paga la reserva PENDIENTE del huésped con la pasarela en modo prueba (SOF-34, RF-37). */

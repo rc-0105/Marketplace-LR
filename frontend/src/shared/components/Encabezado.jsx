@@ -10,7 +10,8 @@ import estilos from './Encabezado.module.css';
  * público y con sesión al panel del rol. Con sesión, fuera del panel, ofrece además
  * "Volver a mi panel" para salir de cualquier pantalla.
  * Con sesión ofrece "Mi cuenta" y "Cerrar sesión", que delega en `alCerrarSesion`;
- * al anfitrión además le ofrece "Mis publicaciones" y al administrador "Revisar publicaciones".
+ * al huésped además le ofrece "Mis reservas", al anfitrión "Mis publicaciones" y al administrador
+ * "Revisar publicaciones".
  */
 export default function Encabezado({ alCerrarSesion }) {
   const sesion = useSesion();
@@ -40,6 +41,9 @@ export default function Encabezado({ alCerrarSesion }) {
             <Link to={panel} className={estilos.volver}>
               <span aria-hidden="true">←</span> Volver a mi panel
             </Link>
+          )}
+          {sesion.usuario.rol === 'HUESPED' && (
+            <Link to="/huesped/reservas" className={estilos.enlace}>Mis reservas</Link>
           )}
           {sesion.usuario.rol === 'ANFITRION' && (
             <Link to="/anfitrion/publicaciones" className={estilos.enlace}>Mis publicaciones</Link>

@@ -76,6 +76,20 @@ describe('Encabezado', () => {
     expect(screen.getByRole('link', { name: 'Mis publicaciones' })).toHaveAttribute('href', '/anfitrion/publicaciones');
   });
 
+  it('al huésped le ofrece sus reservas y solo a él', () => {
+    iniciar('HUESPED');
+    renderizar(vi.fn());
+
+    expect(screen.getByRole('link', { name: 'Mis reservas' })).toHaveAttribute('href', '/huesped/reservas');
+  });
+
+  it.each(['ANFITRION', 'ADMINISTRADOR'])('al %s no le ofrece reservas de huésped', (rol) => {
+    iniciar(rol);
+    renderizar(vi.fn());
+
+    expect(screen.queryByRole('link', { name: 'Mis reservas' })).not.toBeInTheDocument();
+  });
+
   it('al huésped no le ofrece publicaciones', () => {
     iniciar('HUESPED');
     renderizar(vi.fn());

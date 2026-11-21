@@ -147,6 +147,14 @@ public class Reserva {
         return "reserva-" + id + "-" + creadoEn.toEpochMilli();
     }
 
+    /**
+     * El estado que ve el huésped en {@code ahora} (SOF-35): una PENDIENTE cuyo apartado ya se agotó es VENCIDA
+     * aunque la tarea programada todavía no la haya pasado, la misma regla de {@link #ocupaNoches}.
+     */
+    public EstadoReserva estadoActual(Instant ahora) {
+        return estado == EstadoReserva.PENDIENTE && !venceEn.isAfter(ahora) ? EstadoReserva.VENCIDA : estado;
+    }
+
     /** El apartado se agotó sin confirmarse: pasa a VENCIDA y libera las noches. */
     public void vencer() {
         this.estado = EstadoReserva.VENCIDA;
