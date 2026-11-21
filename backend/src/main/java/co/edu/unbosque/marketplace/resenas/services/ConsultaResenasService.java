@@ -53,6 +53,24 @@ public class ConsultaResenasService {
         return new ResenasPublicacion(promedioDe(visibles), publicadas);
     }
 
+    /** Las reseñas visibles de toda la plataforma, de la más reciente a la más antigua, para moderarlas (SOF-82). */
+    public List<ResenaParaModeracion> visiblesParaModeracion() {
+        List<Resena> visibles = resenas.findByEstadoOrderByFechaDesc(EstadoResena.VISIBLE);
+        Set<Long> huespedes = new HashSet<>();
+        for (Resena resena : visibles) {
+            huespedes.add(resena.getHuespedId());
+        }
+        Map<Long, String> nombres = huespedes.isEmpty() ? Map.of() : cuentas.nombresDe(huespedes);
+
+        List<ResenaParaModeracion> lista = new ArrayList<>();
+        for (Resena resena : visibles) {
+            String autor = nombres.getOrDefault(resena.getHuespedId(), AUTOR_DESCONOCIDO);
+            lista.add(new ResenaParaModeracion(resena.getId(), resena.getPublicacionId(), autor,
+                    resena.getCalificacion(), resena.getContenido(), resena.getFecha()));
+        }
+        return lista;
+    }
+
     /** El promedio con un decimal de las reseñas visibles; nulo si no hay ninguna (AC2). */
     public Double promedio(Long publicacionId) {
         List<Resena> visibles = visibles(publicacionId);

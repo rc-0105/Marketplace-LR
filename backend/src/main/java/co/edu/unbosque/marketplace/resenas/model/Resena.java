@@ -22,6 +22,7 @@ public class Resena {
     public static final int CALIFICACION_MINIMA = 1;
     public static final int CALIFICACION_MAXIMA = 5;
     public static final int CONTENIDO_MAXIMO = 1000;
+    public static final int MOTIVO_MAXIMO = 500;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -49,6 +50,9 @@ public class Resena {
     @Column(nullable = false, length = 10)
     private EstadoResena estado;
 
+    @Column(name = "motivo_ocultacion", length = MOTIVO_MAXIMO)
+    private String motivoOcultacion;
+
     protected Resena() {
         // Requerido por JPA.
     }
@@ -70,6 +74,19 @@ public class Resena {
             throw new IllegalArgumentException("La calificación va de 1 a 5");
         }
         return new Resena(reservaId, huespedId, publicacionId, fecha, calificacion, contenido);
+    }
+
+    /** La oculta con el motivo del administrador; la fila y su contenido original se conservan. */
+    public void ocultar(String motivo) {
+        if (motivo == null || motivo.isBlank()) {
+            throw new IllegalArgumentException("El motivo es obligatorio");
+        }
+        this.estado = EstadoResena.OCULTA;
+        this.motivoOcultacion = motivo;
+    }
+
+    public boolean estaOculta() {
+        return estado == EstadoResena.OCULTA;
     }
 
     public Long getId() {
@@ -102,5 +119,9 @@ public class Resena {
 
     public EstadoResena getEstado() {
         return estado;
+    }
+
+    public String getMotivoOcultacion() {
+        return motivoOcultacion;
     }
 }

@@ -126,7 +126,8 @@ class ConsultaResenasIntegracionTest {
     void laOcultaNoCuenta() throws Exception {
         long reservaAna = resenaDe("ana@correo.com", 4, "Muy cómodo", "2026-01-10T10:00:00Z");
         resenaDe("carla@correo.com", 2, "Regular", "2026-02-10T10:00:00Z");
-        jdbc.update("UPDATE resena SET estado = 'OCULTA' WHERE calificacion = 2");
+        jdbc.update("UPDATE resena SET estado = 'OCULTA', motivo_ocultacion = 'Lenguaje ofensivo' "
+                + "WHERE calificacion = 2");
         String token = iniciarSesion("ana@correo.com");
 
         mvc.perform(get("/api/v1/publicaciones/{id}/resenas", publicacionId)

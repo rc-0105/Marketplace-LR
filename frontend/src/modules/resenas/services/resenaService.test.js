@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { get, post } from '../../../shared/services/http.js';
-import { consultarResenas, crearResena } from './resenaService.js';
+import { consultarResenas, crearResena, listarResenasParaModerar, ocultarResena } from './resenaService.js';
 
 vi.mock('../../../shared/services/http.js', () => ({ get: vi.fn(), post: vi.fn() }));
 
@@ -61,5 +61,44 @@ describe('consultarResenas', () => {
     vi.mocked(get).mockRejectedValue(error);
 
     await expect(consultarResenas(5)).rejects.toBe(error);
+  });
+});
+
+describe('listarResenasParaModerar', () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  it('pide las reseñas visibles al endpoint del administrador y las convierte', async () => {
+    vi.mocked(get).mockResolvedValue([
+      { id: 9, publicacionId: 5, autor: 'Ana Gómez', calificacion: 5, contenido: 'Perfecto',
+        fecha: '2026-02-10T10:00:00Z', extra: 'se descarta' },
+    ]);
+
+    const resultado = await listarResenasParaModerar();
+
+    expect(get).toHaveBeenCalledWith('/api/v1/admin/resenas');
+    expect(resultado).toEqual([
+      { id: 9, publicacionId: 5, autor: 'Ana Gómez', calificacion: 5, contenido: 'Perfecto',
+        fecha: '2026-02-10T10:00:00Z' },
+    ]);
+  });
+});
+
+describe('ocultarResena', () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  it('envía el motivo a la reseña y devuelve la respuesta de la API', async () => {
+    vi.mocked(post).mockResolvedValue({ id: 9, estado: 'OCULTA', motivo: 'Ofensiva' });
+
+    const resultado = await ocultarResena(9, 'Ofensiva');
+
+    expect(post).toHaveBeenCalledWith('/api/v1/admin/resenas/9/ocultar', { motivo: 'Ofensiva' });
+    expect(resultado).toEqual({ id: 9, estado: 'OCULTA', motivo: 'Ofensiva' });
+  });
+
+  it('propaga el error de la API sin tragárselo', async () => {
+    const error = Object.assign(new Error('Esta reseña ya está oculta.'), { estado: 409 });
+    vi.mocked(post).mockRejectedValue(error);
+
+    await expect(ocultarResena(9, 'Ofensiva')).rejects.toBe(error);
   });
 });
