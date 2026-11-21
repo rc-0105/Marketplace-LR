@@ -19,6 +19,7 @@ import DashboardPage from '../modules/indicadores/pages/DashboardPage.jsx';
 import DisponibilidadPage from '../modules/disponibilidad/pages/DisponibilidadPage.jsx';
 import DetalleReservaPage from '../modules/reservas/pages/DetalleReservaPage.jsx';
 import MisReservasPage from '../modules/reservas/pages/MisReservasPage.jsx';
+import PortalPagoPage from '../modules/reservas/pages/PortalPagoPage.jsx';
 import ModeracionResenasPage from '../modules/resenas/pages/ModeracionResenasPage.jsx';
 import NotificacionesPage from '../modules/notificaciones/pages/NotificacionesPage.jsx';
 import InicioPage from './pages/InicioPage.jsx';
@@ -74,6 +75,8 @@ export default function App() {
           element={<RutaProtegida rol="HUESPED"><MisReservasPage /></RutaProtegida>} />
         <Route path="/huesped/reservas/:id"
           element={<RutaProtegida rol="HUESPED"><DetalleReservaPage /></RutaProtegida>} />
+        <Route path="/huesped/reservas/:id/pago"
+          element={<RutaProtegida rol="HUESPED"><PortalPagoPage /></RutaProtegida>} />
         <Route path="/administrador/publicaciones"
           element={<RutaProtegida rol="ADMINISTRADOR"><RevisionPublicacionesPage /></RutaProtegida>} />
         <Route path="/administrador/moderacion"

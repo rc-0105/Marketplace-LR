@@ -65,7 +65,7 @@ const NOMBRE_ESTADO_RESERVA = {
 // ERROR es un pago que la pasarela no confirmó a tiempo y la conciliación todavía resuelve (SOF-34).
 const NOMBRE_ESTADO_PAGO = {
   SIN_PAGO: 'Sin pago',
-  APROBADO: 'Aprobado',
+  APROBADO: 'Aceptado',
   RECHAZADO: 'Rechazado',
   ERROR: 'En verificación',
   REEMBOLSADO: 'Reembolsado',

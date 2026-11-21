@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
+import Icono from '../../../shared/components/Icono.jsx';
 import { formatearDatos, formatearFechaBogota } from '../models/eventoAuditoria.js';
 import { detalle } from '../services/auditoriaService.js';
 import estilos from './DetalleEventoAuditoriaPage.module.css';
@@ -30,7 +31,10 @@ export default function DetalleEventoAuditoriaPage() {
 
   return (
     <main className={estilos.pagina}>
-      <Link to={`/administrador/auditoria${search}`} className={estilos.volver}>Volver a la lista</Link>
+      <Link to={`/administrador/auditoria${search}`} className={estilos.volver}>
+        <Icono nombre="flecha" className={estilos.atras} />
+        Volver a la lista
+      </Link>
       {error && <p role="alert" className={estilos.error}>{error}</p>}
       {!error && evento === null && <output className={estilos.nota}>Cargando evento…</output>}
       {evento && (
@@ -48,7 +52,11 @@ export default function DetalleEventoAuditoriaPage() {
             <dt>Id de la entidad</dt>
             <dd>{evento.entidadId ?? 'Sin id'}</dd>
             <dt>Resultado</dt>
-            <dd>{NOMBRE_RESULTADO[evento.resultado] ?? evento.resultado}</dd>
+            <dd>
+              <span className={evento.resultado === 'EXITO' ? estilos.exito : estilos.fallo}>
+                {NOMBRE_RESULTADO[evento.resultado] ?? evento.resultado}
+              </span>
+            </dd>
             <dt>Correlación</dt>
             <dd>{evento.correlacion ?? 'Sin correlación'}</dd>
           </dl>

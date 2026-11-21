@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
+import PropTypes from 'prop-types';
 import CotizadorEstancia from '../../cotizacion/components/CotizadorEstancia.jsx';
 import ResenasPublicacion from '../../resenas/components/ResenasPublicacion.jsx';
 import { consultarDetalle } from '../services/busquedaService.js';
@@ -17,6 +18,33 @@ function formatearFecha(fecha) {
 // La búsqueda manda sus fechas en la dirección; si no vienen o no son AAAA-MM-DD, el cotizador empieza vacío.
 function fechaDeLaBusqueda(valor) {
   return /^\d{4}-\d{2}-\d{2}$/.test(valor ?? '') ? valor : '';
+}
+
+// Íconos decorativos de la página: el texto de al lado ya dice lo que significan.
+function Icono({ trazo }) {
+  return (
+    <svg className={estilos.icono} viewBox="0 0 24 24" aria-hidden="true">
+      <path d={trazo} />
+    </svg>
+  );
+}
+
+Icono.propTypes = { trazo: PropTypes.string.isRequired };
+
+const FLECHA = 'M19 12H5M11 18l-6-6 6-6';
+const UBICACION = 'M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z';
+const ESTRELLA = 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z';
+const CHECK = 'M5 12.5l4.5 4.5L19 7';
+const CALENDARIO = 'M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z';
+const ESCUDO = 'M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z';
+
+function EnlaceVolver() {
+  return (
+    <Link to="/huesped/busqueda" className={estilos.volver}>
+      <Icono trazo={FLECHA} />
+      Volver a la búsqueda
+    </Link>
+  );
 }
 
 export default function DetalleAlojamientoPage() {
@@ -49,7 +77,7 @@ export default function DetalleAlojamientoPage() {
       <main className={estilos.pagina}>
         <h1 className={estilos.titulo}>Alojamiento no disponible</h1>
         <p className={estilos.aviso}>Este alojamiento ya no está disponible o no existe.</p>
-        <Link to="/huesped/busqueda">Volver a la búsqueda</Link>
+        <EnlaceVolver />
       </main>
     );
   }
@@ -58,28 +86,32 @@ export default function DetalleAlojamientoPage() {
     return (
       <main className={estilos.pagina}>
         <p role="alert" className={estilos.error}>{MENSAJE_ERROR}</p>
-        <Link to="/huesped/busqueda">Volver a la búsqueda</Link>
+        <EnlaceVolver />
       </main>
     );
   }
 
   return (
     <main className={estilos.pagina}>
-      <Link to="/huesped/busqueda" className={estilos.volver}>Volver a la búsqueda</Link>
+      <EnlaceVolver />
       <header className={estilos.cabecera}>
         <h1 className={estilos.titulo}>{detalle.titulo}</h1>
-        <p className={estilos.detalle}>
-          {[detalle.tipo, detalle.ciudad].filter(Boolean).join(' · ')}
-          {detalle.capacidad != null && ` · Hasta ${detalle.capacidad} huéspedes`}
-        </p>
-        <p className={estilos.detalle}>
-          {detalle.calificacionPromedio == null
-            ? 'Aún sin calificaciones'
-            : `Calificación promedio: ${detalle.calificacionPromedio.toFixed(1)} de 5`}
-        </p>
-        {detalle.precioNoche != null && (
-          <p className={estilos.precio}>{FORMATO_PESOS.format(detalle.precioNoche)} por noche</p>
-        )}
+        <div className={estilos.datos}>
+          <p className={estilos.dato}>
+            <Icono trazo={UBICACION} />
+            {[detalle.tipo, detalle.ciudad].filter(Boolean).join(' · ')}
+            {detalle.capacidad != null && ` · Hasta ${detalle.capacidad} huéspedes`}
+          </p>
+          <p className={`${estilos.dato} ${detalle.calificacionPromedio == null ? '' : estilos.calificacion}`}>
+            <Icono trazo={ESTRELLA} />
+            {detalle.calificacionPromedio == null
+              ? 'Aún sin calificaciones'
+              : `Calificación promedio: ${detalle.calificacionPromedio.toFixed(1)} de 5`}
+          </p>
+          {detalle.precioNoche != null && (
+            <p className={estilos.precio}>{FORMATO_PESOS.format(detalle.precioNoche)} por noche</p>
+          )}
+        </div>
       </header>
 
       {detalle.imagenes.length > 0 && (
@@ -105,7 +137,12 @@ export default function DetalleAlojamientoPage() {
             <section className={estilos.bloque}>
               <h2 className={estilos.seccion}>Servicios</h2>
               <ul className={estilos.servicios}>
-                {detalle.servicios.map((servicio) => <li key={servicio}>{servicio}</li>)}
+                {detalle.servicios.map((servicio) => (
+                  <li key={servicio} className={estilos.servicio}>
+                    <Icono trazo={CHECK} />
+                    {servicio}
+                  </li>
+                ))}
               </ul>
             </section>
           )}
@@ -113,26 +150,32 @@ export default function DetalleAlojamientoPage() {
           {detalle.reglas && (
             <section className={estilos.bloque}>
               <h2 className={estilos.seccion}>Reglas</h2>
-              <p>{detalle.reglas}</p>
+              <p className={estilos.tarjetaTexto}>{detalle.reglas}</p>
             </section>
           )}
 
           {detalle.politicaCancelacion && (
             <section className={estilos.bloque}>
               <h2 className={estilos.seccion}>Política de cancelación</h2>
-              <p><strong>{detalle.politicaCancelacion}</strong></p>
-              {detalle.descripcionPolitica && <p>{detalle.descripcionPolitica}</p>}
+              <div className={estilos.politica}>
+                <span className={estilos.politicaIcono}><Icono trazo={ESCUDO} /></span>
+                <div>
+                  <p><strong>{detalle.politicaCancelacion}</strong></p>
+                  {detalle.descripcionPolitica && <p className={estilos.nota}>{detalle.descripcionPolitica}</p>}
+                </div>
+              </div>
             </section>
           )}
 
           <section className={estilos.bloque}>
             <h2 className={estilos.seccion}>Disponibilidad</h2>
             {detalle.periodos.length === 0 ? (
-              <p>El anfitrión aún no publicó fechas disponibles.</p>
+              <p className={estilos.nota}>El anfitrión aún no publicó fechas disponibles.</p>
             ) : (
               <ul className={estilos.periodos}>
                 {detalle.periodos.map((periodo) => (
-                  <li key={`${periodo.inicio}-${periodo.fin}`}>
+                  <li key={`${periodo.inicio}-${periodo.fin}`} className={estilos.periodo}>
+                    <Icono trazo={CALENDARIO} />
                     Del {formatearFecha(periodo.inicio)} al {formatearFecha(periodo.fin)}
                   </li>
                 ))}

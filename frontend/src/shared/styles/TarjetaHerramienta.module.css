@@ -1,0 +1,136 @@
+/* Tarjeta de una herramienta del panel del administrador; la comparten el panel y la tarjeta de revisión. */
+.tarjeta {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espacio-3);
+  padding: var(--espacio-6);
+  border: 1px solid var(--color-borde);
+  border-radius: 1.25rem;
+  background: #fff;
+  box-shadow: 0 2px 6px rgb(43 33 28 / 5%);
+  transition: box-shadow var(--transicion), transform var(--transicion), border-color var(--transicion);
+}
+
+.tarjeta:hover {
+  border-color: var(--color-borde-control);
+  box-shadow: 0 14px 30px rgb(43 33 28 / 12%);
+  transform: translateY(-2px);
+}
+
+/* La que pide atención (publicaciones por revisar). */
+.destacada {
+  border-color: var(--color-terracota);
+  background: linear-gradient(160deg, #fff 55%, rgb(161 74 40 / 9%));
+}
+
+.icono {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.875rem;
+  background: var(--color-superficie);
+  color: var(--color-terracota);
+}
+
+.icono svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.destacada .icono {
+  background: var(--color-terracota);
+  color: var(--color-sobre-terracota);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--texto-titulo);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.nota {
+  margin: 0;
+  color: var(--color-texto-secundario);
+  line-height: 1.5;
+}
+
+.pendientes {
+  margin: 0;
+  color: var(--color-terracota-oscuro);
+  font-weight: 600;
+}
+
+.insignia {
+  position: absolute;
+  top: var(--espacio-4);
+  right: var(--espacio-4);
+  min-width: 2rem;
+  padding: 2px var(--espacio-2);
+  border-radius: 999px;
+  background: var(--color-terracota);
+  color: var(--color-sobre-terracota);
+  font-size: var(--texto-pequeno);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  text-align: center;
+}
+
+.enlace {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espacio-2);
+  min-height: 2.75rem;
+  margin-top: auto;
+  padding: 0 var(--espacio-4) 0 var(--espacio-6);
+  border: 1px solid var(--color-borde-control);
+  border-radius: 999px;
+  background: var(--color-fondo);
+  color: var(--color-texto);
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color var(--transicion), border-color var(--transicion), color var(--transicion);
+}
+
+.enlace svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  transition: transform var(--transicion);
+}
+
+.enlace:hover {
+  border-color: var(--color-terracota);
+  background: var(--color-terracota);
+  color: var(--color-sobre-terracota);
+}
+
+.enlace:hover svg {
+  transform: translateX(3px);
+}
+
+.enlace:focus-visible {
+  outline: 2px solid var(--color-terracota);
+  outline-offset: 2px;
+}
+
+/* Acción principal de la tarjeta destacada. */
+.destacada .enlace {
+  border-color: var(--color-terracota);
+  background: var(--color-terracota);
+  color: var(--color-sobre-terracota);
+}
+
+.destacada .enlace:hover {
+  border-color: var(--color-terracota-oscuro);
+  background: var(--color-terracota-oscuro);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tarjeta:hover,
+  .enlace:hover svg {
+    transform: none;
+  }
+}

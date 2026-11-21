@@ -37,6 +37,10 @@ Marca.propTypes = { tipo: PropTypes.string.isRequired, numero: PropTypes.number.
 export default function PasosPublicacion({ paso, faltantes, alIr }) {
   const conocido = faltantes !== null;
   const estaFaltante = (campos) => conocido && campos.some((campo) => faltantes.includes(campo));
+  let completos = 0;
+  for (const requisito of REQUISITOS) {
+    if (conocido && !estaFaltante(requisito.campos)) completos += 1;
+  }
 
   return (
     <aside className={estilos.lateral}>
@@ -48,7 +52,7 @@ export default function PasosPublicacion({ paso, faltantes, alIr }) {
             else if (estaFaltante(item.campos)) tipo = 'falta';
             else if (conocido) tipo = 'completo';
             return (
-              <li key={item.numero}>
+              <li key={item.numero} className={estilos.itemPaso}>
                 <button type="button" className={`${estilos.paso} ${item.numero === paso ? estilos.pasoActual : ''}`}
                   aria-current={item.numero === paso ? 'step' : undefined} onClick={() => alIr(item.numero)}>
                   <Marca tipo={tipo} numero={item.numero} />
@@ -63,6 +67,12 @@ export default function PasosPublicacion({ paso, faltantes, alIr }) {
       <section className={estilos.requisitos} aria-labelledby="titulo-requisitos">
         <h2 id="titulo-requisitos" className={estilos.tituloRequisitos}>Antes de solicitar la activación</h2>
         <p className={estilos.texto}>Una publicación necesita la información mínima completa para poder activarse.</p>
+        <div className={estilos.progreso}>
+          <div className={estilos.barra} aria-hidden="true">
+            <span className={estilos.barraAvance} style={{ width: `${(completos / REQUISITOS.length) * 100}%` }} />
+          </div>
+          <span className={estilos.conteo}>{`${completos} de ${REQUISITOS.length} listos`}</span>
+        </div>
         <ul className={estilos.lista}>
           {REQUISITOS.map((requisito) => {
             const falta = estaFaltante(requisito.campos);

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
+import Icono from '../../../shared/components/Icono.jsx';
 import { ACCIONES_AUDITORIA } from '../models/eventoAuditoria.js';
 import estilos from './FiltrosAuditoria.module.css';
 
@@ -64,7 +65,10 @@ export default function FiltrosAuditoria({ valores = {}, alAplicar }) {
           onChange={cambiar('hasta')} />
       </div>
       {errorRango && <p id="filtro-rango-error" role="alert" className={estilos.error}>{ERROR_RANGO}</p>}
-      <button type="submit" className={estilos.primario}>Aplicar filtros</button>
+      <button type="submit" className={estilos.primario}>
+        <Icono nombre="buscar" />
+        Aplicar filtros
+      </button>
     </form>
   );
 }

@@ -1,24 +1,63 @@
 .pagina {
-  max-width: 48rem;
+  max-width: 52rem;
   margin: 0 auto;
   padding: var(--espacio-12) var(--espacio-4);
 }
 
+/* Volver: botón en píldora con flecha, como en el resto de la aplicación. */
 .volver {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espacio-2);
+  min-height: 2.5rem;
   margin-bottom: var(--espacio-4);
-  color: var(--color-terracota);
-  font-weight: 600;
+  padding: 0 var(--espacio-4) 0 var(--espacio-3);
+  border: 1px solid var(--color-borde);
+  border-radius: 999px;
+  background: var(--color-superficie);
+  color: var(--color-texto);
+  font-size: var(--texto-pequeno);
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color var(--transicion), border-color var(--transicion), box-shadow var(--transicion);
+}
+
+.volver svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  transition: transform var(--transicion);
+}
+
+.atras {
+  transform: rotate(180deg);
+}
+
+.volver:hover {
+  border-color: var(--color-borde-control);
+  background: var(--color-fondo);
+  box-shadow: 0 4px 12px rgb(43 33 28 / 8%);
+}
+
+.volver:hover .atras {
+  transform: rotate(180deg) translateX(3px);
+}
+
+.volver:focus-visible {
+  outline: 2px solid var(--color-terracota);
+  outline-offset: 2px;
 }
 
 .titulo {
   margin: 0 0 var(--espacio-4);
-  font-size: var(--texto-encabezado);
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  font-weight: 300;
+  letter-spacing: -0.02em;
 }
 
 .subtitulo {
   margin: var(--espacio-6) 0 var(--espacio-2);
   font-size: var(--texto-titulo);
+  font-weight: 600;
 }
 
 .nota {
@@ -36,15 +75,23 @@
 .campos {
   display: grid;
   grid-template-columns: max-content 1fr;
-  gap: var(--espacio-2) var(--espacio-6);
+  gap: 0 var(--espacio-8);
   margin: 0;
-  padding: var(--espacio-4);
+  overflow: hidden;
   border: 1px solid var(--color-borde);
-  border-radius: var(--radio);
-  background: var(--color-superficie);
+  border-radius: 1.25rem;
+  background: #fff;
+  box-shadow: 0 2px 6px rgb(43 33 28 / 5%);
+}
+
+.campos dt,
+.campos dd {
+  padding: var(--espacio-3) var(--espacio-4);
+  border-bottom: 1px solid var(--color-borde);
 }
 
 .campos dt {
+  background: var(--color-superficie);
   color: var(--color-texto-secundario);
   font-size: var(--texto-pequeno);
   font-weight: 600;
@@ -55,12 +102,44 @@
   overflow-wrap: anywhere;
 }
 
+.campos dt:last-of-type,
+.campos dd:last-of-type {
+  border-bottom: 0;
+}
+
+.exito,
+.fallo {
+  padding: 2px var(--espacio-3);
+  border-radius: 999px;
+  font-size: var(--texto-pequeno);
+  font-weight: 700;
+}
+
+.exito {
+  background: var(--color-exito-fondo);
+  color: var(--color-exito);
+}
+
+.fallo {
+  background: var(--color-error-fondo);
+  color: var(--color-error);
+}
+
+/* Los datos del evento, como un bloque de código. */
 .datos {
   margin: 0;
   padding: var(--espacio-4);
   overflow-x: auto;
-  border: 1px solid var(--color-borde);
-  border-radius: var(--radio);
-  background: var(--color-fondo);
+  border-radius: 1rem;
+  background: #1f1a17;
+  color: #f3efec;
+  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
   font-size: var(--texto-pequeno);
+  line-height: 1.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .volver:hover .atras {
+    transform: rotate(180deg);
+  }
 }

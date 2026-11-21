@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import { useCallback, useEffect, useState } from 'react';
+import Icono from '../../../shared/components/Icono.jsx';
 import { errorDeMotivo, nombreDeEstado } from '../models/publicacion.js';
 import { bloquearPublicacion, buscarPublicacionesModerables } from '../services/alojamientosService.js';
 import { formatearFecha, formatearPesos } from '../../reservas/models/reserva.js';
@@ -152,7 +153,7 @@ export default function ModeracionPage() {
       .filter(Boolean).join(' · ');
     const idMotivo = `motivo-bloqueo-${publicacion.id}`;
     return (
-      <li key={publicacion.id} className={estilos.tarjeta}>
+      <li key={publicacion.id} className={estilos.tarjeta} data-estado={publicacion.estado}>
         <div className={estilos.cabeceraTarjeta}>
           <h3 className={estilos.nombre}>{publicacion.titulo}</h3>
           <span className={`${estilos.estado} ${estilos[publicacion.estado] ?? ''}`}>
@@ -174,6 +175,7 @@ export default function ModeracionPage() {
             <div className={estilos.acciones}>
               <button type="submit" className={estilos.peligro} disabled={enCurso === `publicacion-${publicacion.id}`}
                 aria-label={`Bloquear ${publicacion.titulo}`}>
+                <Icono nombre="bloquear" />
                 Bloquear
               </button>
             </div>
@@ -187,15 +189,17 @@ export default function ModeracionPage() {
     const idMotivo = `motivo-cancelacion-${reserva.id}`;
     const ocupada = enCurso === `reserva-${reserva.id}`;
     return (
-      <li key={reserva.id} className={estilos.tarjeta}>
-        <h3 className={estilos.nombre}>{reserva.titulo}</h3>
-        <p className={estilos.detalle}>
-          {[`Reserva #${reserva.id}`, reserva.huesped && `Huésped: ${reserva.huesped}`].filter(Boolean).join(' · ')}
-        </p>
-        <p className={estilos.detalle}>
-          {formatearFecha(reserva.llegada)} – {formatearFecha(reserva.salida)} · Total {formatearPesos(reserva.total)}
-        </p>
-        {reserva.motivoBloqueo && <p className={estilos.motivo}>Motivo del bloqueo: {reserva.motivoBloqueo}</p>}
+      <li key={reserva.id} className={`${estilos.tarjeta} ${estilos.tarjetaReserva}`} data-estado="REVISION">
+        <div className={estilos.informacion}>
+          <h3 className={estilos.nombre}>{reserva.titulo}</h3>
+          <p className={estilos.detalle}>
+            {[`Reserva #${reserva.id}`, reserva.huesped && `Huésped: ${reserva.huesped}`].filter(Boolean).join(' · ')}
+          </p>
+          <p className={estilos.detalle}>
+            {formatearFecha(reserva.llegada)} – {formatearFecha(reserva.salida)} · Total {formatearPesos(reserva.total)}
+          </p>
+          {reserva.motivoBloqueo && <p className={estilos.motivo}>Motivo del bloqueo: {reserva.motivoBloqueo}</p>}
+        </div>
         {erroresReserva[reserva.id] && <p role="alert" className={estilos.error}>{erroresReserva[reserva.id]}</p>}
         <form className={estilos.formulario} onSubmit={(evento) => cancelar(evento, reserva)} noValidate>
           <Motivo id={idMotivo} etiqueta={`Motivo de cancelación de la reserva #${reserva.id}`}
@@ -204,10 +208,12 @@ export default function ModeracionPage() {
           <div className={estilos.acciones}>
             <button type="button" className={estilos.principal} disabled={ocupada}
               aria-label={`Confirmar reserva #${reserva.id}`} onClick={() => confirmar(reserva)}>
+              <Icono nombre="aprobar" />
               Confirmar reserva
             </button>
             <button type="submit" className={estilos.peligro} disabled={ocupada}
               aria-label={`Cancelar con devolución la reserva #${reserva.id}`}>
+              <Icono nombre="devolver" />
               Cancelar con devolución
             </button>
           </div>
@@ -218,25 +224,36 @@ export default function ModeracionPage() {
 
   return (
     <main className={estilos.pagina}>
-      <h1 className={estilos.titulo}>Moderación</h1>
-      <p className={estilos.nota}>
-        Bloquea las publicaciones con información engañosa y decide qué pasa con sus reservas futuras.
-      </p>
+      <header className={estilos.cabecera}>
+        <div>
+          <h1 className={estilos.titulo}>Moderación</h1>
+          <p className={estilos.nota}>
+            Bloquea las publicaciones con información engañosa y decide qué pasa con sus reservas futuras.
+          </p>
+        </div>
+        {enRevision?.length > 0 && <span className={estilos.contador}>{enRevision.length} en espera</span>}
+      </header>
       <output className={confirmacion ? estilos.confirmacion : undefined}>{confirmacion}</output>
 
       <section className={estilos.seccion} aria-labelledby="bloquear-titulo">
-        <h2 id="bloquear-titulo" className={estilos.subtitulo}>Bloquear publicaciones</h2>
+        <div className={estilos.encabezadoSeccion}>
+          <span className={`${estilos.icono} ${estilos.iconoPeligro}`}><Icono nombre="bloquear" /></span>
+          <h2 id="bloquear-titulo" className={estilos.subtitulo}>Bloquear publicaciones</h2>
+        </div>
         <form className={estilos.busqueda} onSubmit={buscar} role="search">
           <div className={estilos.campo}>
             <label className={estilos.etiqueta} htmlFor="texto-busqueda">Buscar por título</label>
             <input id="texto-busqueda" type="search" className={estilos.control} value={texto} maxLength={120}
               onChange={(evento) => setTexto(evento.target.value)} />
           </div>
-          <button type="submit" className={estilos.principal}>Buscar</button>
+          <button type="submit" className={estilos.principal}>
+            <Icono nombre="buscar" />
+            Buscar
+          </button>
         </form>
         {errorBusqueda && <p role="alert" className={estilos.error}>{errorBusqueda}</p>}
         {resultados?.length === 0 && (
-          <p className={estilos.nota}>No hay publicaciones activas, pausadas ni bloqueadas con ese título.</p>
+          <p className={estilos.vacio}>No hay publicaciones activas, pausadas ni bloqueadas con ese título.</p>
         )}
         {resultados?.length > 0 && (
           <ul className={estilos.lista} aria-label="Resultados de la búsqueda">
@@ -246,13 +263,16 @@ export default function ModeracionPage() {
       </section>
 
       <section className={estilos.seccion} aria-labelledby="revision-titulo">
-        <h2 id="revision-titulo" className={estilos.subtitulo}>Reservas en revisión</h2>
+        <div className={estilos.encabezadoSeccion}>
+          <span className={`${estilos.icono} ${estilos.iconoAviso}`}><Icono nombre="reservas" /></span>
+          <h2 id="revision-titulo" className={estilos.subtitulo}>Reservas en revisión</h2>
+        </div>
         <p className={estilos.nota}>
           Reservas futuras de publicaciones bloqueadas. Confírmalas o cancélalas con la devolución total al huésped.
         </p>
         {errorRevision && <p role="alert" className={estilos.error}>{errorRevision}</p>}
         {!errorRevision && enRevision === null && <p className={estilos.nota}>Cargando reservas en revisión…</p>}
-        {enRevision?.length === 0 && <p className={estilos.nota}>No hay reservas en revisión.</p>}
+        {enRevision?.length === 0 && <p className={estilos.vacio}>No hay reservas en revisión.</p>}
         {enRevision?.length > 0 && (
           <ul className={estilos.lista} aria-label="Reservas en revisión">{enRevision.map(tarjetaReserva)}</ul>
         )}

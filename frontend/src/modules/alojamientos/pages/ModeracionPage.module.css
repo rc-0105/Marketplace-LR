@@ -1,23 +1,22 @@
 .pagina {
-  max-width: 48rem;
+  max-width: 68rem;
   margin: 0 auto;
   padding: var(--espacio-12) var(--espacio-4);
 }
 
+.cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--espacio-4);
+}
+
 .titulo {
-  margin: 0 0 var(--espacio-2);
-  font-size: var(--texto-encabezado);
-}
-
-.subtitulo {
-  margin: 0 0 var(--espacio-2);
-  font-size: var(--texto-titulo);
-}
-
-.seccion {
-  display: grid;
-  gap: var(--espacio-3);
-  margin-top: var(--espacio-8);
+  margin: 0 0 var(--espacio-1);
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  font-weight: 300;
+  letter-spacing: -0.02em;
 }
 
 .nota {
@@ -25,13 +24,24 @@
   color: var(--color-texto-secundario);
 }
 
+.contador {
+  padding: var(--espacio-1) var(--espacio-4);
+  border-radius: 999px;
+  background: var(--color-reservado-fondo);
+  color: var(--color-reservado);
+  font-size: var(--texto-pequeno);
+  font-weight: 600;
+}
+
 .confirmacion {
   display: block;
   margin-top: var(--espacio-4);
   padding: var(--espacio-3) var(--espacio-4);
+  border-left: 4px solid var(--color-exito);
   border-radius: var(--radio);
   background: var(--color-exito-fondo);
   color: var(--color-exito);
+  font-weight: 500;
 }
 
 .error {
@@ -40,6 +50,63 @@
   border-radius: var(--radio);
   background: var(--color-error-fondo);
   color: var(--color-error);
+}
+
+/* Cada bloque de la página es una tarjeta con su ícono. */
+.seccion {
+  display: grid;
+  gap: var(--espacio-4);
+  margin-top: var(--espacio-8);
+  padding: var(--espacio-6);
+  border: 1px solid var(--color-borde);
+  border-radius: 1.25rem;
+  background: var(--color-superficie);
+}
+
+.encabezadoSeccion {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-3);
+}
+
+.subtitulo {
+  margin: 0;
+  font-size: var(--texto-titulo);
+  font-weight: 600;
+}
+
+.icono {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex-shrink: 0;
+  border-radius: 0.75rem;
+}
+
+.icono svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.iconoPeligro {
+  background: var(--color-error-fondo);
+  color: var(--color-error);
+}
+
+.iconoAviso {
+  background: var(--color-reservado-fondo);
+  color: var(--color-reservado);
+}
+
+.vacio {
+  margin: 0;
+  padding: var(--espacio-6) var(--espacio-4);
+  border: 1px dashed var(--color-borde-control);
+  border-radius: 0.875rem;
+  background: rgb(255 255 255 / 45%);
+  color: var(--color-texto-secundario);
+  text-align: center;
 }
 
 .busqueda {
@@ -61,13 +128,46 @@
   list-style: none;
 }
 
+/* Tarjeta de una publicación o de una reserva, con un acento según su estado. */
 .tarjeta {
+  --acento: var(--color-borde-control);
+
   display: grid;
-  gap: var(--espacio-2);
+  gap: var(--espacio-3);
   padding: var(--espacio-4);
   border: 1px solid var(--color-borde);
-  border-radius: var(--radio);
-  background: var(--color-superficie);
+  border-left: 4px solid var(--acento);
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 2px 6px rgb(43 33 28 / 5%);
+}
+
+.tarjeta[data-estado='ACTIVA'] {
+  --acento: var(--color-exito);
+}
+
+.tarjeta[data-estado='PAUSADA'] {
+  --acento: #4a6290;
+}
+
+.tarjeta[data-estado='BLOQUEADA'] {
+  --acento: var(--color-error);
+}
+
+.tarjeta[data-estado='REVISION'] {
+  --acento: #b07a12;
+}
+
+@media (min-width: 56rem) {
+  .tarjetaReserva {
+    grid-template-columns: minmax(0, 1fr) 24rem;
+  }
+}
+
+.informacion {
+  display: grid;
+  align-content: start;
+  gap: var(--espacio-1);
 }
 
 .cabeceraTarjeta {
@@ -80,7 +180,7 @@
 
 .nombre {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.0625rem;
   font-weight: 600;
 }
 
@@ -91,11 +191,12 @@
 }
 
 .motivo {
-  margin: 0;
+  margin: var(--espacio-1) 0 0;
   padding: var(--espacio-2) var(--espacio-3);
-  border: 1px solid var(--color-borde);
-  border-radius: var(--radio);
-  background: var(--color-fondo);
+  border-left: 3px solid var(--color-error);
+  border-radius: 0 0.625rem 0.625rem 0;
+  background: var(--color-error-fondo);
+  color: var(--color-error);
   font-size: var(--texto-pequeno);
 }
 
@@ -103,8 +204,8 @@
   padding: 4px 12px;
   border-radius: 999px;
   font-size: 0.7rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
@@ -125,8 +226,12 @@
 
 .formulario {
   display: grid;
+  align-content: start;
   gap: var(--espacio-3);
-  margin-top: var(--espacio-2);
+  padding: var(--espacio-3);
+  border: 1px solid var(--color-borde);
+  border-radius: 0.875rem;
+  background: var(--color-fondo);
 }
 
 .campo {
@@ -144,11 +249,22 @@
   min-height: 2.75rem;
   padding: var(--espacio-2) var(--espacio-3);
   border: 1px solid var(--color-borde-control);
-  border-radius: var(--radio);
-  background: var(--color-fondo);
+  border-radius: 0.625rem;
+  background: #fff;
   color: var(--color-texto);
   font: inherit;
   resize: vertical;
+  transition: border-color var(--transicion), box-shadow var(--transicion);
+}
+
+.control:focus {
+  border-color: var(--color-terracota);
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(161 74 40 / 18%);
+}
+
+.control[aria-invalid='true'] {
+  border-color: var(--color-error);
 }
 
 .errorCampo {
@@ -165,13 +281,23 @@
 
 .principal,
 .peligro {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espacio-2);
   min-height: 2.75rem;
   padding: 0 var(--espacio-4);
-  border-radius: var(--radio);
+  border-radius: 999px;
   font: inherit;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color var(--transicion);
+  transition: background-color var(--transicion), border-color var(--transicion), color var(--transicion);
+}
+
+.principal svg,
+.peligro svg {
+  width: 1.125rem;
+  height: 1.125rem;
 }
 
 .principal {
@@ -181,6 +307,7 @@
 }
 
 .principal:hover:not(:disabled) {
+  border-color: var(--color-terracota-oscuro);
   background: var(--color-terracota-oscuro);
 }
 
@@ -191,7 +318,14 @@
 }
 
 .peligro:hover:not(:disabled) {
-  background: var(--color-error-fondo);
+  background: var(--color-error);
+  color: #fff;
+}
+
+.principal:focus-visible,
+.peligro:focus-visible {
+  outline: 2px solid var(--color-terracota);
+  outline-offset: 2px;
 }
 
 .principal:disabled,
