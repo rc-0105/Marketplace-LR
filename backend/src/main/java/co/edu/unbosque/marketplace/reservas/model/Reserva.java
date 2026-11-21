@@ -68,6 +68,17 @@ public class Reserva {
     @Column(nullable = false, updatable = false, precision = 12, scale = 2)
     private BigDecimal total;
 
+    @Column(name = "politica_nombre", insertable = false, updatable = false)
+    private String politicaNombre;
+    @Column(name = "politica_dias_sin_costo", insertable = false, updatable = false)
+    private Integer politicaDiasSinCosto;
+    @Column(name = "politica_porcentaje_devolucion", insertable = false, updatable = false)
+    private Integer politicaPorcentajeDevolucion;
+
+    public String getPoliticaNombre() { return politicaNombre; }
+    public Integer getPoliticaDiasSinCosto() { return politicaDiasSinCosto; }
+    public Integer getPoliticaPorcentajeDevolucion() { return politicaPorcentajeDevolucion; }
+
     // Ids de los servicios adicionales elegidos, para distinguir un reintento idéntico de otro con extras
     // distintos. Sin llave foránea: son los que se cotizaron, aunque el anfitrión borre el servicio después.
     @JdbcTypeCode(SqlTypes.ARRAY)
