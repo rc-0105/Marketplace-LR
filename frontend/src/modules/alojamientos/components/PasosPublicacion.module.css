@@ -6,7 +6,7 @@
 
 .pasos {
   display: grid;
-  gap: 4px;
+  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -33,9 +33,10 @@
 }
 
 .pasoActual {
-  background: #e4ded9;
+  background: var(--color-fondo);
   color: var(--color-texto);
-  font-weight: 500;
+  font-weight: 600;
+  box-shadow: 0 0 0 1px var(--color-borde), 0 6px 16px rgb(43 33 28 / 8%);
 }
 
 .indicador {
@@ -49,15 +50,21 @@
   font-weight: 500;
 }
 
-.actual,
+.actual {
+  background: var(--color-terracota);
+  color: var(--color-sobre-terracota);
+  box-shadow: 0 0 0 4px rgb(161 74 40 / 18%);
+}
+
 .completo {
-  background: #14110f;
+  background: var(--color-exito);
   color: #fff;
 }
 
 .falta {
-  border: 2px solid #9a5b0b;
-  color: #6b4608;
+  background: var(--color-reservado-fondo);
+  color: var(--color-reservado);
+  font-weight: 700;
 }
 
 .pendiente {
@@ -70,8 +77,8 @@
   gap: var(--espacio-3);
   padding: var(--espacio-6);
   border: 1px solid var(--color-borde);
-  border-radius: 1rem;
-  background: var(--color-fondo);
+  border-radius: 1.25rem;
+  background: var(--color-superficie);
 }
 
 .tituloRequisitos {
@@ -104,7 +111,7 @@
 }
 
 .faltaItem {
-  color: #6b4608;
+  color: var(--color-reservado);
   font-weight: 500;
 }
 
@@ -114,17 +121,17 @@
   place-items: center;
   width: 1.25rem;
   height: 1.25rem;
-  border: 2px solid #14110f;
+  border: 2px solid var(--color-exito);
   border-radius: 50%;
-  background: #14110f;
+  background: var(--color-exito);
   color: #fff;
   font-size: 0.7rem;
 }
 
 .casillaFalta {
-  border-color: #9a5b0b;
-  background: transparent;
-  color: #6b4608;
+  border-color: var(--color-reservado);
+  background: var(--color-reservado-fondo);
+  color: var(--color-reservado);
 }
 
 .casillaNeutra {
@@ -137,4 +144,48 @@
   color: var(--color-texto-secundario);
   font-size: 0.8rem;
   line-height: 1.5;
+}
+
+/* Línea que une los pasos, como un recorrido. */
+.itemPaso {
+  position: relative;
+}
+
+.itemPaso:not(:last-child)::after {
+  position: absolute;
+  top: calc(10px + 1.75rem + 2px);
+  left: calc(12px + 0.875rem - 1px);
+  width: 2px;
+  height: 10px;
+  background: var(--color-borde);
+  content: '';
+}
+
+.progreso {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-3);
+}
+
+.barra {
+  flex: 1;
+  height: 0.5rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-borde);
+}
+
+.barraAvance {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-exito);
+  transition: width 400ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.conteo {
+  color: var(--color-texto-secundario);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
