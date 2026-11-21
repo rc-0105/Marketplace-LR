@@ -48,8 +48,8 @@ describe('detalleReservaDesdeApi', () => {
 
 describe('nombres de estado', () => {
   it('nombra cada estado de la reserva y del pago para mostrarlo', () => {
-    expect(['PENDIENTE', 'CONFIRMADA', 'CANCELADA', 'VENCIDA'].map(nombreDeEstadoReserva))
-      .toEqual(['Pendiente de pago', 'Confirmada', 'Cancelada', 'Vencida']);
+    expect(['PENDIENTE', 'CONFIRMADA', 'CANCELADA', 'VENCIDA', 'COMPLETADA'].map(nombreDeEstadoReserva))
+      .toEqual(['Pendiente de pago', 'Confirmada', 'Cancelada', 'Vencida', 'Completada']);
     expect(['SIN_PAGO', 'APROBADO', 'RECHAZADO', 'ERROR', 'REEMBOLSADO', 'NO_COBRADO'].map(nombreDeEstadoPago))
       .toEqual(['Sin pago', 'Aprobado', 'Rechazado', 'En verificación', 'Reembolsado', 'No cobrado']);
   });

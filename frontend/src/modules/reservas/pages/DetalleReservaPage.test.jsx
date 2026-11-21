@@ -101,6 +101,26 @@ describe('DetalleReservaPage', () => {
     expect(screen.queryByText('Transacción')).not.toBeInTheDocument();
   });
 
+  it('con la reserva COMPLETADA ofrece reseñar la estancia (SOF-80)', async () => {
+    vi.mocked(consultarReserva).mockResolvedValue(detalle({ estado: 'COMPLETADA' }));
+
+    renderizar();
+
+    expect(await screen.findByText('Completada')).toBeInTheDocument();
+    expect(screen.getByRole('form', { name: 'Reseñar la estancia' })).toBeInTheDocument();
+  });
+
+  it.each(['PENDIENTE', 'CONFIRMADA', 'CANCELADA', 'VENCIDA'])(
+    'con la reserva %s no ofrece reseñar: la estancia no terminó o no ocurrió', async (estado) => {
+      vi.mocked(consultarReserva).mockResolvedValue(detalle({ estado }));
+
+      renderizar();
+
+      expect(await screen.findByRole('heading', { name: 'Casa en la playa' })).toBeInTheDocument();
+      expect(screen.queryByRole('form', { name: 'Reseñar la estancia' })).not.toBeInTheDocument();
+    },
+  );
+
   it('si el alojamiento ya no existe lo indica', async () => {
     vi.mocked(consultarReserva).mockResolvedValue(detalle({ alojamiento: null }));
 

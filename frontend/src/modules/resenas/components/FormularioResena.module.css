@@ -1,0 +1,136 @@
+.resena {
+  display: grid;
+  gap: var(--espacio-4);
+  padding: var(--espacio-6);
+  border: 1px solid var(--color-borde);
+  border-radius: 1rem;
+  background: var(--color-superficie);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--texto-titulo);
+  font-weight: 300;
+  letter-spacing: -0.01em;
+}
+
+.formulario {
+  display: grid;
+  gap: var(--espacio-4);
+}
+
+.calificacion {
+  display: grid;
+  gap: var(--espacio-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.calificacion legend {
+  margin-bottom: var(--espacio-2);
+  padding: 0;
+  font-weight: 500;
+}
+
+.opciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espacio-2);
+}
+
+/* Cada calificación es una píldora; el radio real queda oculto pero sigue siendo accesible con el teclado. */
+.opcion {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3rem;
+  padding: var(--espacio-2) var(--espacio-4);
+  border: 1px solid var(--color-borde);
+  border-radius: 999px;
+  background: var(--color-fondo);
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.opcion input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.opcion:has(input:checked) {
+  border-color: #14110f;
+  background: #14110f;
+  color: #fff;
+}
+
+.opcion:has(input:focus-visible) {
+  outline: 2px solid var(--color-terracota-oscuro);
+  outline-offset: 2px;
+}
+
+.lectorPantalla {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.campo {
+  display: grid;
+  gap: var(--espacio-2);
+  font-weight: 500;
+}
+
+.campo textarea {
+  padding: var(--espacio-3);
+  border: 1px solid var(--color-borde);
+  border-radius: 0.75rem;
+  background: var(--color-fondo);
+  font: inherit;
+  font-weight: 400;
+  resize: vertical;
+}
+
+.publicar {
+  justify-self: start;
+  padding: var(--espacio-3) var(--espacio-6);
+  border: 0;
+  border-radius: 999px;
+  background: #14110f;
+  color: #fff;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.publicar:hover:not(:disabled) {
+  background: #2a2522;
+}
+
+.publicar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.exito {
+  display: block;
+  padding: var(--espacio-2) var(--espacio-3);
+  border-radius: var(--radio);
+  background: var(--color-exito-fondo);
+  color: var(--color-exito);
+}
+
+.error {
+  margin: 0;
+  padding: var(--espacio-2) var(--espacio-3);
+  border-radius: var(--radio);
+  background: var(--color-error-fondo);
+  color: var(--color-error);
+  font-size: var(--texto-pequeno);
+}
