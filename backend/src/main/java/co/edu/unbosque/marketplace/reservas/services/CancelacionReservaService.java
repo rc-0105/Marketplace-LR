@@ -103,6 +103,7 @@ public class CancelacionReservaService {
             case VENCIDA -> "Esta reserva ya venció: no se puede cancelar.";
             case PENDIENTE -> "Esta reserva todavía no está confirmada: no se puede cancelar.";
             case CONFIRMADA -> "Esta reserva ya no se puede cancelar.";
+            case COMPLETADA -> "Esta reserva ya se completó: no se puede cancelar.";
         };
     }
 
