@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import co.edu.unbosque.marketplace.alojamientos.repository.PublicacionRepository;
+import co.edu.unbosque.marketplace.compartido.idempotencia.ServicioIdempotencia;
 import co.edu.unbosque.marketplace.identidad.model.Rol;
 import co.edu.unbosque.marketplace.identidad.model.Usuario;
 import co.edu.unbosque.marketplace.identidad.repository.UsuarioRepository;
@@ -14,6 +15,7 @@ import co.edu.unbosque.marketplace.reservas.repository.ReservaRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -197,6 +199,7 @@ class PagoReservaIntegracionTest {
     @DisplayName("Una reserva recién creada informa que todavía no tiene pago")
     void unaReservaNuevaInformaQueNoTienePago() throws Exception {
         mvc.perform(post("/api/v1/reservas").header(HttpHeaders.AUTHORIZATION, "Bearer " + iniciarSesion("ana@correo.com"))
+                        .header(ServicioIdempotencia.CABECERA, UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON).content(cuerpoReserva()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.estado").value("PENDIENTE"))
@@ -217,6 +220,7 @@ class PagoReservaIntegracionTest {
 
     private long reservar(String token) throws Exception {
         String respuesta = mvc.perform(post("/api/v1/reservas").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .header(ServicioIdempotencia.CABECERA, UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON).content(cuerpoReserva()))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();

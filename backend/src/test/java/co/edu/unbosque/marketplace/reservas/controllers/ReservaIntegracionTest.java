@@ -3,10 +3,13 @@ package co.edu.unbosque.marketplace.reservas.controllers;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import co.edu.unbosque.marketplace.alojamientos.repository.PublicacionRepository;
+import co.edu.unbosque.marketplace.compartido.idempotencia.RespuestaIdempotente;
+import co.edu.unbosque.marketplace.compartido.idempotencia.ServicioIdempotencia;
 import co.edu.unbosque.marketplace.identidad.model.Rol;
 import co.edu.unbosque.marketplace.identidad.model.Usuario;
 import co.edu.unbosque.marketplace.identidad.repository.UsuarioRepository;
@@ -15,6 +18,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -319,10 +323,112 @@ class ReservaIntegracionTest {
     }
 
     @Test
+    @DisplayName("SOF-77 AC1: la misma solicitud con la misma clave crea una sola reserva y repite la respuesta idéntica")
+    void mismaClaveCreaUnaSolaReserva() throws Exception {
+        Long id = publicacion("ACTIVA");
+        String token = iniciarSesion("ana@correo.com");
+        String clave = UUID.randomUUID().toString();
+        String cuerpo = cuerpo(id, LLEGADA, SALIDA, "[]");
+
+        String primera = reservarConClave(token, clave, cuerpo)
+                .andExpect(status().isCreated())
+                .andExpect(header().doesNotExist(RespuestaIdempotente.CABECERA_REPLICA))
+                .andReturn().getResponse().getContentAsString();
+        String segunda = reservarConClave(token, clave, cuerpo)
+                .andExpect(status().isCreated())
+                .andExpect(header().string(RespuestaIdempotente.CABECERA_REPLICA, "true"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(segunda).isEqualTo(primera);
+        assertThat(reservasGuardadas(id)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("SOF-77: los mismos servicios adicionales en otro orden son la misma solicitud")
+    void elOrdenDeLosServiciosNoCambiaLaSolicitud() throws Exception {
+        Long id = publicacion("ACTIVA");
+        Long desayuno = servicioAdicional(id, "Desayuno", 15000);
+        Long traslado = servicioAdicional(id, "Traslado", 40000);
+        String token = iniciarSesion("ana@correo.com");
+        String clave = UUID.randomUUID().toString();
+
+        reservarConClave(token, clave, cuerpo(id, LLEGADA, SALIDA, "[" + desayuno + "," + traslado + "]"))
+                .andExpect(status().isCreated());
+        reservarConClave(token, clave, cuerpo(id, LLEGADA, SALIDA, "[" + traslado + "," + desayuno + "]"))
+                .andExpect(status().isCreated())
+                .andExpect(header().string(RespuestaIdempotente.CABECERA_REPLICA, "true"));
+    }
+
+    @Test
+    @DisplayName("SOF-77: la misma clave con otras fechas responde 422 y no crea otra reserva")
+    void mismaClaveConOtraSolicitudResponde422() throws Exception {
+        Long id = publicacion("ACTIVA");
+        String token = iniciarSesion("ana@correo.com");
+        String clave = UUID.randomUUID().toString();
+
+        reservarConClave(token, clave, cuerpo(id, LLEGADA, SALIDA, "[]")).andExpect(status().isCreated());
+        reservarConClave(token, clave, cuerpo(id, LLEGADA.plusDays(20), SALIDA.plusDays(20), "[]"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.codigo").value("IDEMPOTENCIA_CLAVE_REUTILIZADA"));
+
+        assertThat(reservasGuardadas(id)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("SOF-77 AC3: otra clave para las mismas fechas aplica la regla de solapamiento y responde 409")
+    void otraClaveParaLasMismasFechasAplicaElSolapamiento() throws Exception {
+        Long id = publicacion("ACTIVA");
+        reservarConClave(iniciarSesion("ana@correo.com"), UUID.randomUUID().toString(),
+                cuerpo(id, LLEGADA, SALIDA, "[]")).andExpect(status().isCreated());
+
+        reservarConClave(iniciarSesion("carla@correo.com"), UUID.randomUUID().toString(),
+                cuerpo(id, LLEGADA, SALIDA, "[]"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("Esas fechas ya no están disponibles: alguien más reservó primero."));
+
+        assertThat(reservasGuardadas(id)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("SOF-77 AC4: con la clave vencida, la solicitud se trata como nueva y no se replica")
+    void claveVencidaSeTrataComoNueva() throws Exception {
+        Long id = publicacion("ACTIVA");
+        String token = iniciarSesion("ana@correo.com");
+        String clave = UUID.randomUUID().toString();
+        reservarConClave(token, clave, cuerpo(id, LLEGADA, SALIDA, "[]")).andExpect(status().isCreated());
+        jdbc.update("UPDATE clave_idempotencia SET vence_en = now() - interval '1 minute' WHERE clave = ?::uuid",
+                clave);
+
+        reservarConClave(token, clave, cuerpo(id, LLEGADA.plusDays(20), SALIDA.plusDays(20), "[]"))
+                .andExpect(status().isCreated())
+                .andExpect(header().doesNotExist(RespuestaIdempotente.CABECERA_REPLICA));
+
+        assertThat(reservasGuardadas(id)).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("SOF-77: sin la cabecera Idempotency-Key, o si no es un UUID, responde 400 y no reserva")
+    void sinClaveValidaResponde400() throws Exception {
+        Long id = publicacion("ACTIVA");
+        String token = iniciarSesion("ana@correo.com");
+
+        mvc.perform(post("/api/v1/reservas").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content(cuerpo(id, LLEGADA, SALIDA, "[]")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.codigo").value("IDEMPOTENCIA_CLAVE_INVALIDA"));
+        reservarConClave(token, "no-es-un-uuid", cuerpo(id, LLEGADA, SALIDA, "[]"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.codigo").value("IDEMPOTENCIA_CLAVE_INVALIDA"));
+
+        assertThat(reservasGuardadas(id)).isZero();
+    }
+
+    @Test
     @DisplayName("Sin fechas ni publicación, responde 400 con el error de cada campo")
     void rechazaCamposFaltantes() throws Exception {
         mvc.perform(post("/api/v1/reservas")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + iniciarSesion("ana@correo.com"))
+                        .header(ServicioIdempotencia.CABECERA, UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isBadRequest())
@@ -343,10 +449,16 @@ class ReservaIntegracionTest {
         assertThat(reservasGuardadas(id)).isZero();
     }
 
+    // Cada llamada es un intento nuevo, con su propia clave de idempotencia (SOF-77).
     private ResultActions reservar(String token, Long id, LocalDate llegada, LocalDate salida, String adicionales)
             throws Exception {
+        return reservarConClave(token, UUID.randomUUID().toString(), cuerpo(id, llegada, salida, adicionales));
+    }
+
+    private ResultActions reservarConClave(String token, String clave, String cuerpo) throws Exception {
         return mvc.perform(post("/api/v1/reservas").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .contentType(MediaType.APPLICATION_JSON).content(cuerpo(id, llegada, salida, adicionales)));
+                .header(ServicioIdempotencia.CABECERA, clave)
+                .contentType(MediaType.APPLICATION_JSON).content(cuerpo));
     }
 
     private String cuerpo(Long id, LocalDate llegada, LocalDate salida, String adicionales) {

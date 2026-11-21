@@ -27,6 +27,18 @@ describe('http', () => {
     }));
   });
 
+  it('agrega a la solicitud las cabeceras extra que recibe post, sin perder las propias', async () => {
+    const fetchFalso = vi.fn(() => respuesta(201, { id: 1 }));
+    vi.stubGlobal('fetch', fetchFalso);
+
+    await post('/api/v1/recurso', { a: 1 }, { 'Idempotency-Key': 'clave-1' });
+
+    const [, opciones] = fetchFalso.mock.calls[0];
+    expect(opciones.headers['Idempotency-Key']).toBe('clave-1');
+    expect(opciones.headers['Content-Type']).toBe('application/json');
+    expect(opciones.headers.Accept).toBe('application/json');
+  });
+
   it('un archivo viaja como multipart: no fija el Content-Type, que lleva el separador del navegador', async () => {
     const fetchFalso = vi.fn(() => respuesta(201, { url: '/api/v1/imagenes/abc' }));
     vi.stubGlobal('fetch', fetchFalso);
