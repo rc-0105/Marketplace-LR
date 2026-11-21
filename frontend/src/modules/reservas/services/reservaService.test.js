@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { get, post } from '../../../shared/services/http.js';
 import {
-  cancelarReserva, consultarReserva, crearReserva, listarMisReservas, listarReservasEnRevision, pagarReserva,
+  anticiparCancelacion, cancelarReserva, consultarReserva, crearReserva, listarMisReservas, listarReservasEnRevision, pagarReserva,
   resolverReservaEnRevision,
 } from './reservaService.js';
 
@@ -123,6 +123,14 @@ describe('pagarReserva', () => {
 });
 
 describe('cancelarReserva', () => {
+  it('consulta el cálculo y conserva el resultado manual al confirmar', async () => {
+    const calculo = { politica: 'Flexible', base: 10, porcentaje: 50, valorDevolucion: 5 };
+    get.mockResolvedValue(calculo);
+    expect(await anticiparCancelacion(7)).toEqual(calculo);
+    expect(get).toHaveBeenCalledWith('/api/v1/reservas/7/cancelacion/previsualizacion');
+    post.mockResolvedValue({ resultadoReembolso: 'REVISION_MANUAL', valorDevolucion: 5 });
+    expect((await cancelarReserva(7, 'Cambio')).resultadoReembolso).toBe('REVISION_MANUAL');
+  });
   beforeEach(() => vi.resetAllMocks());
 
   it('envía el motivo a la ruta de cancelación de la reserva y devuelve la cancelación convertida', async () => {

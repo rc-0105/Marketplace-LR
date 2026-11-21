@@ -72,7 +72,7 @@ const NOMBRE_ESTADO_PAGO = {
   NO_COBRADO: 'No cobrado',
 };
 
-const FORMATO_PESOS = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+const FORMATO_PESOS = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 2 });
 // Las fechas de la reserva son días sin hora: se formatean en UTC para que la zona del navegador no las corra.
 const FORMATO_FECHA = new Intl.DateTimeFormat('es-CO', {
   day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
@@ -169,12 +169,13 @@ export function reservaDesdeApi(dato) {
 }
 
 /**
- * Resultado de cancelar una reserva (SOF-75): el valor de devolución es siempre el 100% del total.
+ * Resultado de cancelar una reserva según los términos reservados.
  * @typedef {Object} Cancelacion
  * @property {number} reservaId
  * @property {string} estado estado final de la reserva, 'CANCELADA'
  * @property {string} motivo
  * @property {number} valorDevolucion
+ * @property {string} resultadoReembolso
  * @property {string} fecha instante en que se registró la cancelación
  */
 
@@ -189,6 +190,7 @@ export function cancelacionDesdeApi(dato) {
     estado: dato.estado,
     motivo: dato.motivo,
     valorDevolucion: Number(dato.valorDevolucion),
+    resultadoReembolso: dato.resultadoReembolso,
     fecha: dato.fecha,
   };
 }
