@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi } from '../../../shared/services/http.js';
@@ -6,10 +6,10 @@ import { formatearFecha, formatearPesos } from '../models/reserva.js';
 
 // Intl separa el signo del número con un espacio duro; Testing Library normaliza el DOM pero no lo esperado.
 const pesos = (valor) => formatearPesos(valor).replace(/\s/g, ' ');
-import { consultarReserva } from '../services/reservaService.js';
+import { cancelarReserva, consultarReserva } from '../services/reservaService.js';
 import DetalleReservaPage from './DetalleReservaPage.jsx';
 
-vi.mock('../services/reservaService.js', () => ({ consultarReserva: vi.fn() }));
+vi.mock('../services/reservaService.js', () => ({ consultarReserva: vi.fn(), cancelarReserva: vi.fn() }));
 
 function renderizar(id = '3') {
   render(
@@ -78,13 +78,14 @@ describe('DetalleReservaPage', () => {
       .toEqual(['Desayuno', 'Servicio no disponible']);
   });
 
-  it('muestra el estado del pago y la transacción cuando la hay', async () => {
+  it('muestra el pago como aceptado y nunca el identificador de la transacción', async () => {
     vi.mocked(consultarReserva).mockResolvedValue(detalle());
 
     renderizar();
 
-    expect(await screen.findByText('Aprobado')).toBeInTheDocument();
-    expect(screen.getByText('sim_abc')).toBeInTheDocument();
+    expect(await screen.findByText('Aceptado')).toBeInTheDocument();
+    expect(screen.queryByText('sim_abc')).not.toBeInTheDocument();
+    expect(screen.queryByText('Transacción')).not.toBeInTheDocument();
   });
 
   it('sin servicios adicionales ni transacción no muestra esas partes', async () => {
@@ -144,5 +145,46 @@ describe('DetalleReservaPage', () => {
     renderizar();
 
     expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos cargar la reserva. Intenta de nuevo.');
+  });
+
+  it('una reserva pendiente ofrece ir al portal de pagos y una confirmada no', async () => {
+    vi.mocked(consultarReserva).mockResolvedValueOnce(detalle({ estado: 'PENDIENTE', estadoPago: 'SIN_PAGO' }));
+    renderizar();
+
+    expect(await screen.findByRole('link', { name: 'Ir al portal de pagos' }))
+      .toHaveAttribute('href', '/huesped/reservas/3/pago');
+  });
+
+  it('una reserva confirmada no ofrece ir al portal de pagos', async () => {
+    vi.mocked(consultarReserva).mockResolvedValueOnce(detalle({}));
+    renderizar();
+
+    await screen.findByRole('heading', { name: 'Casa en la playa' });
+    expect(screen.queryByRole('link', { name: 'Ir al portal de pagos' })).not.toBeInTheDocument();
+  });
+
+  it('una reserva confirmada ofrece cancelarla y, al cancelar, la muestra cancelada (SOF-75)', async () => {
+    vi.mocked(consultarReserva).mockResolvedValueOnce(detalle())
+      .mockResolvedValueOnce(detalle({ estado: 'CANCELADA', estadoPago: 'REEMBOLSADO' }));
+    vi.mocked(cancelarReserva).mockResolvedValue({ reservaId: 3, estado: 'CANCELADA', valorDevolucion: 485000 });
+    renderizar();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancelar reserva' }));
+    fireEvent.change(screen.getByLabelText('Motivo de la cancelación'), { target: { value: 'Cambio de planes' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar cancelación' }));
+
+    expect(await screen.findByText(/Reserva cancelada/)).toHaveTextContent(/485\.000/);
+    expect(cancelarReserva).toHaveBeenCalledWith(3, 'Cambio de planes');
+    expect(await screen.findByText('Reembolsado')).toBeInTheDocument();
+    expect(screen.getByText('Cancelada')).toBeInTheDocument();
+  });
+
+  it.each(['PENDIENTE', 'CANCELADA', 'VENCIDA', 'COMPLETADA'])('una reserva %s no ofrece cancelarla', async (estado) => {
+    vi.mocked(consultarReserva).mockResolvedValue(detalle({ estado }));
+
+    renderizar();
+
+    await screen.findByRole('heading', { name: 'Casa en la playa' });
+    expect(screen.queryByRole('button', { name: 'Cancelar reserva' })).not.toBeInTheDocument();
   });
 });

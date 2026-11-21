@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import ResumenRevision from '../../modules/alojamientos/components/ResumenRevision.jsx';
+import Icono from '../../shared/components/Icono.jsx';
 import { useSesion } from '../../shared/sesion/useSesion.js';
+import tarjetas from '../../shared/styles/TarjetaHerramienta.module.css';
 import InicioHuespedPage from './InicioHuespedPage.jsx';
 import estilos from './PanelRolPage.module.css';
 
@@ -10,38 +12,52 @@ const NOMBRE_ROL = {
   ADMINISTRADOR: 'Administrador',
 };
 
-// Herramientas del administrador; cada módulo aporta su tarjeta y aquí solo se componen.
+// Las demás herramientas del administrador; la de revisión la aporta su módulo (ResumenRevision).
+const HERRAMIENTAS = [
+  {
+    id: 'moderacion', icono: 'moderacion', titulo: 'Moderación',
+    nota: 'Bloquea publicaciones engañosas y resuelve las reservas que quedan en revisión.',
+    ruta: '/administrador/moderacion', enlace: 'Moderar publicaciones',
+  },
+  {
+    id: 'usuarios', icono: 'usuarios', titulo: 'Usuarios',
+    nota: 'Restringe las cuentas que incumplen las políticas o rehabilítalas.',
+    ruta: '/administrador/usuarios', enlace: 'Administrar usuarios',
+  },
+  {
+    id: 'resenas', icono: 'resenas', titulo: 'Reseñas',
+    nota: 'Oculta las reseñas que incumplen las políticas de la plataforma.',
+    ruta: '/administrador/resenas', enlace: 'Moderar reseñas',
+  },
+  {
+    id: 'auditoria', icono: 'auditoria', titulo: 'Auditoría',
+    nota: 'Consulta los eventos críticos registrados en la plataforma.',
+    ruta: '/administrador/auditoria', enlace: 'Consultar auditoría',
+  },
+  {
+    id: 'cuenta', icono: 'cuenta', titulo: 'Tu cuenta',
+    nota: 'Consulta y actualiza tus datos o cambia tu contraseña.',
+    ruta: '/mi-cuenta', enlace: 'Ir a Mi cuenta',
+  },
+];
+
 function HerramientasAdministrador() {
   return (
     <section aria-labelledby="herramientas-titulo">
       <h2 id="herramientas-titulo" className={estilos.subtitulo}>Tus herramientas</h2>
       <div className={estilos.herramientas}>
         <ResumenRevision />
-        <section className={estilos.tarjeta} aria-labelledby="moderacion-titulo">
-          <h3 id="moderacion-titulo" className={estilos.tituloTarjeta}>Moderación</h3>
-          <p className={estilos.nota}>Bloquea publicaciones engañosas y resuelve las reservas que quedan en revisión.</p>
-          <Link to="/administrador/moderacion" className={estilos.enlace}>Moderar publicaciones</Link>
-        </section>
-        <section className={estilos.tarjeta} aria-labelledby="usuarios-titulo">
-          <h3 id="usuarios-titulo" className={estilos.tituloTarjeta}>Usuarios</h3>
-          <p className={estilos.nota}>Restringe las cuentas que incumplen las políticas o rehabilítalas.</p>
-          <Link to="/administrador/usuarios" className={estilos.enlace}>Administrar usuarios</Link>
-        </section>
-        <section className={estilos.tarjeta} aria-labelledby="resenas-titulo">
-          <h3 id="resenas-titulo" className={estilos.tituloTarjeta}>Reseñas</h3>
-          <p className={estilos.nota}>Oculta las reseñas que incumplen las políticas de la plataforma.</p>
-          <Link to="/administrador/resenas" className={estilos.enlace}>Moderar reseñas</Link>
-        </section>
-        <section className={estilos.tarjeta} aria-labelledby="auditoria-titulo">
-          <h3 id="auditoria-titulo" className={estilos.tituloTarjeta}>Auditoría</h3>
-          <p className={estilos.nota}>Consulta los eventos críticos registrados en la plataforma.</p>
-          <Link to="/administrador/auditoria" className={estilos.enlace}>Consultar auditoría</Link>
-        </section>
-        <section className={estilos.tarjeta} aria-labelledby="cuenta-titulo">
-          <h3 id="cuenta-titulo" className={estilos.tituloTarjeta}>Tu cuenta</h3>
-          <p className={estilos.nota}>Consulta y actualiza tus datos o cambia tu contraseña.</p>
-          <Link to="/mi-cuenta" className={estilos.enlace}>Ir a Mi cuenta</Link>
-        </section>
+        {HERRAMIENTAS.map((herramienta) => (
+          <section key={herramienta.id} className={tarjetas.tarjeta} aria-labelledby={`${herramienta.id}-titulo`}>
+            <span className={tarjetas.icono}><Icono nombre={herramienta.icono} /></span>
+            <h3 id={`${herramienta.id}-titulo`} className={tarjetas.titulo}>{herramienta.titulo}</h3>
+            <p className={tarjetas.nota}>{herramienta.nota}</p>
+            <Link to={herramienta.ruta} className={tarjetas.enlace}>
+              {herramienta.enlace}
+              <Icono nombre="flecha" />
+            </Link>
+          </section>
+        ))}
       </div>
     </section>
   );
@@ -58,8 +74,10 @@ export default function PanelRolPage() {
 
   return (
     <main className={esAdministrador ? estilos.paginaAmplia : estilos.pagina}>
-      <h1 className={estilos.titulo}>Hola, {usuario.nombre}</h1>
-      <p className={estilos.rol}>Ingresaste como {NOMBRE_ROL[usuario.rol] ?? usuario.rol}.</p>
+      <header className={estilos.cabecera}>
+        <h1 className={estilos.titulo}>Hola, {usuario.nombre}</h1>
+        <p className={estilos.rol}>Ingresaste como {NOMBRE_ROL[usuario.rol] ?? usuario.rol}.</p>
+      </header>
       {esAdministrador ? (
         <HerramientasAdministrador />
       ) : (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import FormularioResena from '../../resenas/components/FormularioResena.jsx';
+import CancelarReserva from '../components/CancelarReserva.jsx';
 import {
   formatearFecha, formatearPesos, nombreDeEstadoPago, nombreDeEstadoReserva,
 } from '../models/reserva.js';
@@ -23,6 +24,8 @@ export default function DetalleReservaPage() {
   const { id } = useParams();
   const [reserva, setReserva] = useState(null);
   const [errorCarga, setErrorCarga] = useState(null);
+  // Se cancela en esta visita: el aviso de la devolución sigue a la vista aunque la reserva ya no esté confirmada.
+  const [cancelada, setCancelada] = useState(false);
 
   useEffect(() => {
     let vigente = true;
@@ -45,6 +48,13 @@ export default function DetalleReservaPage() {
   }
   if (!reserva) {
     return <main className={estilos.pagina}><p className={estilos.nota}>Cargando la reserva…</p></main>;
+  }
+
+  // Tras cancelar, la reserva y su pago cambian: se vuelve a consultar. Si falla, se marca cancelada igual.
+  function refrescar() {
+    setCancelada(true);
+    setReserva((actual) => ({ ...actual, estado: 'CANCELADA' }));
+    consultarReserva(id).then(setReserva).catch(() => {});
   }
 
   const { alojamiento } = reserva;
@@ -88,9 +98,13 @@ export default function DetalleReservaPage() {
         )}
         <dl className={estilos.estadoPago}>
           <div><dt>Estado del pago</dt><dd>{nombreDeEstadoPago(reserva.estadoPago)}</dd></div>
-          {reserva.transaccionId && <div><dt>Transacción</dt><dd>{reserva.transaccionId}</dd></div>}
         </dl>
+        {reserva.estado === 'PENDIENTE' && (
+          <Link to={`/huesped/reservas/${reserva.id}/pago`} className={estilos.irAPagar}>Ir al portal de pagos</Link>
+        )}
       </section>
+
+      {(reserva.estado === 'CONFIRMADA' || cancelada) && <CancelarReserva reservaId={reserva.id} onCancelada={refrescar} />}
 
       {reserva.estado === 'COMPLETADA' && <FormularioResena reservaId={reserva.id} />}
     </main>

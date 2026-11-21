@@ -111,6 +111,21 @@ describe('Encabezado', () => {
     expect(screen.queryByRole('link', { name: 'Revisar publicaciones' })).not.toBeInTheDocument();
   });
 
+  it('sin sesión ofrece iniciar sesión y crear una cuenta', () => {
+    renderizar(vi.fn());
+
+    expect(screen.getByRole('link', { name: 'Iniciar sesión' })).toHaveAttribute('href', '/inicio-sesion');
+    expect(screen.getByRole('link', { name: 'Crear cuenta' })).toHaveAttribute('href', '/registro');
+  });
+
+  it('con sesión no ofrece iniciar sesión ni crear una cuenta', () => {
+    iniciar('HUESPED');
+    renderizar(vi.fn());
+
+    expect(screen.queryByRole('link', { name: 'Iniciar sesión' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Crear cuenta' })).not.toBeInTheDocument();
+  });
+
   it('sin sesión no muestra el botón de cerrar sesión', () => {
     renderizar(vi.fn());
 
@@ -152,6 +167,47 @@ describe('Encabezado', () => {
       expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeInTheDocument();
     },
   );
+
+  it.each(['HUESPED', 'ANFITRION', 'ADMINISTRADOR'])(
+    'a un %s le pone la campana justo antes de Cerrar sesión, después de la navegación', async (rol) => {
+      vi.mocked(listarNotificaciones).mockResolvedValue({ noLeidas: 0, notificaciones: [] });
+      iniciar(rol);
+      renderizar(vi.fn());
+
+      const campana = await screen.findByRole('link', { name: /^Notificaciones/ });
+      const cerrar = screen.getByRole('button', { name: 'Cerrar sesión' });
+      const cuenta = screen.getByRole('link', { name: 'Mi cuenta' });
+      const controles = [...screen.getByRole('banner').querySelectorAll('a, button')];
+
+      expect(controles.indexOf(cerrar)).toBe(controles.indexOf(campana) + 1);
+      expect(controles.indexOf(cuenta)).toBeLessThan(controles.indexOf(campana));
+    },
+  );
+
+  it('al administrador le ofrece desde el encabezado todas sus secciones y a los demás roles no', () => {
+    iniciar('ADMINISTRADOR');
+    renderizar(vi.fn());
+
+    const secciones = {
+      'Revisar publicaciones': '/administrador/publicaciones',
+      'Moderación': '/administrador/moderacion',
+      'Reseñas': '/administrador/resenas',
+      'Usuarios': '/administrador/usuarios',
+      'Auditoría': '/administrador/auditoria',
+    };
+    Object.entries(secciones).forEach(([nombre, ruta]) => {
+      expect(screen.getByRole('link', { name: nombre })).toHaveAttribute('href', ruta);
+    });
+  });
+
+  it.each(['HUESPED', 'ANFITRION'])('a un %s no le ofrece las secciones de administración', (rol) => {
+    iniciar(rol);
+    renderizar(vi.fn());
+
+    ['Moderación', 'Reseñas', 'Usuarios', 'Auditoría'].forEach((nombre) => {
+      expect(screen.queryByRole('link', { name: nombre })).not.toBeInTheDocument();
+    });
+  });
 
   it('sin sesión no muestra la campana ni consulta notificaciones', () => {
     renderizar(vi.fn());

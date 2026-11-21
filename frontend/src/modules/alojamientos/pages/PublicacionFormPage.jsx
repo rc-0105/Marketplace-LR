@@ -167,7 +167,7 @@ export default function PublicacionFormPage() {
   return (
     <main className={estilos.pagina}>
       <Link to="/anfitrion/publicaciones" className={estilos.volver}>
-        <span aria-hidden="true">‹</span> Volver a mis publicaciones
+        <span aria-hidden="true" className={estilos.flecha}>←</span> Volver a mis publicaciones
       </Link>
       <div className={estilos.encabezado}>
         <h1 className={estilos.titulo}>{titulo}</h1>
@@ -180,7 +180,12 @@ export default function PublicacionFormPage() {
           <PasosPublicacion paso={paso} faltantes={publicacion ? publicacion.camposFaltantes : null} alIr={irA} />
 
           <section className={estilos.seccion} aria-labelledby="titulo-paso">
-            <p className={estilos.numeroPaso}>PASO {paso} DE {ULTIMO_PASO}</p>
+            <div className={estilos.cabeceraPaso}>
+              <p className={estilos.numeroPaso}>PASO {paso} DE {ULTIMO_PASO}</p>
+              <div className={estilos.barra} aria-hidden="true">
+                <span className={estilos.barraAvance} style={{ width: `${(paso / ULTIMO_PASO) * 100}%` }} />
+              </div>
+            </div>
             <h2 id="titulo-paso" className={estilos.tituloPaso}>{pasoActual.titulo}</h2>
             {aviso && <output className={estilos.aviso}>{aviso}</output>}
 
@@ -258,7 +263,9 @@ export default function PublicacionFormPage() {
             <div className={estilos.acciones}>
               <div>
                 {paso > 1 && (
-                  <button type="button" className={estilos.secundario} onClick={() => irA(paso - 1)}>Atrás</button>
+                  <button type="button" className={estilos.secundario} onClick={() => irA(paso - 1)}>
+                    <span aria-hidden="true" className={estilos.flecha}>←</span> Atrás
+                  </button>
                 )}
               </div>
               <div className={estilos.derecha}>
@@ -267,7 +274,7 @@ export default function PublicacionFormPage() {
                 </button>
                 {paso < ULTIMO_PASO && (
                   <button type="button" className={estilos.primario} disabled={enviando} onClick={siguiente}>
-                    Siguiente
+                    Siguiente <span aria-hidden="true" className={estilos.flecha}>→</span>
                   </button>
                 )}
                 {paso === ULTIMO_PASO && publicacion && estado === 'BORRADOR' && (

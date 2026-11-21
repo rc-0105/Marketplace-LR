@@ -1,0 +1,237 @@
+.pagina {
+  display: grid;
+  gap: var(--espacio-6);
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: var(--espacio-8) var(--espacio-4) var(--espacio-12);
+}
+
+.encabezado {
+  display: grid;
+  gap: var(--espacio-1);
+}
+
+.paso {
+  margin: 0;
+  color: var(--color-terracota-oscuro);
+  font-size: var(--texto-pequeno);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.titulo {
+  margin: 0;
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.nota {
+  margin: 0;
+  color: var(--color-texto-secundario);
+}
+
+.columnas {
+  display: grid;
+  gap: var(--espacio-6);
+  align-items: start;
+}
+
+@media (min-width: 56rem) {
+  .columnas {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 26rem);
+  }
+}
+
+.resumen {
+  display: grid;
+  gap: var(--espacio-4);
+  padding: var(--espacio-6);
+  border: 1px solid var(--color-borde);
+  border-radius: 1.25rem;
+  background: var(--color-superficie);
+}
+
+.foto {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 0.75rem;
+  object-fit: cover;
+}
+
+.cabeceraAlojamiento {
+  display: grid;
+  gap: var(--espacio-1);
+}
+
+.alojamiento {
+  margin: 0;
+  font-size: var(--texto-encabezado);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.fechas {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--color-borde);
+  border-radius: 0.75rem;
+  background: var(--color-fondo);
+}
+
+.fecha {
+  display: grid;
+  gap: 2px;
+  padding: var(--espacio-3) var(--espacio-4);
+  font-weight: 500;
+}
+
+.fecha + .fecha {
+  border-left: 1px solid var(--color-borde);
+}
+
+.fechaEtiqueta {
+  color: var(--color-texto-secundario);
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.desglose {
+  display: grid;
+  gap: var(--espacio-2);
+  margin: 0;
+}
+
+.desglose div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--espacio-4);
+}
+
+.desglose dt {
+  color: var(--color-texto-secundario);
+}
+
+.desglose dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.desglose .total {
+  align-items: baseline;
+  margin-top: var(--espacio-2);
+  padding-top: var(--espacio-4);
+  border-top: 1px dashed var(--color-borde-control);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.desglose .total dt {
+  color: var(--color-texto);
+}
+
+.desglose .total dd {
+  color: var(--color-terracota-oscuro);
+}
+
+/* Pasarela: tarjeta clara elevada; PagoReserva aporta la vista previa y los métodos. */
+.pasarela {
+  display: grid;
+  gap: var(--espacio-4);
+  padding: var(--espacio-6);
+  border: 1px solid var(--color-borde);
+  border-radius: 1.25rem;
+  background: #fff;
+  box-shadow: 0 18px 40px rgb(43 33 28 / 10%);
+}
+
+@media (min-width: 56rem) {
+  .pasarela {
+    position: sticky;
+    top: var(--espacio-6);
+  }
+}
+
+.cabeceraPasarela {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espacio-3);
+}
+
+.subtitulo {
+  margin: 0;
+  font-size: var(--texto-titulo);
+  font-weight: 600;
+}
+
+.sello {
+  padding: 2px var(--espacio-3);
+  border-radius: 999px;
+  background: var(--color-reservado-fondo);
+  color: var(--color-reservado);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.apartado {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-2);
+  margin: 0;
+  padding: var(--espacio-2) var(--espacio-3);
+  border-radius: var(--radio);
+  background: var(--color-exito-fondo);
+  color: var(--color-exito);
+  font-size: var(--texto-pequeno);
+}
+
+.punto {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: currentcolor;
+  animation: latido 1.6s ease-in-out infinite;
+}
+
+@keyframes latido {
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .punto {
+    animation: none;
+  }
+}
+
+.aviso {
+  display: block;
+  margin: 0;
+  padding: var(--espacio-3) var(--espacio-4);
+  border-radius: var(--radio);
+  background: var(--color-bloqueado-fondo);
+  color: var(--color-texto);
+}
+
+.enlace {
+  justify-self: center;
+  color: var(--color-texto-secundario);
+  font-weight: 500;
+  text-decoration: underline;
+}
+
+.error {
+  margin: 0;
+  padding: var(--espacio-3) var(--espacio-4);
+  border-radius: var(--radio);
+  background: var(--color-error-fondo);
+  color: var(--color-error);
+}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Icono from '../../../shared/components/Icono.jsx';
 import { errorDeObservaciones } from '../models/publicacion.js';
 import {
   aprobarPublicacion, devolverPublicacion, listarPendientesDeRevision,
@@ -78,12 +79,23 @@ export default function RevisionPublicacionesPage() {
 
   return (
     <main className={estilos.pagina}>
-      <h1 className={estilos.titulo}>Revisión de publicaciones</h1>
-      <p className={estilos.nota}>Aprueba las que cumplen o devuélvelas al anfitrión explicando qué corregir.</p>
+      <header className={estilos.cabecera}>
+        <div>
+          <h1 className={estilos.titulo}>Revisión de publicaciones</h1>
+          <p className={estilos.nota}>Aprueba las que cumplen o devuélvelas al anfitrión explicando qué corregir.</p>
+        </div>
+        {pendientes?.length > 0 && <span className={estilos.contador}>{pendientes.length} por revisar</span>}
+      </header>
       <output className={confirmacion ? estilos.confirmacion : undefined}>{confirmacion}</output>
       {errorCarga && <p role="alert" className={estilos.error}>{errorCarga}</p>}
       {!errorCarga && pendientes === null && <p className={estilos.nota}>Cargando publicaciones pendientes…</p>}
-      {pendientes?.length === 0 && <p className={estilos.nota}>No hay publicaciones pendientes de revisión.</p>}
+      {pendientes?.length === 0 && (
+        <div className={estilos.vacio}>
+          <span className={estilos.vacioIcono}><Icono nombre="aprobar" /></span>
+          <p className={estilos.vacioTexto}>No hay publicaciones pendientes de revisión.</p>
+          <p className={estilos.nota}>Cuando un anfitrión pida activar una publicación, aparecerá aquí.</p>
+        </div>
+      )}
       {pendientes?.length > 0 && (
         <ul className={estilos.lista}>
           {pendientes.map((publicacion) => {
@@ -92,24 +104,28 @@ export default function RevisionPublicacionesPage() {
             const ocupada = enCurso === publicacion.id;
             return (
               <li key={publicacion.id} className={estilos.tarjeta}>
-                <h2 className={estilos.nombre}>{publicacion.titulo}</h2>
-                <p className={estilos.detalle}>{datosDe(publicacion)}</p>
-                {publicacion.enviadaARevisionEn && (
-                  <p className={estilos.detalle}>
-                    Enviada a revisión el{' '}
-                    {new Date(publicacion.enviadaARevisionEn).toLocaleDateString('es-CO', FORMATO_FECHA)}
-                  </p>
-                )}
-                {publicacion.descripcion && <p className={estilos.descripcion}>{publicacion.descripcion}</p>}
-                {errores[publicacion.id] && (
-                  <p role="alert" className={estilos.error}>{errores[publicacion.id]}</p>
-                )}
+                <div className={estilos.informacion}>
+                  <span className={estilos.estado}>Pendiente de revisión</span>
+                  <h2 className={estilos.nombre}>{publicacion.titulo}</h2>
+                  <p className={estilos.detalle}>{datosDe(publicacion)}</p>
+                  {publicacion.enviadaARevisionEn && (
+                    <p className={estilos.fecha}>
+                      Enviada a revisión el{' '}
+                      {new Date(publicacion.enviadaARevisionEn).toLocaleDateString('es-CO', FORMATO_FECHA)}
+                    </p>
+                  )}
+                  {publicacion.descripcion && <p className={estilos.descripcion}>{publicacion.descripcion}</p>}
+                </div>
                 <form className={estilos.revision} onSubmit={(evento) => devolver(evento, publicacion)} noValidate>
+                  {errores[publicacion.id] && (
+                    <p role="alert" className={estilos.error}>{errores[publicacion.id]}</p>
+                  )}
                   <div className={estilos.campo}>
                     <label className={estilos.etiqueta} htmlFor={idObservaciones}>
                       Observaciones para {publicacion.titulo}
                     </label>
-                    <textarea id={idObservaciones} className={estilos.control} rows={3} maxLength={1000}
+                    <textarea id={idObservaciones} className={estilos.control} rows={4} maxLength={1000}
+                      placeholder="Si la devuelves, explica qué debe corregir el anfitrión."
                       value={observaciones[publicacion.id] ?? ''}
                       aria-invalid={errorObservaciones ? true : undefined}
                       aria-describedby={errorObservaciones ? `${idObservaciones}-error` : undefined}
@@ -123,10 +139,12 @@ export default function RevisionPublicacionesPage() {
                   <div className={estilos.acciones}>
                     <button type="button" className={estilos.aprobar} disabled={ocupada}
                       aria-label={`Aprobar ${publicacion.titulo}`} onClick={() => aprobar(publicacion)}>
+                      <Icono nombre="aprobar" />
                       Aprobar
                     </button>
                     <button type="submit" className={estilos.devolver} disabled={ocupada}
                       aria-label={`Devolver ${publicacion.titulo}`}>
+                      <Icono nombre="devolver" />
                       Devolver
                     </button>
                   </div>

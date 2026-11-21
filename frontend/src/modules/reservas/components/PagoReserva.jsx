@@ -1,26 +1,49 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
-import { cancelarReserva, pagarReserva } from '../services/reservaService.js';
+import { pagarReserva } from '../services/reservaService.js';
 import estilos from './PagoReserva.module.css';
 
 const MENSAJE_ERROR = 'No pudimos procesar el pago. Intenta de nuevo.';
-const MENSAJE_ERROR_CANCELACION = 'No pudimos cancelar la reserva. Intenta de nuevo.';
 const FORMATO_PESOS = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
-// Tarjetas de prueba de Stripe: ninguna hace un cobro real (SOF-34).
+// Tarjetas de prueba de Stripe: ninguna hace un cobro real (SOF-34). Los últimos dígitos son los de la
+// tarjeta de prueba equivalente de Stripe, para que el huésped reconozca cuál está usando.
 const TARJETAS = [
-  { valor: 'pm_card_visa', etiqueta: 'Visa de prueba (aprobada)' },
-  { valor: 'pm_card_mastercard', etiqueta: 'Mastercard de prueba (aprobada)' },
-  { valor: 'pm_card_chargeDeclined', etiqueta: 'Tarjeta de prueba rechazada' },
-  { valor: 'pm_card_chargeDeclinedInsufficientFunds', etiqueta: 'Tarjeta de prueba sin fondos' },
+  { valor: 'pm_card_visa', marca: 'Visa', digitos: '4242', resultado: 'Pago aprobado' },
+  { valor: 'pm_card_mastercard', marca: 'Mastercard', digitos: '4444', resultado: 'Pago aprobado' },
+  { valor: 'pm_card_chargeDeclined', marca: 'Visa', digitos: '0002', resultado: 'La tarjeta es rechazada' },
+  { valor: 'pm_card_chargeDeclinedInsufficientFunds', marca: 'Visa', digitos: '9995', resultado: 'Sin fondos suficientes' },
 ];
+
+function LogoMarca({ marca }) {
+  if (marca === 'Mastercard') {
+    return (
+      <span className={estilos.logoMastercard} aria-hidden="true">
+        <span className={estilos.circuloRojo} />
+        <span className={estilos.circuloAmarillo} />
+      </span>
+    );
+  }
+  return <span className={estilos.logoVisa} aria-hidden="true">VISA</span>;
+}
+
+LogoMarca.propTypes = { marca: PropTypes.string.isRequired };
+
+function IconoCandado() {
+  return (
+    <svg className={estilos.candado} viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </svg>
+  );
+}
 
 /**
  * Pago de una reserva PENDIENTE con la pasarela en modo prueba (SOF-34). Aprobado o rechazado, el
  * resultado es definitivo y el botón desaparece; si la pasarela no respondió o falló (5xx), la reserva
- * sigue apartada y se puede reintentar.
+ * sigue apartada y se puede reintentar. La cancelación de la reserva confirmada se hace desde su detalle.
  */
-export default function PagoReserva({ reservaId, total }) {
+export default function PagoReserva({ reservaId, total, onAprobado }) {
   const [tarjeta, setTarjeta] = useState(TARJETAS[0].valor);
   const [claveIntento, setClaveIntento] = useState(() => crypto.randomUUID());
   const [pagando, setPagando] = useState(false);
@@ -30,12 +53,6 @@ export default function PagoReserva({ reservaId, total }) {
   // Si la pasarela no dio resultado, el cobro pudo completarse igual: el reintento va con la misma tarjeta
   // para que la pasarela devuelva ese cobro y no abra otro.
   const [tarjetaFija, setTarjetaFija] = useState(false);
-
-  // Cancelación de la reserva ya CONFIRMADA (SOF-75, HU-30): solo se ofrece tras el pago aprobado.
-  const [motivo, setMotivo] = useState('');
-  const [cancelando, setCancelando] = useState(false);
-  const [cancelacion, setCancelacion] = useState(null);
-  const [errorCancelacion, setErrorCancelacion] = useState(null);
 
   function cambiarTarjeta(evento) {
     setTarjeta(evento.target.value);
@@ -48,6 +65,7 @@ export default function PagoReserva({ reservaId, total }) {
     try {
       setAprobada(await pagarReserva(reservaId, tarjeta, claveIntento));
       setTerminado(true);
+      if (onAprobado) onAprobado();
     } catch (falla) {
       const conMensaje = falla.estado >= 400 && falla.estado !== 500;
       setError(conMensaje ? falla.message : MENSAJE_ERROR);
@@ -59,61 +77,55 @@ export default function PagoReserva({ reservaId, total }) {
     }
   }
 
-  async function cancelar() {
-    setErrorCancelacion(null);
-    setCancelando(true);
-    try {
-      setCancelacion(await cancelarReserva(reservaId, motivo));
-    } catch (falla) {
-      // Solo los 4xx traen un mensaje pensado para el usuario; un 5xx o sin conexión, el aviso genérico.
-      setErrorCancelacion(falla.estado >= 400 && falla.estado < 500 ? falla.message : MENSAJE_ERROR_CANCELACION);
-    } finally {
-      setCancelando(false);
-    }
-  }
+  const elegida = TARJETAS.find((opcion) => opcion.valor === tarjeta);
 
   return (
     <section className={estilos.pago} aria-label="Pago de la reserva">
       {!terminado && (
         <div className={estilos.formulario}>
-          <label className={estilos.campo}>
-            Tarjeta de prueba
-            <select value={tarjeta} onChange={cambiarTarjeta} disabled={pagando || tarjetaFija}>
-              {TARJETAS.map((opcion) => (
-                <option key={opcion.valor} value={opcion.valor}>{opcion.etiqueta}</option>
-              ))}
-            </select>
-          </label>
+          {/* Vista previa decorativa de la tarjeta elegida; los datos accesibles están en las opciones. */}
+          <div className={`${estilos.tarjeta} ${elegida.marca === 'Mastercard' ? estilos.tarjetaMastercard : ''}`}
+            aria-hidden="true">
+            <div className={estilos.tarjetaFila}>
+              <span className={estilos.chip} />
+              <span className={estilos.tarjetaEtiqueta}>Tarjeta de prueba</span>
+            </div>
+            <span className={estilos.tarjetaNumero}>{`•••• •••• •••• ${elegida.digitos}`}</span>
+            <div className={estilos.tarjetaFila}>
+              <span className={estilos.tarjetaDato}>
+                <small>Vence</small>
+                12/34
+              </span>
+              <LogoMarca marca={elegida.marca} />
+            </div>
+          </div>
+
+          <fieldset className={estilos.metodos} disabled={pagando || tarjetaFija}>
+            <legend className={estilos.leyenda}>Elige el método de pago</legend>
+            {TARJETAS.map((opcion) => (
+              <label key={opcion.valor}
+                className={`${estilos.metodo} ${tarjeta === opcion.valor ? estilos.elegido : ''}`}>
+                <input type="radio" name="metodo-pago" value={opcion.valor} checked={tarjeta === opcion.valor}
+                  onChange={cambiarTarjeta} className={estilos.radio} />
+                <span className={estilos.marca}><LogoMarca marca={opcion.marca} /></span>
+                <span className={estilos.datos}>
+                  <span className={estilos.numero}>{`${opcion.marca} terminada en ${opcion.digitos}`}</span>
+                  <span className={estilos.resultado}>{`Tarjeta de prueba · ${opcion.resultado}`}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
           <button type="button" className={estilos.pagar} onClick={pagar} disabled={pagando}>
+            <IconoCandado />
             {pagando ? 'Procesando pago…' : `Pagar ${FORMATO_PESOS.format(total)}`}
           </button>
+          <p className={estilos.confianza}>Conexión cifrada · Ningún pago de prueba hace un cobro real</p>
         </div>
       )}
       {aprobada && (
-        <output className={estilos.exito}>
-          Pago aprobado: tu reserva está confirmada. Transacción {aprobada.transaccionId}.
-        </output>
+        <output className={estilos.exito}>Pago aceptado: tu reserva está confirmada.</output>
       )}
       {error && <p role="alert" className={estilos.error}>{error}</p>}
-      {aprobada && !cancelacion && (
-        <div className={estilos.cancelacion}>
-          <label className={estilos.campo}>
-            Motivo de la cancelación
-            <textarea value={motivo} onChange={(evento) => setMotivo(evento.target.value)} disabled={cancelando}
-              maxLength={500} />
-          </label>
-          <button type="button" className={estilos.cancelar} onClick={cancelar}
-                  disabled={cancelando || !motivo.trim()}>
-            {cancelando ? 'Cancelando…' : 'Cancelar reserva'}
-          </button>
-        </div>
-      )}
-      {cancelacion && (
-        <output className={estilos.exito}>
-          Reserva cancelada: se devuelve {FORMATO_PESOS.format(cancelacion.valorDevolucion)}.
-        </output>
-      )}
-      {errorCancelacion && <p role="alert" className={estilos.error}>{errorCancelacion}</p>}
     </section>
   );
 }
@@ -121,4 +133,5 @@ export default function PagoReserva({ reservaId, total }) {
 PagoReserva.propTypes = {
   reservaId: PropTypes.number.isRequired,
   total: PropTypes.number.isRequired,
+  onAprobado: PropTypes.func,
 };

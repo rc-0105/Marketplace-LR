@@ -51,7 +51,7 @@ describe('nombres de estado', () => {
     expect(['PENDIENTE', 'CONFIRMADA', 'CANCELADA', 'VENCIDA', 'COMPLETADA'].map(nombreDeEstadoReserva))
       .toEqual(['Pendiente de pago', 'Confirmada', 'Cancelada', 'Vencida', 'Completada']);
     expect(['SIN_PAGO', 'APROBADO', 'RECHAZADO', 'ERROR', 'REEMBOLSADO', 'NO_COBRADO'].map(nombreDeEstadoPago))
-      .toEqual(['Sin pago', 'Aprobado', 'Rechazado', 'En verificación', 'Reembolsado', 'No cobrado']);
+      .toEqual(['Sin pago', 'Aceptado', 'Rechazado', 'En verificación', 'Reembolsado', 'No cobrado']);
   });
 });
 

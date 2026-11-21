@@ -9,65 +9,47 @@
 }
 
 .paginaAmplia {
-  max-width: 48rem;
+  max-width: 68rem;
+}
+
+.cabecera {
+  display: grid;
+  justify-items: start;
+  gap: var(--espacio-2);
 }
 
 .titulo {
-  margin: 0 0 var(--espacio-2);
-  font-size: var(--texto-encabezado);
+  margin: 0;
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
 }
 
+/* El rol con el que se ingresó, como una etiqueta. */
 .rol {
-  margin: 0 0 var(--espacio-4);
+  margin: 0;
+  padding: 4px var(--espacio-4);
+  border-radius: 999px;
+  background: var(--color-superficie);
+  color: var(--color-terracota-oscuro);
+  font-size: var(--texto-pequeno);
   font-weight: 600;
 }
 
 .nota {
-  margin: 0;
+  margin: var(--espacio-4) 0 0;
   color: var(--color-texto-secundario);
 }
 
 .subtitulo {
   margin: var(--espacio-8) 0 var(--espacio-4);
   font-size: var(--texto-titulo);
+  font-weight: 600;
 }
 
 .herramientas {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
   gap: var(--espacio-4);
-}
-
-.tarjeta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--espacio-2);
-  padding: var(--espacio-4);
-  border: 1px solid var(--color-borde);
-  border-radius: var(--radio);
-  background: var(--color-superficie);
-}
-
-.tituloTarjeta {
-  margin: 0;
-  font-size: var(--texto-titulo);
-}
-
-.enlace {
-  display: inline-flex;
-  align-items: center;
-  min-height: 2.75rem;
-  margin-top: auto;
-  padding: 0 var(--espacio-4);
-  border: 1px solid var(--color-terracota);
-  border-radius: var(--radio);
-  color: var(--color-terracota);
-  font-weight: 600;
-  text-decoration: none;
-  transition: background-color var(--transicion);
-}
-
-.enlace:hover {
-  background: var(--color-fondo);
 }

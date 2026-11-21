@@ -1,14 +1,13 @@
 import { useRef, useState } from 'react';
 import PropTypes from 'prop-types';
+import { Link, useNavigate } from 'react-router-dom';
 import Campo from '../../../shared/components/Campo.jsx';
-import PagoReserva from '../../reservas/components/PagoReserva.jsx';
 import { crearReserva } from '../../reservas/services/reservaService.js';
 import { cotizarEstancia } from '../services/cotizacionService.js';
 import estilos from './CotizadorEstancia.module.css';
 
 const MENSAJE_ERROR = 'No pudimos calcular la cotización. Intenta de nuevo.';
 const MENSAJE_ERROR_RESERVA = 'No pudimos confirmar la reserva. Intenta de nuevo.';
-const MENSAJE_RESERVA_CREADA = 'Reserva creada, queda pendiente de pago.';
 const FORMATO_PESOS = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
 /**
@@ -18,6 +17,7 @@ const FORMATO_PESOS = new Intl.NumberFormat('es-CO', { style: 'currency', curren
  * La cotización mostrada guarda las fechas y los servicios con que se calculó: "Confirmar reserva"
  * reserva exactamente eso. Si luego se edita una fecha o un servicio, la cotización se descarta
  * (y con ella el botón) hasta volver a cotizar, para no reservar algo distinto de lo que se ve.
+ * Creada la reserva (PENDIENTE), el huésped pasa al portal de pagos para pagarla (SOF-34).
  */
 export default function CotizadorEstancia({
   publicacionId, serviciosAdicionales = [], llegadaInicial = '', salidaInicial = '',
@@ -30,10 +30,10 @@ export default function CotizadorEstancia({
   const [errorCotizacion, setErrorCotizacion] = useState(null);
   const [calculando, setCalculando] = useState(false);
   const [reservando, setReservando] = useState(false);
-  const [mensajeReserva, setMensajeReserva] = useState(null);
   const [errorReserva, setErrorReserva] = useState(null);
-  // La reserva PENDIENTE recién creada, que es la que se paga (SOF-34).
-  const [reserva, setReserva] = useState(null);
+  // Reserva ya pagada del huésped con esta misma estancia: la API la devuelve en vez de crear otra.
+  const [yaReservada, setYaReservada] = useState(null);
+  const navegar = useNavigate();
   // Cada edición o cálculo invalida las respuestas en vuelo: una cotización tardía no debe reaparecer.
   const solicitud = useRef(0);
 
@@ -41,9 +41,8 @@ export default function CotizadorEstancia({
     solicitud.current += 1;
     setCotizada(null);
     setCalculando(false);
-    setMensajeReserva(null);
     setErrorReserva(null);
-    setReserva(null);
+    setYaReservada(null);
   }
 
   function cambiarFecha(evento) {
@@ -78,15 +77,19 @@ export default function CotizadorEstancia({
   // precio y revalidar que todo siga vigente (AC4, AC5), y el cruce de fechas lo decide ella (AC2, AC3).
   async function confirmarReserva() {
     setErrorReserva(null);
-    setMensajeReserva(null);
     setReservando(true);
     try {
       const { llegada, salida, servicios, clave } = cotizada;
-      setReserva(await crearReserva({ publicacionId, llegada, salida, serviciosAdicionalesIds: servicios }, clave));
-      setMensajeReserva(MENSAJE_RESERVA_CREADA);
+      const reserva = await crearReserva({ publicacionId, llegada, salida, serviciosAdicionalesIds: servicios }, clave);
+      // Si ya la tenía confirmada no hay nada que pagar: se avisa en vez de abrir el portal de pagos.
+      if (reserva.estado === 'CONFIRMADA') {
+        setYaReservada(reserva);
+        setReservando(false);
+        return;
+      }
+      navegar(`/huesped/reservas/${reserva.id}/pago`);
     } catch (error) {
       setErrorReserva(error.estado >= 400 && error.estado < 500 ? error.message : MENSAJE_ERROR_RESERVA);
-    } finally {
       setReservando(false);
     }
   }
@@ -149,14 +152,17 @@ export default function CotizadorEstancia({
             <div><dt>Descuentos</dt><dd>{FORMATO_PESOS.format(cotizada.cotizacion.descuento)}</dd></div>
             <div className={estilos.total}><dt>Total</dt><dd>{FORMATO_PESOS.format(cotizada.cotizacion.total)}</dd></div>
           </dl>
-          {!reserva && (
+          {yaReservada ? (
+            <div className={estilos.yaReservada}>
+              <output>Ya reservaste estas fechas. Tu reserva está confirmada y pagada.</output>
+              <Link to={`/huesped/reservas/${yaReservada.id}`} className={estilos.verReserva}>Ver mi reserva</Link>
+            </div>
+          ) : (
             <button type="button" className={estilos.reservar} onClick={confirmarReserva} disabled={reservando}>
               {reservando ? 'Confirmando…' : 'Confirmar reserva'}
             </button>
           )}
-          {mensajeReserva && <output className={estilos.exito}>{mensajeReserva}</output>}
           {errorReserva && <p role="alert" className={estilos.error}>{errorReserva}</p>}
-          {reserva && <PagoReserva reservaId={reserva.id} total={reserva.total} />}
         </>
       )}
     </section>

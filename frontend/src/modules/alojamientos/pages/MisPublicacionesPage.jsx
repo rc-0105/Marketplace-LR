@@ -87,14 +87,16 @@ export default function MisPublicacionesPage() {
     const lugar = [publicacion.tipo?.nombre, publicacion.ciudad].filter(Boolean).join(' · ');
     return (
       <li key={publicacion.id} className={estilos.tarjeta}>
-        {foto ? (
-          <img src={foto} alt={`Foto de ${publicacion.titulo}`} className={estilos.foto} />
-        ) : (
-          <div className={estilos.sinFoto}>Sin foto</div>
-        )}
-        <span className={`${estilos.estado} ${estilos[publicacion.estado]}`}>
-          {nombreDeEstado(publicacion.estado)}
-        </span>
+        <div className={estilos.portada}>
+          {foto ? (
+            <img src={foto} alt={`Foto de ${publicacion.titulo}`} className={estilos.foto} />
+          ) : (
+            <div className={estilos.sinFoto}>Sin foto</div>
+          )}
+          <span className={`${estilos.estado} ${estilos[publicacion.estado]}`}>
+            {nombreDeEstado(publicacion.estado)}
+          </span>
+        </div>
         <div className={estilos.texto}>
           <h3 className={estilos.nombre}>{publicacion.titulo}</h3>
           {lugar && <p className={estilos.detalle}>{lugar}</p>}
@@ -106,12 +108,12 @@ export default function MisPublicacionesPage() {
         )}
         <p className={estilos.detalle}>{resumenDe(publicacion)}</p>
         {publicacion.estado === 'BORRADOR' && publicacion.observacionesRevision && (
-          <p className={estilos.observaciones}>
+          <p className={`${estilos.observaciones} ${estilos.devuelta}`}>
             Devuelta por el administrador: {publicacion.observacionesRevision}
           </p>
         )}
         {publicacion.estado === 'BLOQUEADA' && (
-          <div className={estilos.observaciones}>
+          <div className={`${estilos.observaciones} ${estilos.bloqueo}`}>
             {publicacion.motivoBloqueo && (
               <p className={estilos.parrafo}>Bloqueada por un administrador: {publicacion.motivoBloqueo}</p>
             )}
@@ -131,7 +133,8 @@ export default function MisPublicacionesPage() {
             Disponibilidad
           </Link>
           {accion && (
-            <button type="button" className={estilos.cambiarEstado}
+            <button type="button"
+              className={`${estilos.cambiarEstado} ${publicacion.estado === 'ACTIVA' ? '' : estilos.principal}`}
               aria-label={`${accion.etiqueta} ${publicacion.titulo}`}
               disabled={enCurso === publicacion.id}
               onClick={() => cambiarEstado(publicacion, accion)}>
@@ -169,9 +172,13 @@ export default function MisPublicacionesPage() {
                 return null;
               }
               return (
-                <section key={columna.estado} className={estilos.columna} aria-label={columna.titulo}>
+                <section key={columna.estado} className={estilos.columna} aria-label={columna.titulo}
+                  data-estado={columna.estado}>
                   <div className={estilos.encabezadoColumna}>
-                    <h2 className={estilos.tituloColumna}>{columna.titulo}</h2>
+                    <h2 className={estilos.tituloColumna}>
+                      <span className={estilos.punto} aria-hidden="true" />
+                      {columna.titulo}
+                    </h2>
                     <span className={estilos.conteo}>{deLaColumna.length}</span>
                   </div>
                   {deLaColumna.length === 0 && <p className={estilos.columnaVacia}>Sin publicaciones aquí</p>}
