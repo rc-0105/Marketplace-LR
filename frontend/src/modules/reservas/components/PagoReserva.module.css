@@ -1,46 +1,56 @@
+/* Se muestra dentro de la tarjeta oscura de cotización: etiquetas claras y avisos con su propio fondo. */
 .pago {
   display: grid;
   gap: var(--espacio-3);
-  margin-top: var(--espacio-4);
+  padding-top: var(--espacio-4);
+  border-top: 1px solid rgb(255 255 255 / 20%);
 }
 
 .formulario {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
+  display: grid;
   gap: var(--espacio-3);
 }
 
 .campo {
   display: grid;
   gap: var(--espacio-2);
-  flex: 1 1 14rem;
+  font-size: var(--texto-pequeno);
+}
+
+.campo select,
+.campo textarea {
+  padding: 0 var(--espacio-3);
+  border: 1px solid var(--color-borde-control);
+  border-radius: var(--radio);
+  background: var(--color-fondo);
+  color: var(--color-texto);
+  font: inherit;
 }
 
 .campo select {
   min-height: 2.75rem;
-  padding: 0 var(--espacio-3);
-  border: 1px solid var(--color-borde);
-  border-radius: var(--radio);
-  background: var(--color-superficie);
-  color: inherit;
-  font: inherit;
+}
+
+.campo textarea {
+  min-height: 4.5rem;
+  padding: var(--espacio-2) var(--espacio-3);
+  resize: vertical;
 }
 
 .pagar {
-  min-height: 2.75rem;
-  padding: 0 var(--espacio-4);
+  min-height: 3rem;
+  padding: 0 var(--espacio-8);
   border: 0;
-  border-radius: var(--radio);
-  background: var(--color-terracota);
-  color: var(--color-sobre-terracota);
-  font-weight: 600;
+  border-radius: 999px;
+  background: #f3efec;
+  color: #2a2522;
+  font-weight: 500;
   cursor: pointer;
   transition: background-color var(--transicion);
 }
 
 .pagar:hover:not(:disabled) {
-  background: var(--color-terracota-oscuro);
+  background: #fff;
 }
 
 .pagar:disabled {
@@ -49,39 +59,26 @@
 }
 
 .cancelacion {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
+  display: grid;
   gap: var(--espacio-3);
 }
 
-.campo textarea {
-  min-height: 2.75rem;
-  padding: var(--espacio-2) var(--espacio-3);
-  border: 1px solid var(--color-borde);
-  border-radius: var(--radio);
-  background: var(--color-superficie);
-  color: inherit;
-  font: inherit;
-  resize: vertical;
-}
-
 .cancelar {
-  min-height: 2.75rem;
-  padding: 0 var(--espacio-4);
-  border: 1px solid var(--color-borde-control);
-  border-radius: var(--radio);
+  min-height: 3rem;
+  padding: 0 var(--espacio-8);
+  border: 1px solid rgb(255 255 255 / 60%);
+  border-radius: 999px;
   background: transparent;
-  color: var(--color-texto);
-  font-weight: 600;
+  color: #fff;
+  font-weight: 500;
   cursor: pointer;
   transition: background-color var(--transicion);
 }
 
 .cancelar:hover:not(:disabled) {
+  border-color: var(--color-error-fondo);
   background: var(--color-error-fondo);
   color: var(--color-error);
-  border-color: var(--color-error);
 }
 
 .cancelar:disabled {
