@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { get, post } from '../../../shared/services/http.js';
 import {
-  cancelarReserva, consultarReserva, crearReserva, listarMisReservas, pagarReserva,
+  cancelarReserva, consultarReserva, crearReserva, listarMisReservas, listarReservasEnRevision, pagarReserva,
+  resolverReservaEnRevision,
 } from './reservaService.js';
 
 vi.mock('../../../shared/services/http.js', () => ({ get: vi.fn(), post: vi.fn() }));
@@ -124,5 +125,38 @@ describe('cancelarReserva', () => {
       reservaId: 7, estado: 'CANCELADA', motivo: 'Cambio de planes', valorDevolucion: 470000,
       fecha: '2026-12-01T15:00:00Z',
     });
+  });
+});
+
+describe('reservas en revisión manual', () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  it('lista las reservas en revisión con el total como número y el huésped nulo si no llega', async () => {
+    vi.mocked(get).mockResolvedValue([
+      { id: 9, publicacionId: 5, titulo: 'Casa en la playa', huespedId: 3, huesped: 'Luis Gómez', llegada: '2026-12-10',
+        salida: '2026-12-14', total: '1200000.00', estadoPago: 'APROBADO', motivoBloqueo: 'Fotos falsas' },
+      { id: 10, publicacionId: 5, titulo: 'Casa en la playa', huespedId: 4, llegada: '2026-12-20',
+        salida: '2026-12-22', total: 500000, estadoPago: 'APROBADO', motivoBloqueo: 'Fotos falsas' },
+    ]);
+
+    const enRevision = await listarReservasEnRevision();
+
+    expect(get).toHaveBeenCalledWith('/api/v1/admin/reservas/revision');
+    expect(enRevision[0]).toEqual({
+      id: 9, publicacionId: 5, titulo: 'Casa en la playa', huespedId: 3, huesped: 'Luis Gómez', llegada: '2026-12-10',
+      salida: '2026-12-14', total: 1200000, estadoPago: 'APROBADO', motivoBloqueo: 'Fotos falsas',
+    });
+    expect(enRevision[1]).toMatchObject({ huesped: null, total: 500000 });
+  });
+
+  it('confirma sin motivo y cancela con motivo contra la ruta de administración', async () => {
+    vi.mocked(post).mockResolvedValue({});
+
+    await resolverReservaEnRevision(9, 'CONFIRMAR');
+    await resolverReservaEnRevision(10, 'CANCELAR', 'Publicación engañosa');
+
+    expect(post).toHaveBeenNthCalledWith(1, '/api/v1/admin/reservas/9/resolver', { decision: 'CONFIRMAR' });
+    expect(post).toHaveBeenNthCalledWith(2, '/api/v1/admin/reservas/10/resolver',
+      { decision: 'CANCELAR', motivo: 'Publicación engañosa' });
   });
 });

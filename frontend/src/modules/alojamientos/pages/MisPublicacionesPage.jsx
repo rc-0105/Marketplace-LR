@@ -15,18 +15,21 @@ const ACCIONES = {
   ACTIVA: { etiqueta: 'Pausar', ejecutar: pausarPublicacion },
 };
 
-// Las cuatro columnas del tablero, en el orden del ciclo de vida de una publicación.
+// Las columnas del tablero, en el orden del ciclo de vida de una publicación. La de bloqueadas solo aparece
+// si el anfitrión tiene alguna, para no sumar una columna vacía al tablero de todos.
 const COLUMNAS = [
   { estado: 'BORRADOR', titulo: 'Borrador' },
   { estado: 'PENDIENTE_REVISION', titulo: 'Pendiente de revisión' },
   { estado: 'ACTIVA', titulo: 'Activa' },
   { estado: 'PAUSADA', titulo: 'Pausada' },
+  { estado: 'BLOQUEADA', titulo: 'Bloqueada', soloConPublicaciones: true },
 ];
 
 const RESUMEN_ESTADO = {
   PENDIENTE_REVISION: 'Esperando la aprobación de un administrador.',
   ACTIVA: 'Visible en las búsquedas.',
   PAUSADA: 'Fuera de las búsquedas hasta que la reactives.',
+  BLOQUEADA: 'Fuera de las búsquedas y sin reservas nuevas.',
 };
 
 function resumenDe(publicacion) {
@@ -107,6 +110,14 @@ export default function MisPublicacionesPage() {
             Devuelta por el administrador: {publicacion.observacionesRevision}
           </p>
         )}
+        {publicacion.estado === 'BLOQUEADA' && (
+          <div className={estilos.observaciones}>
+            {publicacion.motivoBloqueo && (
+              <p className={estilos.parrafo}>Bloqueada por un administrador: {publicacion.motivoBloqueo}</p>
+            )}
+            <p className={estilos.parrafo}>Contacta a soporte para revisarla.</p>
+          </div>
+        )}
         {errores[publicacion.id] && (
           <p role="alert" className={estilos.error}>{errores[publicacion.id]}</p>
         )}
@@ -154,6 +165,9 @@ export default function MisPublicacionesPage() {
           <div className={estilos.tablero}>
             {COLUMNAS.map((columna) => {
               const deLaColumna = publicaciones.filter((publicacion) => publicacion.estado === columna.estado);
+              if (columna.soloConPublicaciones && deLaColumna.length === 0) {
+                return null;
+              }
               return (
                 <section key={columna.estado} className={estilos.columna} aria-label={columna.titulo}>
                   <div className={estilos.encabezadoColumna}>
@@ -168,7 +182,8 @@ export default function MisPublicacionesPage() {
           </div>
           <p className={estilos.leyenda}>
             Las publicaciones pasan por Borrador, En revisión, Activa y Pausada. Solo las activas aparecen en las
-            búsquedas y reciben reservas.
+            búsquedas y reciben reservas. Si un administrador bloquea una publicación, queda Bloqueada hasta que
+            soporte la revise.
           </p>
         </>
       )}

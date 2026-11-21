@@ -43,6 +43,18 @@
  * @property {string[]} camposFaltantes lo que la API dice que falta para activarla
  * @property {string | null} observacionesRevision motivo de la última devolución del administrador
  * @property {string | null} enviadaARevisionEn fecha ISO en que se pidió la última revisión
+ * @property {string | null} motivoBloqueo por qué la bloqueó un administrador, si está BLOQUEADA
+ */
+
+/**
+ * Publicación como la ve el administrador al buscar qué moderar (SOF-83).
+ * @typedef {Object} PublicacionModerable
+ * @property {number} id
+ * @property {string} titulo
+ * @property {string | null} ciudad
+ * @property {'ACTIVA' | 'PAUSADA' | 'BLOQUEADA'} estado
+ * @property {string | null} anfitrion
+ * @property {string | null} motivoBloqueo
  */
 
 /**
@@ -254,6 +266,7 @@ const NOMBRE_ESTADO = {
   PENDIENTE_REVISION: 'En revisión',
   ACTIVA: 'Activa',
   PAUSADA: 'Pausada',
+  BLOQUEADA: 'Bloqueada',
 };
 
 const NOMBRE_CAMPO = {
@@ -309,6 +322,22 @@ export function publicacionDesdeApi(respuesta) {
     camposFaltantes: respuesta.camposFaltantes ?? [],
     observacionesRevision: respuesta.observacionesRevision ?? null,
     enviadaARevisionEn: respuesta.enviadaARevisionEn ?? null,
+    motivoBloqueo: respuesta.motivoBloqueo ?? null,
+  };
+}
+
+/**
+ * @param {Object} respuesta fila de GET /api/v1/admin/publicaciones
+ * @returns {PublicacionModerable}
+ */
+export function publicacionModerableDesdeApi(respuesta) {
+  return {
+    id: respuesta.id,
+    titulo: respuesta.titulo,
+    ciudad: respuesta.ciudad ?? null,
+    estado: respuesta.estado,
+    anfitrion: respuesta.anfitrion ?? null,
+    motivoBloqueo: respuesta.motivoBloqueo ?? null,
   };
 }
 
@@ -323,4 +352,18 @@ export function errorDeObservaciones(observaciones) {
     return 'Indica las observaciones para el anfitrión.';
   }
   return limpias.length > 1000 ? 'Las observaciones admiten máximo 1000 caracteres.' : undefined;
+}
+
+/**
+ * Mismo formato que exige la API para bloquear una publicación o cancelar una reserva en revisión:
+ * obligatorio y de hasta 500 caracteres.
+ * @param {string} motivo
+ * @returns {string | undefined} mensaje de error, o nada si sirve
+ */
+export function errorDeMotivo(motivo) {
+  const limpio = motivo.trim();
+  if (!limpio) {
+    return 'Indica el motivo.';
+  }
+  return limpio.length > 500 ? 'El motivo admite máximo 500 caracteres.' : undefined;
 }

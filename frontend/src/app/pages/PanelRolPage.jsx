@@ -16,6 +16,11 @@ function HerramientasAdministrador() {
       <h2 id="herramientas-titulo" className={estilos.subtitulo}>Tus herramientas</h2>
       <div className={estilos.herramientas}>
         <ResumenRevision />
+        <section className={estilos.tarjeta} aria-labelledby="moderacion-titulo">
+          <h3 id="moderacion-titulo" className={estilos.tituloTarjeta}>Moderación</h3>
+          <p className={estilos.nota}>Bloquea publicaciones engañosas y resuelve las reservas que quedan en revisión.</p>
+          <Link to="/administrador/moderacion" className={estilos.enlace}>Moderar publicaciones</Link>
+        </section>
         <section className={estilos.tarjeta} aria-labelledby="usuarios-titulo">
           <h3 id="usuarios-titulo" className={estilos.tituloTarjeta}>Usuarios</h3>
           <p className={estilos.nota}>Restringe las cuentas que incumplen las políticas o rehabilítalas.</p>

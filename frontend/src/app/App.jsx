@@ -6,6 +6,7 @@ import MiCuentaPage from '../modules/identidad/pages/MiCuentaPage.jsx';
 import AdministracionUsuariosPage from '../modules/identidad/pages/AdministracionUsuariosPage.jsx';
 import RegistroPage from '../modules/identidad/pages/RegistroPage.jsx';
 import MisPublicacionesPage from '../modules/alojamientos/pages/MisPublicacionesPage.jsx';
+import ModeracionPage from '../modules/alojamientos/pages/ModeracionPage.jsx';
 import PublicacionEnviadaPage from '../modules/alojamientos/pages/PublicacionEnviadaPage.jsx';
 import PublicacionFormPage from '../modules/alojamientos/pages/PublicacionFormPage.jsx';
 import RevisionPublicacionesPage from '../modules/alojamientos/pages/RevisionPublicacionesPage.jsx';
@@ -73,6 +74,8 @@ export default function App() {
           element={<RutaProtegida rol="HUESPED"><DetalleReservaPage /></RutaProtegida>} />
         <Route path="/administrador/publicaciones"
           element={<RutaProtegida rol="ADMINISTRADOR"><RevisionPublicacionesPage /></RutaProtegida>} />
+        <Route path="/administrador/moderacion"
+          element={<RutaProtegida rol="ADMINISTRADOR"><ModeracionPage /></RutaProtegida>} />
         <Route path="/administrador/usuarios"
           element={<RutaProtegida rol="ADMINISTRADOR"><AdministracionUsuariosPage /></RutaProtegida>} />
         <Route path="/administrador/auditoria"

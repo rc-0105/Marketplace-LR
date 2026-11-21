@@ -1,6 +1,6 @@
 import { get, post } from '../../../shared/services/http.js';
 import {
-  cancelacionDesdeApi, detalleReservaDesdeApi, reservaDesdeApi, resumenReservaDesdeApi,
+  cancelacionDesdeApi, detalleReservaDesdeApi, reservaDesdeApi, reservaEnRevisionDesdeApi, resumenReservaDesdeApi,
 } from '../models/reserva.js';
 
 const RUTA = '/api/v1/reservas';
@@ -69,4 +69,28 @@ export async function pagarReserva(reservaId, metodoPago) {
  */
 export async function cancelarReserva(reservaId, motivo) {
   return cancelacionDesdeApi(await post(`${RUTA}/${reservaId}/cancelacion`, { motivo }));
+}
+
+const RUTA_REVISION = '/api/v1/admin/reservas';
+
+/**
+ * Reservas en revisión manual porque su publicación fue bloqueada (SOF-83), para el administrador.
+ * @returns {Promise<import('../models/reserva.js').ReservaEnRevision[]>}
+ */
+export async function listarReservasEnRevision() {
+  const respuesta = await get(`${RUTA_REVISION}/revision`);
+  return respuesta.map(reservaEnRevisionDesdeApi);
+}
+
+/**
+ * Resuelve una reserva en revisión manual (SOF-83): CONFIRMAR la mantiene; CANCELAR la cancela con la
+ * devolución total y exige motivo. 409 si ya no está en revisión; 502 si la pasarela no procesó la devolución
+ * (la reserva sigue en revisión). El ErrorApi se propaga.
+ * @param {number} reservaId
+ * @param {'CONFIRMAR' | 'CANCELAR'} decision
+ * @param {string} [motivo] obligatorio para CANCELAR
+ */
+export function resolverReservaEnRevision(reservaId, decision, motivo) {
+  const cuerpo = decision === 'CANCELAR' ? { decision, motivo } : { decision };
+  return post(`${RUTA_REVISION}/${reservaId}/resolver`, cuerpo);
 }

@@ -191,3 +191,38 @@ export function cancelacionDesdeApi(dato) {
     fecha: dato.fecha,
   };
 }
+
+/**
+ * Reserva que quedó en revisión manual porque su publicación fue bloqueada (SOF-83).
+ * @typedef {Object} ReservaEnRevision
+ * @property {number} id
+ * @property {number} publicacionId
+ * @property {string} titulo
+ * @property {number} huespedId
+ * @property {string | null} huesped nombre del huésped, si la API lo envía
+ * @property {string} llegada AAAA-MM-DD
+ * @property {string} salida AAAA-MM-DD
+ * @property {number} total
+ * @property {string} estadoPago
+ * @property {string | null} motivoBloqueo
+ */
+
+/**
+ * Convierte una fila de GET /api/v1/admin/reservas/revision; el total llega como número o texto.
+ * @param {Record<string, any>} dato
+ * @returns {ReservaEnRevision}
+ */
+export function reservaEnRevisionDesdeApi(dato) {
+  return {
+    id: dato.id,
+    publicacionId: dato.publicacionId,
+    titulo: dato.titulo,
+    huespedId: dato.huespedId,
+    huesped: dato.huesped ?? null,
+    llegada: dato.llegada,
+    salida: dato.salida,
+    total: Number(dato.total),
+    estadoPago: dato.estadoPago,
+    motivoBloqueo: dato.motivoBloqueo ?? null,
+  };
+}

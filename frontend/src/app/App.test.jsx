@@ -131,6 +131,21 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Revisión de publicaciones' })).toBeInTheDocument();
   });
 
+  it('muestra la moderación al administrador y pide las reservas en revisión', async () => {
+    get.mockResolvedValue([]);
+    iniciar('ADMINISTRADOR');
+    renderizarEn('/administrador/moderacion');
+    expect(screen.getByRole('heading', { name: 'Moderación' })).toBeInTheDocument();
+    expect(await screen.findByText('No hay reservas en revisión.')).toBeInTheDocument();
+    expect(get).toHaveBeenCalledWith('/api/v1/admin/reservas/revision');
+  });
+
+  it('un anfitrión que entra a la moderación vuelve a su panel', () => {
+    iniciar('ANFITRION');
+    renderizarEn('/administrador/moderacion');
+    esperarInicioDe('ANFITRION', 'Anfitrión');
+  });
+
   it('muestra la auditoría al administrador y la pide a la API', async () => {
     get.mockResolvedValue({ contenido: [], pagina: 0, tamano: 50, totalElementos: 0, totalPaginas: 0 });
     iniciar('ADMINISTRADOR');
