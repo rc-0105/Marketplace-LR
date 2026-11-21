@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import FormularioResena from '../../resenas/components/FormularioResena.jsx';
 import {
   formatearFecha, formatearPesos, nombreDeEstadoPago, nombreDeEstadoReserva,
 } from '../models/reserva.js';
@@ -90,6 +91,8 @@ export default function DetalleReservaPage() {
           {reserva.transaccionId && <div><dt>Transacción</dt><dd>{reserva.transaccionId}</dd></div>}
         </dl>
       </section>
+
+      {reserva.estado === 'COMPLETADA' && <FormularioResena reservaId={reserva.id} />}
     </main>
   );
 }
