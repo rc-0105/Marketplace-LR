@@ -136,12 +136,20 @@ public class ReservaController {
      * titular o el anfitrión de la publicación. El filtro de seguridad solo mira el rol; que sea uno de los
      * dos dueños posibles lo decide el service.
      */
+    @GetMapping("/{id}/cancelacion/previsualizacion")
+    @PreAuthorize(Permisos.HUESPED_O_ANFITRION)
+    public co.edu.unbosque.marketplace.reservas.services.CalculoCancelacion anticipar(@AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long id) {
+        return cancelacionService.anticipar(id, Long.valueOf(jwt.getSubject()));
+    }
+
     @PostMapping("/{id}/cancelacion")
     @PreAuthorize(Permisos.HUESPED_O_ANFITRION)
     public CancelacionResponse cancelar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
             @Valid @RequestBody CancelarReservaRequest data) {
         Cancelacion cancelacion = cancelacionService.cancelar(id, Long.valueOf(jwt.getSubject()), data.motivo());
         return new CancelacionResponse(cancelacion.getReservaId(), cancelacion.getEstadoFinal().name(),
-                cancelacion.getMotivo(), cancelacion.getValorDevolucion(), cancelacion.getFecha());
+                cancelacion.getMotivo(), cancelacion.getValorDevolucion(), cancelacion.getFecha(),
+                cancelacion.getResultadoReembolso(), cancelacion.getReembolsoId());
     }
 }

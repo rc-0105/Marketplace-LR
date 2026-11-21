@@ -41,6 +41,7 @@ import org.springframework.test.web.servlet.ResultActions;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
+@org.springframework.test.annotation.DirtiesContext(classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 class CancelacionReservaIntegracionTest {
 
     private static final String CONTRASENA = "Segura#2026";
@@ -65,6 +66,88 @@ class CancelacionReservaIntegracionTest {
     private RegistroReservas registro;
 
     private Long publicacionId;
+
+    @org.springframework.boot.test.mock.mockito.SpyBean
+    private co.edu.unbosque.marketplace.reservas.infraestructura.ReembolsosSimulados pasarela;
+
+    @Test
+    void anticipaSinEfectosYDosConfirmacionesSoloReembolsanUnaVez() throws Exception {
+        String token = iniciarSesion("ana@correo.com");
+        politica("Flexible");
+        long id = reservarYPagar(token);
+        politica("Estricta");
+        var total = (BigDecimal) fila(id).get("total");
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/reservas/{id}/cancelacion/previsualizacion", id)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.politica").value("Flexible"))
+                .andExpect(jsonPath("$.porcentaje").value(100)).andExpect(jsonPath("$.base").value(total.doubleValue()))
+                .andExpect(jsonPath("$.valorDevolucion").value(total.doubleValue()));
+        assertThat(fila(id)).containsEntry("estado", "CONFIRMADA");
+        org.mockito.Mockito.verifyNoInteractions(pasarela);
+        var salida = new java.util.concurrent.CyclicBarrier(2);
+        java.util.concurrent.Callable<Integer> intento = () -> {
+            salida.await(10, java.util.concurrent.TimeUnit.SECONDS);
+            return cancelar(token, id, "Cambio").andReturn().getResponse().getStatus();
+        };
+        try (var hilos = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var a = hilos.submit(intento);
+            var b = hilos.submit(intento);
+            assertThat(java.util.List.of(a.get(), b.get())).containsExactlyInAnyOrder(200, 409);
+        }
+        cancelar(token, id, "Reintento").andExpect(status().isConflict());
+        org.mockito.Mockito.verify(pasarela).solicitar(id, total);
+        assertThat(jdbc.queryForMap("SELECT reembolso_id, resultado_reembolso, valor_devolucion FROM cancelacion WHERE reserva_id=?", id))
+                .containsEntry("resultado_reembolso", "SIMULADO").containsEntry("reembolso_id", "sim-" + id)
+                .containsEntry("valor_devolucion", total);
+    }
+
+    @Test
+    void estrictaTardiaNoInvocaPasarela() throws Exception {
+        politica("Estricta");
+        String token = iniciarSesion("ana@correo.com");
+        long id = reservarYPagar(token);
+        cancelar(token, id, "Cambio").andExpect(status().isOk()).andExpect(jsonPath("$.valorDevolucion").value(0))
+                .andExpect(jsonPath("$.resultadoReembolso").value("NO_APLICA"));
+        org.mockito.Mockito.verifyNoInteractions(pasarela);
+    }
+
+    @Test
+    void falloConservaCancelacionSinPersistirElMensajeTecnico() throws Exception {
+        String token = iniciarSesion("ana@correo.com");
+        long id = reservarYPagar(token);
+        org.mockito.Mockito.doThrow(new IllegalStateException("detalle privado del proveedor")).when(pasarela)
+                .solicitar(org.mockito.ArgumentMatchers.eq(id), org.mockito.ArgumentMatchers.any());
+        cancelar(token, id, "Cambio").andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultadoReembolso").value("REVISION_MANUAL"));
+        assertThat(fila(id)).containsEntry("estado", "CANCELADA");
+        assertThat(jdbc.queryForMap("SELECT error_reembolso, resultado_reembolso FROM cancelacion WHERE reserva_id=?", id))
+                .containsEntry("error_reembolso", "FALLO_PASARELA").containsEntry("resultado_reembolso", "REVISION_MANUAL");
+    }
+
+    private void politica(String nombre) {
+        jdbc.update("UPDATE publicacion SET politica_id=(SELECT id FROM politica_cancelacion WHERE nombre=?) WHERE id=?", nombre, publicacionId);
+    }
+
+    @Test
+    void flexibleTardiaComparteElImporteYProtegeLaVistaPrevia() throws Exception {
+        politica("Flexible");
+        String token = iniciarSesion("ana@correo.com");
+        long id = reservarYPagar(token);
+        var manana = LocalDate.now(java.time.ZoneId.of("America/Bogota")).plusDays(1);
+        jdbc.update("UPDATE reserva SET llegada=?, salida=? WHERE id=?", manana, manana.plusDays(4), id);
+        var mitad = ((BigDecimal) fila(id).get("total")).movePointLeft(2).multiply(BigDecimal.valueOf(50));
+        String ruta = "/api/v1/reservas/{id}/cancelacion/previsualizacion";
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(ruta, id)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + iniciarSesion("carla@correo.com")))
+                .andExpect(status().isForbidden());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(ruta, id)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.porcentaje").value(50))
+                .andExpect(jsonPath("$.valorDevolucion").value(mitad.doubleValue()));
+        cancelar(token, id, "Cambio").andExpect(status().isOk()).andExpect(jsonPath("$.valorDevolucion").value(mitad.doubleValue()));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(ruta, id)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)).andExpect(status().isConflict());
+    }
 
     @BeforeEach
     void preparar() throws Exception {
