@@ -59,7 +59,8 @@ export default function PagoReserva({ reservaId, total }) {
     try {
       setCancelacion(await cancelarReserva(reservaId, motivo));
     } catch (falla) {
-      setErrorCancelacion(falla.estado >= 400 && falla.estado !== 500 ? falla.message : MENSAJE_ERROR_CANCELACION);
+      // Solo los 4xx traen un mensaje pensado para el usuario; un 5xx o sin conexión, el aviso genérico.
+      setErrorCancelacion(falla.estado >= 400 && falla.estado < 500 ? falla.message : MENSAJE_ERROR_CANCELACION);
     } finally {
       setCancelando(false);
     }
@@ -92,7 +93,8 @@ export default function PagoReserva({ reservaId, total }) {
         <div className={estilos.cancelacion}>
           <label className={estilos.campo}>
             Motivo de la cancelación
-            <textarea value={motivo} onChange={(evento) => setMotivo(evento.target.value)} disabled={cancelando} />
+            <textarea value={motivo} onChange={(evento) => setMotivo(evento.target.value)} disabled={cancelando}
+              maxLength={500} />
           </label>
           <button type="button" className={estilos.cancelar} onClick={cancelar}
                   disabled={cancelando || !motivo.trim()}>

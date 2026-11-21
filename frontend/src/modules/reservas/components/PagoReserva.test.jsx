@@ -151,4 +151,19 @@ describe('PagoReserva', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos cancelar la reserva. Intenta de nuevo.');
     expect(screen.getByRole('button', { name: /Cancelar reserva/ })).toBeEnabled();
   });
+
+  it('ante una falla del servidor o del proxy (503) no muestra su mensaje técnico sino el aviso genérico', async () => {
+    await pagarAprobado();
+    vi.mocked(cancelarReserva).mockRejectedValue(new ErrorApi(503, 'upstream connect error'));
+
+    cancelar('Cambio de planes');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos cancelar la reserva. Intenta de nuevo.');
+  });
+
+  it('el motivo no admite más de 500 caracteres, el mismo límite de la API', async () => {
+    await pagarAprobado();
+
+    expect(screen.getByLabelText('Motivo de la cancelación')).toHaveAttribute('maxLength', '500');
+  });
 });
