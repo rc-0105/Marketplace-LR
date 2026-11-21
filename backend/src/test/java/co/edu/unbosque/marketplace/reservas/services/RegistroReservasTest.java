@@ -91,6 +91,50 @@ class RegistroReservasTest {
         verify(cancelaciones, never()).saveAndFlush(any());
     }
 
+    @Test
+    @DisplayName("SOF-83: confirmar una reserva en revisión delega en la actualización condicional")
+    void confirmarRevisionDelegaEnElRepositorio() {
+        when(reservas.confirmarRevision(42L)).thenReturn(1, 0);
+
+        assertThat(registro.confirmarRevision(42L)).isTrue();
+        assertThat(registro.confirmarRevision(42L)).isFalse();
+    }
+
+    @Test
+    @DisplayName("SOF-83: cancelar una reserva en revisión ya reembolsada cambia estado y pago, y registra la cancelación")
+    void cancelarRevisionReembolsadaRegistraLaCancelacion() {
+        when(reservas.cancelarRevisionReembolsada(42L)).thenReturn(1);
+        Cancelacion cancelacion = cancelacionDe(42L);
+
+        assertThat(registro.cancelarRevision(cancelacion, true)).isTrue();
+
+        var orden = inOrder(reservas, cancelaciones);
+        orden.verify(reservas).cancelarRevisionReembolsada(42L);
+        orden.verify(cancelaciones).saveAndFlush(cancelacion);
+        verify(reservas, never()).cancelarRevision(any());
+    }
+
+    @Test
+    @DisplayName("SOF-83: sin cobro que devolver, cancela la reserva en revisión sin tocar el estado del pago")
+    void cancelarRevisionSinReembolsoNoTocaElPago() {
+        when(reservas.cancelarRevision(42L)).thenReturn(1);
+
+        assertThat(registro.cancelarRevision(cancelacionDe(42L), false)).isTrue();
+
+        verify(reservas, never()).cancelarRevisionReembolsada(any());
+        verify(cancelaciones).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("SOF-83: si la reserva ya no estaba en revisión, no registra la cancelación")
+    void cancelarRevisionSinCambioNoRegistra() {
+        when(reservas.cancelarRevision(99L)).thenReturn(0);
+
+        assertThat(registro.cancelarRevision(cancelacionDe(99L), false)).isFalse();
+
+        verify(cancelaciones, never()).saveAndFlush(any());
+    }
+
     private static Cancelacion cancelacionDe(Long reservaId) {
         return Cancelacion.nueva(reservaId, 7L, AHORA, "Motivo", BigDecimal.TEN, EstadoReserva.CANCELADA);
     }

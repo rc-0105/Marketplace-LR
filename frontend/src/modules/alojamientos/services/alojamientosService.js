@@ -1,5 +1,5 @@
 import { get, post, put, subirArchivo } from '../../../shared/services/http.js';
-import { publicacionDesdeApi } from '../models/publicacion.js';
+import { publicacionDesdeApi, publicacionModerableDesdeApi } from '../models/publicacion.js';
 
 const RUTA = '/api/v1/publicaciones';
 
@@ -152,4 +152,25 @@ export async function aprobarPublicacion(id) {
  */
 export async function devolverPublicacion(id, observaciones) {
   return publicacionDesdeApi(await post(`${RUTA_REVISION}/${id}/devolver`, { observaciones }));
+}
+
+/**
+ * Publicaciones activas, pausadas o bloqueadas cuyo título contiene el texto (SOF-83), hasta 50.
+ * @param {string} texto vacío para ver las primeras
+ * @returns {Promise<import('../models/publicacion.js').PublicacionModerable[]>}
+ */
+export async function buscarPublicacionesModerables(texto) {
+  const respuesta = await get(`${RUTA_REVISION}?texto=${encodeURIComponent(texto.trim())}`);
+  return respuesta.map(publicacionModerableDesdeApi);
+}
+
+/**
+ * Bloquea una publicación activa o pausada con el motivo indicado (SOF-83). Sus reservas futuras confirmadas
+ * pasan a revisión manual. 409 si no está activa ni pausada; el ErrorApi se propaga.
+ * @param {number | string} id
+ * @param {string} motivo
+ * @returns {Promise<import('../models/publicacion.js').Publicacion>}
+ */
+export async function bloquearPublicacion(id, motivo) {
+  return publicacionDesdeApi(await post(`${RUTA_REVISION}/${id}/bloquear`, { motivo }));
 }

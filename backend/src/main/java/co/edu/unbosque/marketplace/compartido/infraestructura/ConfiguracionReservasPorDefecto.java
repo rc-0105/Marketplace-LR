@@ -3,6 +3,7 @@ package co.edu.unbosque.marketplace.compartido.infraestructura;
 import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasCalendario;
 import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasFuturas;
 import co.edu.unbosque.marketplace.compartido.consultas.ConsultaReservasPeriodo;
+import co.edu.unbosque.marketplace.compartido.consultas.RevisionReservasPublicacion;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -37,5 +38,12 @@ public class ConfiguracionReservasPorDefecto {
     @ConditionalOnMissingBean(ConsultaReservasCalendario.class)
     ConsultaReservasCalendario consultaReservasCalendarioPorDefecto() {
         return (publicacionId, desde, hasta) -> List.of();
+    }
+
+    // Sin reservas, bloquear una publicación no deja ninguna en revisión manual (SOF-83).
+    @Bean
+    @ConditionalOnMissingBean(RevisionReservasPublicacion.class)
+    RevisionReservasPublicacion revisionReservasPublicacionPorDefecto() {
+        return publicacionId -> 0;
     }
 }

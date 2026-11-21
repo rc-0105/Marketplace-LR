@@ -60,6 +60,14 @@ describe('PanelRolPage', () => {
     expect(await screen.findByText('No hay publicaciones pendientes de revisión.')).toBeInTheDocument();
   });
 
+  it('al administrador le ofrece la moderación de publicaciones y reservas', () => {
+    iniciar('ADMINISTRADOR');
+    renderizar();
+
+    expect(screen.getByRole('heading', { name: 'Moderación' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Moderar publicaciones' })).toHaveAttribute('href', '/administrador/moderacion');
+  });
+
   it('al huésped le muestra su ventana principal con el buscador en lugar del aviso de construcción', async () => {
     vi.mocked(consultarDestacados).mockResolvedValue([]);
     iniciar('HUESPED');

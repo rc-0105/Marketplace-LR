@@ -1,5 +1,6 @@
 package co.edu.unbosque.marketplace.reservas.services;
 
+import co.edu.unbosque.marketplace.alojamientos.services.PublicacionService;
 import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
@@ -48,30 +49,40 @@ public class PagoReservaService {
     private final PasarelaPagos pasarela;
     private final PublicadorEventos publicador;
     private final NotificacionesReserva notificaciones;
+    private final PublicacionService publicaciones;
     private final Clock reloj;
 
     public PagoReservaService(ReservaRepository reservas, RegistroReservas registro, PasarelaPagos pasarela,
-            PublicadorEventos publicador, NotificacionesReserva notificaciones, Clock reloj) {
+            PublicadorEventos publicador, NotificacionesReserva notificaciones, PublicacionService publicaciones,
+            Clock reloj) {
         this.reservas = reservas;
         this.registro = registro;
         this.pasarela = pasarela;
         this.publicador = publicador;
         this.notificaciones = notificaciones;
+        this.publicaciones = publicaciones;
         this.reloj = reloj;
     }
 
     /**
      * Cobra la reserva del huésped con el método de prueba. Solo el dueño paga, y solo una reserva PENDIENTE
-     * con el apartado vigente: una ya pagada, cancelada o vencida responde 409 sin llamar a la pasarela.
+     * con el apartado vigente: una ya pagada, cancelada o vencida, o de una publicación bloqueada, responde 409
+     * sin llamar a la pasarela.
      */
     public Reserva pagar(Long reservaId, Long huespedId, String metodoPago) {
         Reserva reserva = reservas.findById(reservaId).orElseThrow(ReservaNoEncontradaException::new);
         Propiedad.exigirPropietario(reserva.getHuespedId(), huespedId);
-        if (reserva.getEstado() == EstadoReserva.CONFIRMADA) {
+        // EN_REVISION_MANUAL (SOF-83) es una CONFIRMADA cuya publicación se bloqueó: también está pagada.
+        if (reserva.getEstado() == EstadoReserva.CONFIRMADA || reserva.getEstado() == EstadoReserva.EN_REVISION_MANUAL) {
             throw new ReservaNoPagableException("Esta reserva ya está pagada.");
         }
         if (!reserva.ocupaNoches(Instant.now(reloj))) {
             throw new ReservaNoPagableException("Esta reserva ya no se puede pagar: su apartado venció o fue cancelada.");
+        }
+        // El bloqueo (SOF-83) solo manda a revisión las ya confirmadas; una pendiente no debe confirmarse después.
+        if (publicaciones.estaBloqueada(reserva.getPublicacionId())) {
+            throw new ReservaNoPagableException(
+                    "Esta reserva ya no se puede pagar: un administrador bloqueó el alojamiento.");
         }
 
         // Una sola clave por reserva: si un cobro se completó en la pasarela después de agotarse la espera, el

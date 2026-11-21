@@ -11,5 +11,10 @@ public enum EstadoPublicacion {
     PENDIENTE_REVISION,
     ACTIVA,
     /** El anfitrión la sacó de las búsquedas; al reactivarla vuelve a ACTIVA. */
-    PAUSADA
+    PAUSADA,
+    /**
+     * Un administrador la bloqueó por información engañosa (SOF-83): sale de las búsquedas y su anfitrión no
+     * puede volver a activarla; tiene que contactar a soporte.
+     */
+    BLOQUEADA
 }

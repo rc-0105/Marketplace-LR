@@ -90,4 +90,27 @@ public class RegistroReservas {
         cancelaciones.saveAndFlush(cancelacion);
         return true;
     }
+
+    /** Revisión manual (SOF-83): la reserva vuelve a CONFIRMADA si sigue en revisión; {@code false} si no. */
+    @Transactional
+    public boolean confirmarRevision(Long reservaId) {
+        return reservas.confirmarRevision(reservaId) == 1;
+    }
+
+    /**
+     * Revisión manual (SOF-83): si la reserva sigue en revisión la cancela, con el pago REEMBOLSADO cuando la
+     * pasarela ya devolvió el cobro, y registra {@code cancelacion} en la misma transacción, igual que
+     * {@link #cancelar}. Devuelve {@code false}, sin registrar nada, si ya no estaba en revisión.
+     */
+    @Transactional
+    public boolean cancelarRevision(Cancelacion cancelacion, boolean reembolsado) {
+        Long reservaId = cancelacion.getReservaId();
+        int cambiadas = reembolsado ? reservas.cancelarRevisionReembolsada(reservaId)
+                : reservas.cancelarRevision(reservaId);
+        if (cambiadas != 1) {
+            return false;
+        }
+        cancelaciones.saveAndFlush(cancelacion);
+        return true;
+    }
 }

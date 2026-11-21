@@ -21,6 +21,7 @@ import co.edu.unbosque.marketplace.alojamientos.repository.AnfitrionDePublicacio
 import co.edu.unbosque.marketplace.alojamientos.repository.PublicacionRepository;
 import co.edu.unbosque.marketplace.alojamientos.repository.ServicioRepository;
 import co.edu.unbosque.marketplace.alojamientos.repository.TipoAlojamientoRepository;
+import co.edu.unbosque.marketplace.compartido.consultas.RevisionReservasPublicacion;
 import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
@@ -41,6 +42,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,6 +54,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class PublicacionService {
 
     private static final String ENTIDAD = "Publicacion";
+    // Igual que el listado de cuentas para administración (SOF-84).
+    private static final int MAXIMO_MODERACION = 50;
+    private static final int MAXIMO_MENSAJE = 600;
+    private static final List<EstadoPublicacion> MODERABLES = List.of(EstadoPublicacion.ACTIVA,
+            EstadoPublicacion.PAUSADA, EstadoPublicacion.BLOQUEADA);
 
     private final PublicacionRepository publicaciones;
     private final ServicioRepository catalogo;
@@ -59,16 +66,18 @@ public class PublicacionService {
     private final PoliticaCancelacionRepository politicas;
     private final PublicadorEventos publicador;
     private final Notificador notificador;
+    private final RevisionReservasPublicacion revisionReservas;
 
     public PublicacionService(PublicacionRepository publicaciones, ServicioRepository catalogo,
             TipoAlojamientoRepository tipos, PoliticaCancelacionRepository politicas, PublicadorEventos publicador,
-            Notificador notificador) {
+            Notificador notificador, RevisionReservasPublicacion revisionReservas) {
         this.publicaciones = publicaciones;
         this.catalogo = catalogo;
         this.tipos = tipos;
         this.politicas = politicas;
         this.publicador = publicador;
         this.notificador = notificador;
+        this.revisionReservas = revisionReservas;
     }
 
     /** Guarda la publicación en BORRADOR a nombre del anfitrión autenticado. */
@@ -207,6 +216,8 @@ public class PublicacionService {
         case PENDIENTE_REVISION ->
             throw new CambioEstadoNoPermitidoException("La publicación ya está esperando revisión.");
         case ACTIVA -> throw new CambioEstadoNoPermitidoException("La publicación ya está activa.");
+        case BLOQUEADA -> throw new CambioEstadoNoPermitidoException(
+                "Esta publicación fue bloqueada por un administrador. Contacta a soporte para revisarla.");
         };
         Publicacion guardada = publicaciones.save(publicacion);
         auditar(publicacionId, anfitrionId, false, operacion);
@@ -275,6 +286,17 @@ public class PublicacionService {
                 .collect(Collectors.toUnmodifiableMap(Publicacion::getId, AlojamientoReservado::desde));
     }
 
+    /**
+     * Si un administrador bloqueó la publicación (SOF-83): una reserva pendiente suya ya no se cobra. Un id que
+     * ya no existe no cuenta como bloqueado.
+     */
+    @Transactional(readOnly = true)
+    public boolean estaBloqueada(Long publicacionId) {
+        return publicaciones.findById(publicacionId)
+                .map(publicacion -> publicacion.getEstado() == EstadoPublicacion.BLOQUEADA)
+                .orElse(false);
+    }
+
     // Una publicación inexistente o que no está ACTIVA responde el mismo 404: a quien reserva o
     // cotiza no se le revela si existe en otro estado.
     private Publicacion buscarActiva(Long publicacionId) {
@@ -323,6 +345,39 @@ public class PublicacionService {
         return guardada;
     }
 
+    /**
+     * Moderación (SOF-83): publicaciones ACTIVA, PAUSADA o BLOQUEADA cuyo título contiene el texto, como
+     * máximo 50. Sin texto devuelve las primeras por título.
+     */
+    @Transactional(readOnly = true)
+    public List<Publicacion> listarParaModeracion(String texto) {
+        String filtro = texto == null ? "" : texto.strip();
+        // Escapados para LIKE: quien busca "_" quiere ese carácter, no cualquiera.
+        String literal = filtro.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+        return publicaciones.buscarParaModeracion(literal, MODERABLES, PageRequest.of(0, MAXIMO_MODERACION));
+    }
+
+    /**
+     * Bloquea una publicación ACTIVA o PAUSADA con información engañosa (SOF-83, AC1): pasa a BLOQUEADA con el
+     * motivo, sale de las búsquedas y no admite reservas nuevas. En la misma transacción sus reservas futuras
+     * confirmadas pasan a revisión manual (AC2), y el anfitrión recibe el motivo.
+     */
+    @Transactional
+    public Publicacion bloquear(Long publicacionId, Long administradorId, String motivo) {
+        Publicacion publicacion = publicaciones.findById(publicacionId)
+                .orElseThrow(PublicacionNoEncontradaException::new);
+        if (publicacion.getEstado() != EstadoPublicacion.ACTIVA
+                && publicacion.getEstado() != EstadoPublicacion.PAUSADA) {
+            throw new CambioEstadoNoPermitidoException("Solo se puede bloquear una publicación activa o pausada.");
+        }
+        publicacion.bloquear(motivo.trim(), Instant.now());
+        Publicacion guardada = publicaciones.save(publicacion);
+        revisionReservas.enviarARevision(publicacionId);
+        auditar(publicacionId, administradorId, true, "bloquear");
+        notificarEstado(publicacionId, guardada, " Motivo: " + guardada.getMotivoBloqueo());
+        return guardada;
+    }
+
     private Publicacion buscarPendiente(Long publicacionId) {
         Publicacion publicacion = publicaciones.findById(publicacionId)
                 .orElseThrow(PublicacionNoEncontradaException::new);
@@ -351,10 +406,16 @@ public class PublicacionService {
 
     // SOF-37 AC2: el anfitrión dueño recibe el nuevo estado, también cuando el cambio lo hizo él mismo.
     private void notificarEstado(Long publicacionId, Publicacion publicacion, String complemento) {
+        String mensaje = "Tu publicación «%s» ahora está %s.%s".formatted(publicacion.getTitulo(),
+                nombreLegible(publicacion.getEstado()), complemento);
         notificador.notificar(new NuevaNotificacion(publicacion.getAnfitrionId(), TipoNotificacion.PUBLICACION_ESTADO,
-                "Tu publicación «%s» ahora está %s.%s".formatted(publicacion.getTitulo(),
-                        nombreLegible(publicacion.getEstado()), complemento),
-                ENTIDAD, publicacionId));
+                recortado(mensaje), ENTIDAD, publicacionId));
+    }
+
+    // La columna admite 600 caracteres; un título largo con un motivo de bloqueo de 500 puede pasarse y el
+    // aviso se perdería. Se recorta el final, que es el motivo; el anfitrión lo ve completo en su publicación.
+    private static String recortado(String mensaje) {
+        return mensaje.length() <= MAXIMO_MENSAJE ? mensaje : mensaje.substring(0, MAXIMO_MENSAJE - 1) + "…";
     }
 
     private static String nombreLegible(EstadoPublicacion estado) {
@@ -363,6 +424,7 @@ public class PublicacionService {
         case PENDIENTE_REVISION -> "pendiente de revisión";
         case ACTIVA -> "activa";
         case PAUSADA -> "pausada";
+        case BLOQUEADA -> "bloqueada";
         };
     }
 

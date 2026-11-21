@@ -71,7 +71,7 @@ public class CancelacionReservaService {
         if (reserva.getEstado() != EstadoReserva.CONFIRMADA) {
             throw new ReservaNoCancelableException(mensajeEstadoNoCancelable(reserva.getEstado()));
         }
-        if (!LocalDate.now(reloj.withZone(ZONA)).isBefore(reserva.getSalida())) {
+        if (!hoyEnColombia(reloj).isBefore(reserva.getSalida())) {
             throw new ReservaNoCancelableException("La estancia ya terminó: no se puede cancelar.");
         }
 
@@ -93,6 +93,11 @@ public class CancelacionReservaService {
         return cancelacion;
     }
 
+    /** "Hoy" en Colombia según el reloj de la aplicación: la regla de la cancelación y de la revisión manual. */
+    static LocalDate hoyEnColombia(Clock reloj) {
+        return LocalDate.now(reloj.withZone(ZONA));
+    }
+
     private boolean esAnfitrionDeLaPublicacion(Long publicacionId, Long usuarioId) {
         return publicaciones.consultarAcceso(publicacionId).map(acceso -> acceso.esDe(usuarioId)).orElse(false);
     }
@@ -103,6 +108,7 @@ public class CancelacionReservaService {
             case VENCIDA -> "Esta reserva ya venció: no se puede cancelar.";
             case PENDIENTE -> "Esta reserva todavía no está confirmada: no se puede cancelar.";
             case CONFIRMADA -> "Esta reserva ya no se puede cancelar.";
+            case EN_REVISION_MANUAL -> "Esta reserva está en revisión por un administrador.";
             case COMPLETADA -> "Esta reserva ya se completó: no se puede cancelar.";
         };
     }

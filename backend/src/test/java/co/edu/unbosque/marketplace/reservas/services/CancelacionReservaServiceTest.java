@@ -134,6 +134,18 @@ class CancelacionReservaServiceTest {
     }
 
     @Test
+    @DisplayName("SOF-83: una reserva en revisión manual no la cancelan ni el huésped ni el anfitrión")
+    void unaReservaEnRevisionNoSePuedeCancelar() {
+        when(reservas.findById(RESERVA_ID)).thenReturn(Optional.of(con(EstadoReserva.EN_REVISION_MANUAL)));
+
+        assertThatThrownBy(() -> servicio.cancelar(RESERVA_ID, HUESPED_ID, "Motivo"))
+                .isInstanceOf(ReservaNoCancelableException.class)
+                .hasMessage("Esta reserva está en revisión por un administrador.");
+
+        verify(registro, never()).cancelar(any());
+    }
+
+    @Test
     @DisplayName("AC5: quien no es ni el huésped ni el anfitrión recibe 403 y el intento queda auditado como fallo")
     void unUsuarioSinNingunaPropiedadRecibe403() {
         assertThatThrownBy(() -> servicio.cancelar(RESERVA_ID, OTRO_USUARIO_ID, "Motivo"))

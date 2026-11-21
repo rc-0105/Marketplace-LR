@@ -162,6 +162,30 @@ describe('MisPublicacionesPage', () => {
     expect(screen.queryByText(/Motivo anterior/)).not.toBeInTheDocument();
   });
 
+  it('muestra la publicación bloqueada en su columna con el motivo, el aviso de soporte y sin activar', async () => {
+    vi.mocked(listarMisPublicaciones).mockResolvedValue([
+      publicacion({ id: 4, titulo: 'Casa engañosa', estado: 'BLOQUEADA', motivoBloqueo: 'Fotos falsas' }),
+      publicacion({ id: 5, titulo: 'Cabaña activa', estado: 'ACTIVA' }),
+    ]);
+    renderizar();
+
+    const bloqueadas = await screen.findByRole('region', { name: 'Bloqueada' });
+    expect(within(bloqueadas).getByRole('heading', { name: 'Casa engañosa' })).toBeInTheDocument();
+    expect(within(bloqueadas).getByText('Bloqueada', { selector: 'span' })).toBeInTheDocument();
+    expect(within(bloqueadas).getByText('Bloqueada por un administrador: Fotos falsas')).toBeInTheDocument();
+    expect(within(bloqueadas).getByText('Contacta a soporte para revisarla.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Casa engañosa/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pausar Cabaña activa' })).toBeInTheDocument();
+  });
+
+  it('sin publicaciones bloqueadas no muestra la columna de bloqueadas', async () => {
+    vi.mocked(listarMisPublicaciones).mockResolvedValue([publicacion({ estado: 'ACTIVA' })]);
+    renderizar();
+
+    expect(await screen.findByRole('region', { name: 'Activa' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Bloqueada' })).not.toBeInTheDocument();
+  });
+
   it('muestra un error si la API falla', async () => {
     vi.mocked(listarMisPublicaciones).mockRejectedValue(new ErrorApi(500, 'Error interno.'));
 

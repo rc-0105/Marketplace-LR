@@ -43,7 +43,7 @@ class NotificacionesReservaTest {
     @BeforeEach
     void preparar() {
         when(publicaciones.consultarReservados(Set.of(PUBLICACION_ID))).thenReturn(Map.of(PUBLICACION_ID,
-                new AlojamientoReservado(PUBLICACION_ID, "Casa en la playa", "Santa Marta", null, Map.of())));
+                new AlojamientoReservado(PUBLICACION_ID, "Casa en la playa", "Santa Marta", null, Map.of(), null)));
         when(publicaciones.consultarAcceso(PUBLICACION_ID))
                 .thenReturn(Optional.of(new AccesoPublicacion(ANFITRION_ID, true)));
     }

@@ -11,6 +11,7 @@ import java.util.List;
  * {@code editadoPor} y {@code editadoEn} son nulos mientras nadie la edite.
  * {@code observacionesRevision} es el motivo de la última devolución del
  * administrador, y {@code enviadaARevisionEn} cuándo se pidió la última revisión.
+ * {@code motivoBloqueo} y {@code bloqueadaEn} solo tienen valor si un administrador la bloqueó (SOF-83).
  */
 public record PublicacionResponse(
         Long id,
@@ -35,7 +36,9 @@ public record PublicacionResponse(
         Instant editadoEn,
         String observacionesRevision,
         Instant enviadaARevisionEn,
-        List<String> camposFaltantes) {
+        List<String> camposFaltantes,
+        String motivoBloqueo,
+        Instant bloqueadaEn) {
 
     public static PublicacionResponse desde(Publicacion publicacion) {
         return new PublicacionResponse(
@@ -63,6 +66,8 @@ public record PublicacionResponse(
                 publicacion.getEditadoEn(),
                 publicacion.getObservacionesRevision(),
                 publicacion.getEnviadaARevisionEn(),
-                publicacion.camposFaltantesParaActivar());
+                publicacion.camposFaltantesParaActivar(),
+                publicacion.getMotivoBloqueo(),
+                publicacion.getBloqueadaEn());
     }
 }

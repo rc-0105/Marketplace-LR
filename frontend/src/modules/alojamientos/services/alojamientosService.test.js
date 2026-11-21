@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { get, post, put, subirArchivo } from '../../../shared/services/http.js';
 import {
   subirImagen, activarPublicacion, actualizarConfiguracion, actualizarImagenes, actualizarServicios, aprobarPublicacion,
-  consultarPublicacion, crearPublicacion, devolverPublicacion, editarPublicacion, listarMisPublicaciones,
+  bloquearPublicacion, buscarPublicacionesModerables, consultarPublicacion, crearPublicacion, devolverPublicacion, editarPublicacion, listarMisPublicaciones,
   listarPendientesDeRevision, listarPoliticasCancelacion, listarServicios, listarTiposAlojamiento, pausarPublicacion,
 } from './alojamientosService.js';
 
@@ -157,5 +157,42 @@ describe('alojamientosService', () => {
     await expect(consultarPublicacion(5)).resolves.toMatchObject({
       tarifaLimpieza: null, modoReserva: 'INMEDIATA', politicaCancelacion: null, serviciosAdicionales: [],
     });
+  });
+  it('busca las publicaciones moderables con el texto recortado y codificado, con su motivo de bloqueo', async () => {
+    vi.mocked(get).mockResolvedValue([
+      { id: 5, titulo: 'Casa en la playa', ciudad: 'Cartagena', estado: 'BLOQUEADA', anfitrion: 'Ana Pérez',
+        motivoBloqueo: 'Fotos falsas' },
+      { id: 6, titulo: 'Casa de campo', ciudad: null, estado: 'ACTIVA' },
+    ]);
+
+    const encontradas = await buscarPublicacionesModerables('  casa & co ');
+
+    expect(get).toHaveBeenCalledWith('/api/v1/admin/publicaciones?texto=casa%20%26%20co');
+    expect(encontradas).toEqual([
+      { id: 5, titulo: 'Casa en la playa', ciudad: 'Cartagena', estado: 'BLOQUEADA', anfitrion: 'Ana Pérez',
+        motivoBloqueo: 'Fotos falsas' },
+      { id: 6, titulo: 'Casa de campo', ciudad: null, estado: 'ACTIVA', anfitrion: null, motivoBloqueo: null },
+    ]);
+  });
+
+  it('bloquea una publicación con el motivo y devuelve el modelo bloqueado', async () => {
+    vi.mocked(post).mockResolvedValue({ id: 5, titulo: 'Casa', estado: 'BLOQUEADA', motivoBloqueo: 'Fotos falsas' });
+
+    const bloqueada = await bloquearPublicacion(5, 'Fotos falsas');
+
+    expect(post).toHaveBeenCalledWith('/api/v1/admin/publicaciones/5/bloquear', { motivo: 'Fotos falsas' });
+    expect(bloqueada).toMatchObject({ id: 5, estado: 'BLOQUEADA', motivoBloqueo: 'Fotos falsas' });
+  });
+
+  it('las publicaciones del anfitrión traen el motivo de bloqueo, o nulo si no lo tienen', async () => {
+    vi.mocked(get).mockResolvedValue([
+      { id: 1, titulo: 'Casa', estado: 'BLOQUEADA', motivoBloqueo: 'Fotos falsas' },
+      { id: 2, titulo: 'Cabaña', estado: 'ACTIVA' },
+    ]);
+
+    const [bloqueada, activa] = await listarMisPublicaciones();
+
+    expect(bloqueada.motivoBloqueo).toBe('Fotos falsas');
+    expect(activa.motivoBloqueo).toBeNull();
   });
 });
