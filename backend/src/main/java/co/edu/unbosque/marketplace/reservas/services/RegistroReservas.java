@@ -72,4 +72,10 @@ public class RegistroReservas {
     public int vencerCaducados() {
         return reservas.vencerCaducados(Instant.now(reloj));
     }
+
+    /** Cancelación (SOF-75): cancela si la reserva sigue CONFIRMADA; {@code false} si ya no lo estaba. */
+    @Transactional
+    public boolean cancelar(Long reservaId) {
+        return reservas.cancelar(reservaId) == 1;
+    }
 }

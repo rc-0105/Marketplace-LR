@@ -63,6 +63,16 @@ class RegistroReservasTest {
         verify(reservas, never()).saveAndFlush(any());
     }
 
+    @Test
+    @DisplayName("cancelar delega en el repositorio y es verdadero solo si canceló una reserva (SOF-75)")
+    void cancelarDelegaEnElRepositorio() {
+        when(reservas.cancelar(42L)).thenReturn(1);
+        when(reservas.cancelar(99L)).thenReturn(0);
+
+        assertThat(registro.cancelar(42L)).isTrue();
+        assertThat(registro.cancelar(99L)).isFalse();
+    }
+
     private static Reserva nueva() {
         return Reserva.nueva(30L, 7L, LLEGADA, SALIDA, 4, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE,
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ONE, Set.of(), AHORA.plusSeconds(900));

@@ -346,6 +346,25 @@ class ReservaRepositoryIntegracionTest {
                 .isEqualTo(EstadoPago.ERROR);
     }
 
+    @Test
+    @DisplayName("cancelar cancela una CONFIRMADA y libera las noches; sobre otra ya no toca nada")
+    @Transactional
+    void cancelarSoloCancelaUnaConfirmada() {
+        Reserva confirmada = guardar(publicacionId, "2026-12-10", "2026-12-14", EstadoReserva.CONFIRMADA);
+        Reserva pendiente = guardar(publicacionId, "2026-12-14", "2026-12-16", EstadoReserva.PENDIENTE);
+
+        assertThat(reservas.cancelar(confirmada.getId())).isEqualTo(1);
+        assertThat(reservas.cancelar(confirmada.getId())).isZero();
+        assertThat(reservas.cancelar(pendiente.getId())).isZero();
+
+        entidades.clear();
+        assertThat(reservas.findById(confirmada.getId())).get().extracting(Reserva::getEstado)
+                .isEqualTo(EstadoReserva.CANCELADA);
+        assertThat(reservas.findById(pendiente.getId())).get().extracting(Reserva::getEstado)
+                .isEqualTo(EstadoReserva.PENDIENTE);
+        assertThat(guardar(publicacionId, "2026-12-10", "2026-12-14", EstadoReserva.PENDIENTE).getId()).isNotNull();
+    }
+
     private List<Reserva> ocupantesDe(Long id) {
         return reservas.findOcupantes(id, DESDE, HASTA, AHORA);
     }

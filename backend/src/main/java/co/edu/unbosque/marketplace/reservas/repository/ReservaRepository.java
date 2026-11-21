@@ -105,4 +105,12 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
             + " and r.estadoPago = co.edu.unbosque.marketplace.reservas.model.EstadoPago.ERROR"
             + " and r.estado <> co.edu.unbosque.marketplace.reservas.model.EstadoReserva.CONFIRMADA")
     int marcarNoCobrado(@Param("id") Long id);
+
+    // Cancelación (SOF-75): cancela solo si sigue CONFIRMADA. Devuelve 0 si ya no lo estaba (otra
+    // cancelación, o la carrera con una conciliación que la resolvió primero); quien llama decide qué hacer.
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Reserva r set r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.CANCELADA"
+            + " where r.id = :id"
+            + " and r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.CONFIRMADA")
+    int cancelar(@Param("id") Long id);
 }
