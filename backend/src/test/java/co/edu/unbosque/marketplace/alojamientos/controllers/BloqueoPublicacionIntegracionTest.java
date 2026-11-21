@@ -135,6 +135,27 @@ class BloqueoPublicacionIntegracionTest {
     }
 
     @Test
+    @DisplayName("Una reserva pendiente con el apartado vigente no se puede pagar después del bloqueo: 409 y sigue sin cobrar")
+    void laPendienteNoSePagaTrasElBloqueo() throws Exception {
+        Long pendiente = sembrarReserva(publicacionId, "PENDIENTE", LLEGADA, SALIDA);
+        jdbc.update("UPDATE reserva SET vence_en = now() + interval '10 minutes' WHERE id = ?", pendiente);
+        bloquear(iniciarSesion("rosa@correo.com"), publicacionId, MOTIVO).andExpect(status().isOk());
+
+        mvc.perform(post("/api/v1/reservas/{id}/pago", pendiente)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + iniciarSesion("ana@correo.com"))
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"metodoPago": "pm_card_visa"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail")
+                        .value("Esta reserva ya no se puede pagar: un administrador bloqueó el alojamiento."));
+
+        assertThat(jdbc.queryForMap("SELECT estado, estado_pago, transaccion_id FROM reserva WHERE id = ?", pendiente))
+                .containsEntry("estado", "PENDIENTE").containsEntry("estado_pago", "SIN_PAGO")
+                .containsEntry("transaccion_id", null);
+    }
+
+    @Test
     @DisplayName("AC2: una reserva en revisión manual sigue ocupando sus noches: la base rechaza otra que se cruce")
     void laReservaEnRevisionSigueOcupando() throws Exception {
         sembrarReserva(publicacionId, "CONFIRMADA", LLEGADA, SALIDA);

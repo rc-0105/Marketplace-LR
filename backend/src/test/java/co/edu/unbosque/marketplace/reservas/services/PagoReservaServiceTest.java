@@ -17,6 +17,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import co.edu.unbosque.marketplace.alojamientos.services.PublicacionService;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
@@ -64,8 +65,9 @@ class PagoReservaServiceTest {
     private final PasarelaPagos pasarela = mock(PasarelaPagos.class);
     private final PublicadorEventos publicador = mock(PublicadorEventos.class);
     private final NotificacionesReserva notificaciones = mock(NotificacionesReserva.class);
+    private final PublicacionService publicaciones = mock(PublicacionService.class);
     private final PagoReservaService servicio = new PagoReservaService(reservas, registro, pasarela, publicador,
-            notificaciones, Clock.fixed(AHORA, ZoneOffset.UTC));
+            notificaciones, publicaciones, Clock.fixed(AHORA, ZoneOffset.UTC));
 
     private final Logger logger = (Logger) LoggerFactory.getLogger(PagoReservaService.class);
     private final ListAppender<ILoggingEvent> eventos = new ListAppender<>();
@@ -166,6 +168,17 @@ class PagoReservaServiceTest {
                 .isInstanceOf(ReservaNoPagableException.class)
                 .hasMessage("Esta reserva ya está pagada.");
         org.mockito.Mockito.verifyNoInteractions(pasarela);
+    }
+
+    @Test
+    @DisplayName("SOF-83: una reserva pendiente de una publicación bloqueada no se cobra: 409 sin llamar a la pasarela")
+    void unaReservaDePublicacionBloqueadaNoSeCobra() {
+        when(publicaciones.estaBloqueada(30L)).thenReturn(true);
+
+        assertThatThrownBy(() -> servicio.pagar(RESERVA_ID, HUESPED_ID, "pm_card_visa"))
+                .isInstanceOf(ReservaNoPagableException.class)
+                .hasMessage("Esta reserva ya no se puede pagar: un administrador bloqueó el alojamiento.");
+        org.mockito.Mockito.verifyNoInteractions(pasarela, registro, notificaciones);
     }
 
     @Test

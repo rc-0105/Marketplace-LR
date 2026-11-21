@@ -286,6 +286,17 @@ public class PublicacionService {
                 .collect(Collectors.toUnmodifiableMap(Publicacion::getId, AlojamientoReservado::desde));
     }
 
+    /**
+     * Si un administrador bloqueó la publicación (SOF-83): una reserva pendiente suya ya no se cobra. Un id que
+     * ya no existe no cuenta como bloqueado.
+     */
+    @Transactional(readOnly = true)
+    public boolean estaBloqueada(Long publicacionId) {
+        return publicaciones.findById(publicacionId)
+                .map(publicacion -> publicacion.getEstado() == EstadoPublicacion.BLOQUEADA)
+                .orElse(false);
+    }
+
     // Una publicación inexistente o que no está ACTIVA responde el mismo 404: a quien reserva o
     // cotiza no se le revela si existe en otro estado.
     private Publicacion buscarActiva(Long publicacionId) {
