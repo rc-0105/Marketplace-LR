@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSesion } from '../../shared/sesion/useSesion.js';
 import { buscarAlojamientos } from '../../modules/busqueda/services/busquedaService.js';
+import { agruparPorCiudad } from '../../modules/busqueda/models/agruparPorCiudad.js';
 import { consultarDestacados } from '../../modules/busqueda/services/inicioService.js';
 import BuscadorInicio from './BuscadorInicio.jsx';
 import portada from '../../assets/inicio/portada.png';
@@ -194,20 +195,6 @@ ResultadosBusqueda.propTypes = {
   alAbrir: PropTypes.func.isRequired,
   alQuitar: PropTypes.func.isRequired,
 };
-
-/** Agrupa por ciudad sin distinguir mayúsculas ni espacios; las ciudades salen en el orden en que aparecen. */
-function agruparPorCiudad(alojamientos) {
-  const grupos = new Map();
-  for (const alojamiento of alojamientos) {
-    const nombre = (alojamiento.ciudad ?? '').trim();
-    const clave = nombre.toLowerCase();
-    if (!grupos.has(clave)) {
-      grupos.set(clave, { ciudad: nombre, alojamientos: [] });
-    }
-    grupos.get(clave).alojamientos.push(alojamiento);
-  }
-  return [...grupos.values()];
-}
 
 export default function InicioPage() {
   const sesion = useSesion();

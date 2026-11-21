@@ -2,11 +2,15 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { listarPendientesDeRevision } from '../../modules/alojamientos/services/alojamientosService.js';
+import { consultarDestacados } from '../../modules/busqueda/services/inicioService.js';
 import { guardarSesion, limpiarSesion } from '../../shared/services/sesion.js';
 import PanelRolPage from './PanelRolPage.jsx';
 
 vi.mock('../../modules/alojamientos/services/alojamientosService.js', () => ({
   listarPendientesDeRevision: vi.fn(),
+}));
+vi.mock('../../modules/busqueda/services/inicioService.js', () => ({
+  consultarDestacados: vi.fn(),
 }));
 
 function iniciar(rol) {
@@ -30,7 +34,6 @@ describe('PanelRolPage', () => {
   afterEach(() => limpiarSesion());
 
   it.each([
-    ['HUESPED', 'Huésped'],
     ['ANFITRION', 'Anfitrión'],
     ['ADMINISTRADOR', 'Administrador'],
   ])('saluda por nombre e indica el rol %s', (rol, nombre) => {
@@ -57,14 +60,19 @@ describe('PanelRolPage', () => {
     expect(await screen.findByText('No hay publicaciones pendientes de revisión.')).toBeInTheDocument();
   });
 
-  it('al huésped le ofrece buscar alojamiento', () => {
+  it('al huésped le muestra su ventana principal con el buscador en lugar del aviso de construcción', async () => {
+    vi.mocked(consultarDestacados).mockResolvedValue([]);
     iniciar('HUESPED');
     renderizar();
 
-    expect(screen.getByRole('link', { name: 'Buscar alojamiento' })).toHaveAttribute('href', '/huesped/busqueda');
+    expect(screen.getByRole('heading', { name: 'Hola, Ana Pérez' })).toBeInTheDocument();
+    expect(screen.getByRole('form', { name: 'Buscar alojamientos' })).toBeInTheDocument();
+    expect(screen.queryByText(/en construcción/)).not.toBeInTheDocument();
+    expect(await screen.findByText('Todavía no hay alojamientos publicados.')).toBeInTheDocument();
   });
 
-  it.each(['HUESPED', 'ANFITRION'])('a un %s no le muestra las herramientas del administrador', (rol) => {
+  it('a un ANFITRION no le muestra las herramientas del administrador', () => {
+    const rol = 'ANFITRION';
     iniciar(rol);
     renderizar();
 

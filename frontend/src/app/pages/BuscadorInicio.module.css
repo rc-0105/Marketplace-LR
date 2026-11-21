@@ -15,6 +15,8 @@
   border: 1px solid var(--color-borde);
   border-radius: 999px;
   background: #fff;
+  /* Color propio: la barra puede ir sobre una franja oscura cuyo texto es claro. */
+  color: var(--color-texto);
   box-shadow: 0 4px 18px rgb(43 33 28 / 12%);
 }
 
@@ -58,6 +60,7 @@
 }
 
 .campo label {
+  color: var(--color-texto);
   font-size: 0.75rem;
   font-weight: 600;
   line-height: 1.2;
@@ -112,10 +115,22 @@
 
 .error {
   margin: 0;
+  padding: var(--espacio-2) var(--espacio-4);
+  border-radius: 999px;
+  background: var(--color-error-fondo);
   color: var(--color-error);
   font-size: var(--texto-pequeno);
   font-weight: 500;
   text-align: center;
+}
+
+/* Sobre una franja a todo el ancho la barra ocupa toda la fila, alineada con el saludo. */
+.completo {
+  justify-items: stretch;
+}
+
+.completo .buscador {
+  width: 100%;
 }
 
 @media (max-width: 48rem) {
