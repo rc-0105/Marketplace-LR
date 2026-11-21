@@ -1,0 +1,343 @@
+.pagina {
+  display: grid;
+  /* minmax(0, 1fr): sin esto el carrusel ensancha la columna y la página se sale hacia la derecha */
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--espacio-8);
+  max-width: 75rem;
+  margin: 0 auto;
+  padding: var(--espacio-6) var(--espacio-4) var(--espacio-12);
+}
+
+.portada {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: var(--espacio-4);
+  min-height: 22rem;
+  padding: var(--espacio-8);
+  border-radius: 1rem;
+  background-color: var(--color-texto-secundario);
+  background-position: center;
+  background-size: cover;
+}
+
+.titulo {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(2rem, 6vw, 4rem);
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  text-shadow: 0 1px 12px rgb(0 0 0 / 45%);
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espacio-3);
+}
+
+.reservar {
+  padding: var(--espacio-3) var(--espacio-6);
+  border-radius: var(--radio);
+  background: var(--color-fondo);
+  color: var(--color-texto);
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color var(--transicion);
+}
+
+.crearCuenta {
+  padding: var(--espacio-3) var(--espacio-6);
+  border: 1.5px solid #fff;
+  border-radius: var(--radio);
+  color: #fff;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.crearCuenta:hover {
+  background: rgb(255 255 255 / 15%);
+}
+
+.reservar:hover {
+  background: var(--color-superficie);
+}
+
+.encabezadoSeccion {
+  margin-bottom: var(--espacio-4);
+  padding-bottom: var(--espacio-3);
+  border-bottom: 1px solid var(--color-borde);
+}
+
+.encabezadoSeccion:has(.quitar) {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--espacio-4);
+}
+
+.quitar {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-terracota);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15.9rem, 1fr));
+  gap: var(--espacio-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.subtitulo {
+  margin: 0;
+  font-size: var(--texto-encabezado);
+  font-weight: 500;
+}
+
+.aviso {
+  margin: 0;
+  color: var(--color-texto-secundario);
+}
+
+.error {
+  margin: 0;
+  padding: var(--espacio-3) var(--espacio-4);
+  border-radius: var(--radio);
+  background: var(--color-error-fondo);
+  color: var(--color-error);
+}
+
+/* Carrusel: sin barra de desplazamiento; se mueve con las flechas de los lados o con el dedo. */
+.carrusel {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-3);
+}
+
+.tarjetas {
+  display: flex;
+  flex: 1;
+  gap: var(--espacio-6);
+  margin: 0;
+  padding: var(--espacio-2) var(--espacio-1) var(--espacio-4);
+  overflow-x: auto;
+  list-style: none;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.tarjetas::-webkit-scrollbar {
+  display: none;
+}
+
+.flecha {
+  display: grid;
+  flex: 0 0 2.75rem;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--color-borde);
+  border-radius: 50%;
+  background: var(--color-fondo);
+  color: var(--color-texto);
+  box-shadow: 0 2px 8px rgb(43 33 28 / 12%);
+  cursor: pointer;
+  transition: transform var(--transicion), box-shadow var(--transicion);
+}
+
+.flecha:hover {
+  transform: scale(1.06);
+  box-shadow: 0 4px 14px rgb(43 33 28 / 18%);
+}
+
+.tarjeta {
+  flex: 0 0 15.9rem;
+  scroll-snap-align: start;
+}
+
+.botonTarjeta {
+  display: grid;
+  gap: var(--espacio-3);
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.foto,
+.sinFoto {
+  width: 100%;
+  height: 10rem;
+  border-radius: 0.75rem;
+}
+
+.foto {
+  object-fit: cover;
+  transition: transform var(--transicion), box-shadow var(--transicion);
+}
+
+.botonTarjeta:hover .foto {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgb(43 33 28 / 18%);
+}
+
+.sinFoto {
+  display: grid;
+  place-items: center;
+  background: var(--color-bloqueado-fondo);
+  color: var(--color-texto-secundario);
+}
+
+.texto {
+  display: grid;
+  gap: var(--espacio-1);
+}
+
+.tipo {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}
+
+.detalle {
+  margin: 0;
+  color: var(--color-texto-secundario);
+  font-size: var(--texto-pequeno);
+}
+
+.pie {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.precio {
+  margin: 0;
+  font-weight: 600;
+}
+
+.iconoIr {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+/* Resumen del alojamiento */
+.fondoResumen {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: var(--espacio-4);
+  background: rgb(43 33 28 / 55%);
+}
+
+.resumen {
+  width: min(100%, 26rem);
+  overflow: hidden;
+  border-radius: 1rem;
+  background: var(--color-fondo);
+  box-shadow: 0 20px 50px rgb(0 0 0 / 30%);
+}
+
+.fotoResumen {
+  display: block;
+  width: 100%;
+  height: 13rem;
+  object-fit: cover;
+}
+
+.cuerpoResumen {
+  display: grid;
+  gap: var(--espacio-2);
+  padding: var(--espacio-6);
+}
+
+.tipoResumen {
+  margin: 0;
+  color: var(--color-texto-secundario);
+  font-size: var(--texto-pequeno);
+}
+
+.tituloResumen {
+  margin: 0;
+  font-size: var(--texto-encabezado);
+  font-weight: 500;
+}
+
+.datoResumen {
+  margin: 0;
+  color: var(--color-texto-secundario);
+}
+
+.precioResumen {
+  margin: 0;
+  font-size: var(--texto-titulo);
+  font-weight: 600;
+}
+
+.precioResumen span {
+  color: var(--color-texto-secundario);
+  font-size: var(--texto-pequeno);
+  font-weight: 400;
+}
+
+.accionesResumen {
+  display: flex;
+  gap: var(--espacio-3);
+  justify-content: flex-end;
+  margin-top: var(--espacio-4);
+}
+
+.cerrar,
+.reservarResumen {
+  min-height: 2.75rem;
+  padding: 0 var(--espacio-6);
+  border-radius: var(--radio);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cerrar {
+  border: 1px solid var(--color-borde-control);
+  background: transparent;
+  color: var(--color-texto);
+}
+
+.reservarResumen {
+  border: 0;
+  background: var(--color-terracota);
+  color: var(--color-sobre-terracota);
+  transition: background-color var(--transicion);
+}
+
+.reservarResumen:hover {
+  background: var(--color-terracota-oscuro);
+}
+
+@media (max-width: 40rem) {
+  .portada {
+    min-height: 16rem;
+    padding: var(--espacio-6);
+  }
+
+  .flecha {
+    display: none;
+  }
+}

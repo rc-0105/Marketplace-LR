@@ -16,6 +16,15 @@ function iniciar(rol) {
   guardarSesion({ token: 't', expiraEn, usuario: { id: 1, nombre: 'Ana', correo: 'a@b.co', rol, activa: true } });
 }
 
+// Cada rol vuelve a su inicio: el anfitrión a Mis publicaciones, los demás a su panel.
+function esperarInicioDe(rol, nombre) {
+  if (rol === 'ANFITRION') {
+    expect(screen.getByRole('heading', { name: 'Mis publicaciones' })).toBeInTheDocument();
+  } else {
+    expect(screen.getByText(`Ingresaste como ${nombre}.`)).toBeInTheDocument();
+  }
+}
+
 function renderizarEn(ruta) {
   render(
     <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={[ruta]}>
@@ -30,21 +39,21 @@ describe('App', () => {
     vi.clearAllMocks();
   });
 
-  it('muestra el nombre del marketplace', () => {
+  it('muestra el Inicio con su título en la ruta raíz', () => {
+    vi.mocked(get).mockResolvedValue([]);
     renderizarEn('/');
-    expect(
-      screen.getByRole('heading', { name: /marketplace de alojamientos/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Encuentra tu alojamiento' })).toBeInTheDocument();
   });
 
   it('ofrece crear una cuenta desde el inicio', () => {
+    vi.mocked(get).mockResolvedValue([]);
     renderizarEn('/');
     expect(screen.getByRole('link', { name: 'Crear una cuenta' })).toHaveAttribute('href', '/registro');
   });
 
   it('muestra el registro en su ruta', () => {
     renderizarEn('/registro');
-    expect(screen.getByRole('heading', { name: 'Crea tu cuenta' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Regístrate con nosotros' })).toBeInTheDocument();
   });
 
   it('muestra el encabezado con la marca en todas las páginas', () => {
@@ -54,11 +63,24 @@ describe('App', () => {
 
   it.each([
     ['HUESPED', '/huesped'],
-    ['ANFITRION', '/anfitrion'],
     ['ADMINISTRADOR', '/administrador'],
   ])('muestra el panel de %s en su ruta', (rol, ruta) => {
     iniciar(rol);
     renderizarEn(ruta);
+    expect(screen.getByText(/^Ingresaste como/)).toBeInTheDocument();
+  });
+
+  it('el inicio del anfitrión es Mis publicaciones: /anfitrion lleva directo ahí', async () => {
+    vi.mocked(get).mockResolvedValue([]);
+    iniciar('ANFITRION');
+    renderizarEn('/anfitrion');
+    expect(await screen.findByRole('heading', { name: 'Mis publicaciones' })).toBeInTheDocument();
+    expect(screen.queryByText(/^Ingresaste como/)).not.toBeInTheDocument();
+  });
+
+  it('un huésped que entra a /anfitrion vuelve a su panel', () => {
+    iniciar('HUESPED');
+    renderizarEn('/anfitrion');
     expect(screen.getByText(/^Ingresaste como/)).toBeInTheDocument();
   });
 
@@ -98,8 +120,8 @@ describe('App', () => {
     'un %s que entra a la auditoría vuelve a su panel', (rol, nombre) => {
       iniciar(rol);
       renderizarEn('/administrador/auditoria');
-      expect(screen.getByText(`Ingresaste como ${nombre}.`)).toBeInTheDocument();
-      expect(get).not.toHaveBeenCalled();
+      esperarInicioDe(rol, nombre);
+      expect(get).not.toHaveBeenCalledWith(expect.stringContaining('/admin/'));
     },
   );
 
@@ -123,8 +145,8 @@ describe('App', () => {
     'un %s que entra al detalle de auditoría vuelve a su panel', (rol, nombre) => {
       iniciar(rol);
       renderizarEn('/administrador/auditoria/7');
-      expect(screen.getByText(`Ingresaste como ${nombre}.`)).toBeInTheDocument();
-      expect(get).not.toHaveBeenCalled();
+      esperarInicioDe(rol, nombre);
+      expect(get).not.toHaveBeenCalledWith(expect.stringContaining('/admin/'));
     },
   );
 
@@ -153,13 +175,13 @@ describe('App', () => {
   it('un anfitrión que entra al calendario del huésped vuelve a su panel', () => {
     iniciar('ANFITRION');
     renderizarEn('/huesped/publicaciones/10/calendario');
-    expect(screen.getByText('Ingresaste como Anfitrión.')).toBeInTheDocument();
+    esperarInicioDe('ANFITRION', 'Anfitrión');
   });
 
   it('un anfitrión que entra a la revisión de publicaciones vuelve a su panel', () => {
     iniciar('ANFITRION');
     renderizarEn('/administrador/publicaciones');
-    expect(screen.getByText('Ingresaste como Anfitrión.')).toBeInTheDocument();
+    esperarInicioDe('ANFITRION', 'Anfitrión');
   });
 
   it('un rol ajeno vuelve a su propio panel', () => {
@@ -171,7 +193,7 @@ describe('App', () => {
   it.each(['/inicio-sesion', '/registro', '/recuperar-contrasena'])('con sesión %s lleva al panel del rol', (ruta) => {
     iniciar('ANFITRION');
     renderizarEn(ruta);
-    expect(screen.getByText('Ingresaste como Anfitrión.')).toBeInTheDocument();
+    esperarInicioDe('ANFITRION', 'Anfitrión');
   });
 
   it('sin sesión muestra el inicio de sesión normalmente', () => {

@@ -1,4 +1,4 @@
-import { Link, Route, Routes, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { cerrarSesion } from '../modules/identidad/services/identidadService.js';
 import InicioSesionPage from '../modules/identidad/pages/InicioSesionPage.jsx';
 import RecuperacionPage from '../modules/identidad/pages/RecuperacionPage.jsx';
@@ -6,6 +6,7 @@ import MiCuentaPage from '../modules/identidad/pages/MiCuentaPage.jsx';
 import AdministracionUsuariosPage from '../modules/identidad/pages/AdministracionUsuariosPage.jsx';
 import RegistroPage from '../modules/identidad/pages/RegistroPage.jsx';
 import MisPublicacionesPage from '../modules/alojamientos/pages/MisPublicacionesPage.jsx';
+import PublicacionEnviadaPage from '../modules/alojamientos/pages/PublicacionEnviadaPage.jsx';
 import PublicacionFormPage from '../modules/alojamientos/pages/PublicacionFormPage.jsx';
 import RevisionPublicacionesPage from '../modules/alojamientos/pages/RevisionPublicacionesPage.jsx';
 import AuditoriaPage from '../modules/auditoria/pages/AuditoriaPage.jsx';
@@ -14,6 +15,7 @@ import BusquedaPage from '../modules/busqueda/pages/BusquedaPage.jsx';
 import DetalleAlojamientoPage from '../modules/busqueda/pages/DetalleAlojamientoPage.jsx';
 import CalendarioPage from '../modules/disponibilidad/pages/CalendarioPage.jsx';
 import DisponibilidadPage from '../modules/disponibilidad/pages/DisponibilidadPage.jsx';
+import InicioPage from './pages/InicioPage.jsx';
 import PanelRolPage from './pages/PanelRolPage.jsx';
 import Encabezado from '../shared/components/Encabezado.jsx';
 import ProveedorSesion from '../shared/sesion/ProveedorSesion.jsx';
@@ -22,19 +24,8 @@ import SoloInvitados from '../shared/sesion/SoloInvitados.jsx';
 
 const ROLES_CON_PANEL = [
   { rol: 'HUESPED', ruta: '/huesped' },
-  { rol: 'ANFITRION', ruta: '/anfitrion' },
   { rol: 'ADMINISTRADOR', ruta: '/administrador' },
 ];
-
-function Inicio() {
-  return (
-    <main>
-      <h1>Marketplace de Alojamientos</h1>
-      <p>Inversiones LR · interfaz en construcción.</p>
-      <Link to="/registro">Crear una cuenta</Link>
-    </main>
-  );
-}
 
 export default function App() {
   const navigate = useNavigate();
@@ -48,17 +39,22 @@ export default function App() {
     <ProveedorSesion>
       <Encabezado alCerrarSesion={alCerrarSesion} />
       <Routes>
-        <Route path="/" element={<Inicio />} />
+        <Route path="/" element={<InicioPage />} />
         <Route path="/registro" element={<SoloInvitados><RegistroPage /></SoloInvitados>} />
         <Route path="/inicio-sesion" element={<SoloInvitados><InicioSesionPage /></SoloInvitados>} />
         <Route path="/recuperar-contrasena" element={<SoloInvitados><RecuperacionPage /></SoloInvitados>} />
         <Route path="/mi-cuenta" element={<RutaProtegida><MiCuentaPage /></RutaProtegida>} />
+        {/* Mis publicaciones es el inicio del anfitrión: /anfitrion lleva directo ahí. */}
+        <Route path="/anfitrion"
+          element={<RutaProtegida rol="ANFITRION"><Navigate to="/anfitrion/publicaciones" replace /></RutaProtegida>} />
         <Route path="/anfitrion/publicaciones"
           element={<RutaProtegida rol="ANFITRION"><MisPublicacionesPage /></RutaProtegida>} />
         <Route path="/anfitrion/publicaciones/nueva"
           element={<RutaProtegida rol="ANFITRION"><PublicacionFormPage /></RutaProtegida>} />
         <Route path="/anfitrion/publicaciones/:id/editar"
           element={<RutaProtegida rol="ANFITRION"><PublicacionFormPage /></RutaProtegida>} />
+        <Route path="/anfitrion/publicaciones/:id/enviada"
+          element={<RutaProtegida rol="ANFITRION"><PublicacionEnviadaPage /></RutaProtegida>} />
         <Route path="/anfitrion/publicaciones/:id/disponibilidad"
           element={<RutaProtegida rol="ANFITRION"><DisponibilidadPage /></RutaProtegida>} />
         <Route path="/huesped/busqueda"
