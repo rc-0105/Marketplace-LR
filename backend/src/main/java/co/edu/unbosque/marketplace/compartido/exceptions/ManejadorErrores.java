@@ -1,9 +1,13 @@
 package co.edu.unbosque.marketplace.compartido.exceptions;
 
+import co.edu.unbosque.marketplace.compartido.idempotencia.exceptions.SolicitudEnProcesoException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -25,6 +29,15 @@ public class ManejadorErrores {
         ProblemDetail problema = ProblemDetail.forStatusAndDetail(error.getEstado(), error.getMessage());
         error.getPropiedades().forEach(problema::setProperty);
         return problema;
+    }
+
+    /** Más específico que el de {@link NegocioException}: además del problema agrega {@code Retry-After}. */
+    @ExceptionHandler(SolicitudEnProcesoException.class)
+    public ResponseEntity<ProblemDetail> solicitudEnProceso(SolicitudEnProcesoException error) {
+        return ResponseEntity.status(error.getEstado())
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(error.getSegundosReintento()))
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .body(negocio(error));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
