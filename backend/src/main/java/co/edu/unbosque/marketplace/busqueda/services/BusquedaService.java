@@ -22,6 +22,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class BusquedaService {
 
+    public static final int LIMITE_MAXIMO_DESTACADOS = 60;
+
     private final PublicacionService publicaciones;
     private final DisponibilidadService disponibilidad;
     private final CuentaService cuentas;
@@ -68,6 +70,31 @@ public class BusquedaService {
         for (CandidatoBusqueda candidato : candidatos) {
             if (disponibles.contains(candidato.id()) && cumpleFiltros(candidato, filtros)) {
                 resultado.add(candidato);
+            }
+        }
+        return resultado;
+    }
+
+    /**
+     * Alojamientos del Inicio público: las ACTIVAS más recientes, sin las de anfitriones restringidos (RF-58).
+     * El límite se ajusta al rango permitido en vez de rechazarse: es una vitrina, no una consulta exacta.
+     */
+    public List<CandidatoBusqueda> destacados(int limite) {
+        int tope = Math.min(Math.max(limite, 1), LIMITE_MAXIMO_DESTACADOS);
+        List<CandidatoBusqueda> activas = publicaciones.listarActivasRecientes();
+        Set<Long> anfitriones = new HashSet<>();
+        for (CandidatoBusqueda activa : activas) {
+            anfitriones.add(activa.anfitrionId());
+        }
+        Set<Long> restringidos = cuentas.filtrarRestringidos(anfitriones);
+
+        List<CandidatoBusqueda> resultado = new ArrayList<>();
+        for (CandidatoBusqueda activa : activas) {
+            if (resultado.size() == tope) {
+                break;
+            }
+            if (!restringidos.contains(activa.anfitrionId())) {
+                resultado.add(activa);
             }
         }
         return resultado;

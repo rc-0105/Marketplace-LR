@@ -166,12 +166,17 @@ class BusquedaIntegracionTest {
     }
 
     @Test
-    @DisplayName("Solo el huésped busca: el anfitrión recibe 403 y sin token 401")
-    void soloElHuespedBusca() throws Exception {
-        buscar(iniciarSesion("luis@correo.com"), "Santa Marta", LLEGADA, SALIDA)
-                .andExpect(status().isForbidden());
+    @DisplayName("La búsqueda es pública: un visitante sin token y un anfitrión reciben 200")
+    void laBusquedaEsPublica() throws Exception {
         mvc.perform(get("/api/v1/busqueda").param("ciudad", "Santa Marta").param("llegada", LLEGADA.toString())
-                .param("salida", SALIDA.toString())).andExpect(status().isUnauthorized());
+                .param("salida", SALIDA.toString())).andExpect(status().isOk());
+        buscar(iniciarSesion("luis@correo.com"), "Santa Marta", LLEGADA, SALIDA).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Un visitante sin token sigue sin poder pedir el detalle, solo la lista es pública")
+    void elDetalleSigueProtegido() throws Exception {
+        mvc.perform(get("/api/v1/busqueda/1")).andExpect(status().isUnauthorized());
     }
 
     @Test
