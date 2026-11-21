@@ -40,6 +40,6 @@ public record DetalleBusquedaResponse(Long id, String titulo, String descripcion
                 alojamiento.ciudad(), alojamiento.tipo(), alojamiento.capacidad(), alojamiento.precioNoche(),
                 alojamiento.reglas(), alojamiento.imagenes(), alojamiento.servicios(),
                 alojamiento.politicaCancelacion(), alojamiento.descripcionPolitica(), alojamiento.tarifaLimpieza(),
-                adicionales, periodos, null);
+                adicionales, periodos, detalle.calificacionPromedio());
     }
 }

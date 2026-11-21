@@ -1,7 +1,8 @@
-import { post } from '../../../shared/services/http.js';
-import { resenaDesdeApi } from '../models/resena.js';
+import { get, post } from '../../../shared/services/http.js';
+import { resenaDesdeApi, resenasPublicacionDesdeApi } from '../models/resena.js';
 
 const RUTA_RESERVAS = '/api/v1/reservas';
+const RUTA_PUBLICACIONES = '/api/v1/publicaciones';
 
 /**
  * Publica la reseña de una reserva COMPLETADA del huésped autenticado (SOF-80, HU-35). La API responde 409 si
@@ -13,4 +14,14 @@ const RUTA_RESERVAS = '/api/v1/reservas';
  */
 export async function crearResena(reservaId, { calificacion, contenido }) {
   return resenaDesdeApi(await post(`${RUTA_RESERVAS}/${reservaId}/resena`, { calificacion, contenido }));
+}
+
+/**
+ * Las reseñas visibles de una publicación, de la más reciente a la más antigua, con su calificación promedio
+ * (SOF-81, HU-36). Sin reseñas el promedio es nulo y la lista queda vacía. El ErrorApi se propaga.
+ * @param {number | string} publicacionId
+ * @returns {Promise<import('../models/resena.js').ResenasPublicacion>}
+ */
+export async function consultarResenas(publicacionId) {
+  return resenasPublicacionDesdeApi(await get(`${RUTA_PUBLICACIONES}/${publicacionId}/resenas`));
 }

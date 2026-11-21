@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import CotizadorEstancia from '../../cotizacion/components/CotizadorEstancia.jsx';
+import ResenasPublicacion from '../../resenas/components/ResenasPublicacion.jsx';
 import { consultarDetalle } from '../services/busquedaService.js';
 import estilos from './DetalleAlojamientoPage.module.css';
 
@@ -137,6 +138,11 @@ export default function DetalleAlojamientoPage() {
                 ))}
               </ul>
             )}
+          </section>
+
+          <section className={estilos.bloque}>
+            <h2 className={estilos.seccion}>Reseñas</h2>
+            <ResenasPublicacion publicacionId={detalle.id} />
           </section>
         </div>
 

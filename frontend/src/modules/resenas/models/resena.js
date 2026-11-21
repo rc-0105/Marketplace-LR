@@ -31,3 +31,40 @@ export function resenaDesdeApi(dato) {
     fecha: dato.fecha,
   };
 }
+
+/**
+ * Reseña visible de una publicación, con su autor (SOF-81, HU-36).
+ * @typedef {Object} ResenaPublicada
+ * @property {number} id
+ * @property {number} reservaId reserva que le dio origen
+ * @property {string} autor nombre del huésped
+ * @property {number} calificacion de 1 a 5
+ * @property {string} contenido
+ * @property {string} fecha instante ISO en que se publicó
+ */
+
+/**
+ * Las reseñas visibles de una publicación, de la más reciente a la más antigua.
+ * @typedef {Object} ResenasPublicacion
+ * @property {number | null} promedio con un decimal; nulo mientras no haya reseñas
+ * @property {ResenaPublicada[]} resenas
+ */
+
+/**
+ * Convierte la respuesta de GET /api/v1/publicaciones/{id}/resenas.
+ * @param {Record<string, any>} dato
+ * @returns {ResenasPublicacion}
+ */
+export function resenasPublicacionDesdeApi(dato) {
+  return {
+    promedio: dato.promedio ?? null,
+    resenas: (dato.resenas ?? []).map((resena) => ({
+      id: resena.id,
+      reservaId: resena.reservaId,
+      autor: resena.autor,
+      calificacion: resena.calificacion,
+      contenido: resena.contenido,
+      fecha: resena.fecha,
+    })),
+  };
+}
