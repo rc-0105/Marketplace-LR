@@ -131,6 +131,11 @@ public class ServicioIdempotencia {
         throw new SolicitudEnProcesoException(segundosReintento);
     }
 
+    /** Elimina las claves vencidas y devuelve cuántas fueron (REQ-IS11); la invoca la tarea programada. */
+    public int limpiarVencidas() {
+        return registro.eliminarVencidas(Instant.now(reloj));
+    }
+
     private static UUID validar(String clave) {
         if (clave == null || !UUID_CANONICO.matcher(clave).matches()) {
             throw new ClaveIdempotenciaInvalidaException();

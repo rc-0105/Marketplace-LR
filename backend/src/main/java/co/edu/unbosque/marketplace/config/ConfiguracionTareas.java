@@ -1,5 +1,6 @@
 package co.edu.unbosque.marketplace.config;
 
+import co.edu.unbosque.marketplace.compartido.idempotencia.ServicioIdempotencia;
 import co.edu.unbosque.marketplace.identidad.services.SesionService;
 import co.edu.unbosque.marketplace.reservas.services.RegistroReservas;
 import java.util.concurrent.TimeUnit;
@@ -14,10 +15,13 @@ public class ConfiguracionTareas {
 
     private final SesionService sesiones;
     private final RegistroReservas reservas;
+    private final ServicioIdempotencia idempotencia;
 
-    public ConfiguracionTareas(SesionService sesiones, RegistroReservas reservas) {
+    public ConfiguracionTareas(SesionService sesiones, RegistroReservas reservas,
+            ServicioIdempotencia idempotencia) {
         this.sesiones = sesiones;
         this.reservas = reservas;
+        this.idempotencia = idempotencia;
     }
 
     /** Primera corrida a los 5 minutos del arranque y luego cada hora (D10). */
@@ -34,5 +38,11 @@ public class ConfiguracionTareas {
     @Scheduled(fixedDelay = 1, timeUnit = TimeUnit.MINUTES)
     public void vencerApartadosDeReservas() {
         reservas.vencerCaducados();
+    }
+
+    /** Cada hora elimina las claves de idempotencia vencidas (SOF-77); la primera corrida a los 10 minutos. */
+    @Scheduled(initialDelay = 10, fixedDelay = 60, timeUnit = TimeUnit.MINUTES)
+    public void limpiarClavesDeIdempotencia() {
+        idempotencia.limpiarVencidas();
     }
 }

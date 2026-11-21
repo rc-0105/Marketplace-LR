@@ -461,4 +461,13 @@ class ServicioIdempotenciaTest {
 
         verify(registro).reclamar(any(), any(), anyString(), eq(manana), eq(LEASE));
     }
+
+    @Test
+    @DisplayName("limpiarVencidas delega en el registro con el instante del reloj y devuelve el conteo")
+    void limpiarVencidasDelega() {
+        when(registro.eliminarVencidas(AHORA)).thenReturn(2);
+
+        assertThat(servicio.limpiarVencidas()).isEqualTo(2);
+        verify(registro).eliminarVencidas(AHORA);
+    }
 }

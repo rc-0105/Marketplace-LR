@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import co.edu.unbosque.marketplace.compartido.idempotencia.ServicioIdempotencia;
 import co.edu.unbosque.marketplace.identidad.services.SesionService;
 import co.edu.unbosque.marketplace.reservas.services.RegistroReservas;
 import java.util.concurrent.TimeUnit;
@@ -19,7 +20,7 @@ class ConfiguracionTareasTest {
     void tareaInvocaLaLimpieza() {
         SesionService sesiones = mock(SesionService.class);
 
-        new ConfiguracionTareas(sesiones, mock(RegistroReservas.class)).limpiarSesionesVencidas();
+        new ConfiguracionTareas(sesiones, mock(RegistroReservas.class), mock(ServicioIdempotencia.class)).limpiarSesionesVencidas();
 
         verify(sesiones).limpiarVencidas();
     }
@@ -41,7 +42,7 @@ class ConfiguracionTareasTest {
     void tareaVenceLosApartados() {
         RegistroReservas registro = mock(RegistroReservas.class);
 
-        new ConfiguracionTareas(mock(SesionService.class), registro).vencerApartadosDeReservas();
+        new ConfiguracionTareas(mock(SesionService.class), registro, mock(ServicioIdempotencia.class)).vencerApartadosDeReservas();
 
         verify(registro).vencerCaducados();
     }
@@ -54,5 +55,27 @@ class ConfiguracionTareasTest {
 
         assertThat(programacion.timeUnit()).isEqualTo(TimeUnit.MINUTES);
         assertThat(programacion.fixedDelay()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("La tarea de idempotencia delega la limpieza en el servicio")
+    void tareaLimpiaLasClavesVencidas() {
+        ServicioIdempotencia idempotencia = mock(ServicioIdempotencia.class);
+
+        new ConfiguracionTareas(mock(SesionService.class), mock(RegistroReservas.class), idempotencia)
+                .limpiarClavesDeIdempotencia();
+
+        verify(idempotencia).limpiarVencidas();
+    }
+
+    @Test
+    @DisplayName("Las claves vencidas se limpian cada hora, con 10 minutos de espera inicial")
+    void clavesSeLimpianCadaHora() throws NoSuchMethodException {
+        Scheduled programacion = ConfiguracionTareas.class.getMethod("limpiarClavesDeIdempotencia")
+                .getAnnotation(Scheduled.class);
+
+        assertThat(programacion.timeUnit()).isEqualTo(TimeUnit.MINUTES);
+        assertThat(programacion.initialDelay()).isEqualTo(10);
+        assertThat(programacion.fixedDelay()).isEqualTo(60);
     }
 }
