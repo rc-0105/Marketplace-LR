@@ -8,6 +8,8 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 /**
  * Único traductor de errores a HTTP. Responde con ProblemDetail (RFC 9457) para
@@ -35,6 +37,17 @@ public class ManejadorErrores {
                 HttpStatus.BAD_REQUEST, "La solicitud tiene datos inválidos.");
         problema.setProperty("errores", errores);
         return problema;
+    }
+
+    // Spring corta la subida antes de llegar al servicio; el límite de application.yml coincide con el del servicio.
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ProblemDetail archivoMuyGrande(MaxUploadSizeExceededException error) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.PAYLOAD_TOO_LARGE, "La imagen pesa más de 5 MB.");
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ProblemDetail archivoAusente(MissingServletRequestPartException error) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Adjunta la imagen en el campo «archivo».");
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
