@@ -9,13 +9,16 @@ import co.edu.unbosque.marketplace.reservas.controllers.dto.CrearReservaRequest;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.DetalleReservaResponse;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.MisReservasResponse;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.PagarReservaRequest;
+import co.edu.unbosque.marketplace.reservas.controllers.dto.ReservaAnfitrionResponse;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.ReservaResponse;
 import co.edu.unbosque.marketplace.reservas.model.Cancelacion;
 import co.edu.unbosque.marketplace.reservas.services.CancelacionReservaService;
 import co.edu.unbosque.marketplace.reservas.services.HistorialReservasService;
 import co.edu.unbosque.marketplace.reservas.services.PagoReservaService;
 import co.edu.unbosque.marketplace.reservas.services.ReservaService;
+import co.edu.unbosque.marketplace.reservas.services.ReservasAnfitrionService;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,11 +31,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Confirmación de una reserva sobre una cotización vigente (SOF-33), su pago (SOF-34), su cancelación (SOF-75)
- * y el estado e historial de las reservas (SOF-35) para el huésped.
+ * Confirmación de una reserva sobre una cotización vigente (SOF-33), su pago (SOF-34), su cancelación (SOF-75),
+ * el estado e historial de las reservas (SOF-35) para el huésped y el listado del lado del anfitrión (SOF-36).
  */
 @RestController
 @RequestMapping("/api/v1/reservas")
@@ -47,15 +51,17 @@ public class ReservaController {
     private final CancelacionReservaService cancelacionService;
     private final ServicioIdempotencia idempotencia;
     private final HistorialReservasService historialService;
+    private final ReservasAnfitrionService reservasAnfitrionService;
 
     public ReservaController(ReservaService reservaService, PagoReservaService pagoService,
             CancelacionReservaService cancelacionService, ServicioIdempotencia idempotencia,
-            HistorialReservasService historialService) {
+            HistorialReservasService historialService, ReservasAnfitrionService reservasAnfitrionService) {
         this.reservaService = reservaService;
         this.pagoService = pagoService;
         this.cancelacionService = cancelacionService;
         this.idempotencia = idempotencia;
         this.historialService = historialService;
+        this.reservasAnfitrionService = reservasAnfitrionService;
     }
 
     /**
@@ -90,6 +96,20 @@ public class ReservaController {
     public MisReservasResponse mias(@AuthenticationPrincipal Jwt jwt) {
         // El huésped sale del token: no hay forma de pedir las reservas de otro.
         return MisReservasResponse.desde(historialService.mias(Long.valueOf(jwt.getSubject())));
+    }
+
+    /**
+     * Las reservas de las publicaciones del anfitrión autenticado, en cualquier estado (SOF-36). Sin
+     * {@code publicacionId}, todas sus publicaciones; con él, solo esa (404 si no existe, 403 si es de
+     * otro anfitrión). Declarado antes de {@code /{id}} para que el literal {@code /anfitrion} no quede a
+     * su sombra.
+     */
+    @GetMapping("/anfitrion")
+    @PreAuthorize(Permisos.ANFITRION)
+    public List<ReservaAnfitrionResponse> anfitrion(@AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required = false) Long publicacionId) {
+        return reservasAnfitrionService.delAnfitrion(Long.valueOf(jwt.getSubject()), publicacionId).stream()
+                .map(ReservaAnfitrionResponse::desde).toList();
     }
 
     /** Una reserva del huésped autenticado con su alojamiento, desglose y estado (SOF-35, RF-38). */

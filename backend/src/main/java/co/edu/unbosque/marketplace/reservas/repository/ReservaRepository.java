@@ -29,6 +29,11 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
     // Historial del huésped (SOF-35): todas sus reservas, en cualquier estado, por fecha de llegada.
     List<Reserva> findByHuespedIdOrderByLlegadaAscIdAsc(Long huespedId);
 
+    // Historial del anfitrión (SOF-36): todas las reservas de sus publicaciones, en cualquier estado, un
+    // único orden monotono por llegada que no separa pasadas de futuras (D2/D3). No reutiliza OCUPA: todos
+    // los estados están en alcance, así que no hay predicado que filtrar.
+    List<Reserva> findByPublicacionIdInOrderByLlegadaAscIdAsc(Collection<Long> publicacionIds);
+
     // Reintento idempotente (ADR-4): reservas vigentes del mismo huésped con las mismas fechas exactas.
     @Query("select r from Reserva r where r.huespedId = :huespedId and r.publicacionId = :publicacionId"
             + " and r.llegada = :llegada and r.salida = :salida and " + OCUPA + " order by r.id")
