@@ -38,7 +38,7 @@ describe('PagoReserva', () => {
 
     expect(await screen.findByRole('status'))
       .toHaveTextContent('Pago aprobado: tu reserva está confirmada. Transacción pi_123.');
-    expect(pagarReserva).toHaveBeenCalledWith(7, 'pm_card_visa');
+    expect(pagarReserva).toHaveBeenCalledWith(7, 'pm_card_visa', expect.any(String));
     expect(screen.queryByRole('button', { name: /Pagar/ })).not.toBeInTheDocument();
   });
 
@@ -57,7 +57,7 @@ describe('PagoReserva', () => {
 
     expect(await screen.findByRole('alert'))
       .toHaveTextContent('La pasarela rechazó el pago: la reserva no se confirmó y las fechas quedaron libres.');
-    expect(pagarReserva).toHaveBeenCalledWith(7, 'pm_card_chargeDeclined');
+    expect(pagarReserva).toHaveBeenCalledWith(7, 'pm_card_chargeDeclined', expect.any(String));
     expect(screen.queryByRole('button', { name: /Pagar/ })).not.toBeInTheDocument();
   });
 
@@ -72,8 +72,8 @@ describe('PagoReserva', () => {
     expect(screen.getByRole('button', { name: /Pagar/ })).toBeEnabled();
   });
 
-  it('tras un tiempo agotado deja fija la tarjeta: el reintento va con la misma para no abrir otro cobro', async () => {
-    vi.mocked(pagarReserva).mockRejectedValueOnce(new ErrorApi(504, 'La pasarela de pagos no respondió a tiempo.'))
+  it.each([504, 502])('tras un %i reintenta con la misma tarjeta y clave', async (estado) => {
+    vi.mocked(pagarReserva).mockRejectedValueOnce(new ErrorApi(estado, 'Error de pasarela.'))
       .mockResolvedValueOnce({ id: 7, estado: 'CONFIRMADA', estadoPago: 'APROBADO', transaccionId: 'pi_1' });
     abrir();
     pagar('pm_card_mastercard');
@@ -83,7 +83,23 @@ describe('PagoReserva', () => {
     pagar();
 
     expect(await screen.findByRole('status')).toHaveTextContent('Transacción pi_1.');
-    expect(pagarReserva).toHaveBeenNthCalledWith(2, 7, 'pm_card_mastercard');
+    const clave = vi.mocked(pagarReserva).mock.calls[0][2];
+    expect(clave).toEqual(expect.any(String));
+    expect(pagarReserva).toHaveBeenNthCalledWith(2, 7, 'pm_card_mastercard', clave);
+  });
+
+  it('envía una clave nueva si cambia la tarjeta tras un error recuperable', async () => {
+    vi.mocked(pagarReserva).mockRejectedValueOnce(new ErrorApi(500, 'Error'))
+      .mockResolvedValueOnce({ transaccionId: 'pi_2' });
+    abrir();
+    pagar();
+    await screen.findByRole('alert');
+    pagar('pm_card_mastercard');
+    await screen.findByRole('status');
+
+    expect(pagarReserva).toHaveBeenNthCalledWith(2, 7, 'pm_card_mastercard', expect.any(String));
+    const [primera, segunda] = vi.mocked(pagarReserva).mock.calls;
+    expect(segunda[2]).not.toBe(primera[2]);
   });
 
   it('ante un error inesperado muestra un aviso genérico y deja reintentar', async () => {

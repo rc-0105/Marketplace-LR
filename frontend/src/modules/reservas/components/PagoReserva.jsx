@@ -22,6 +22,7 @@ const TARJETAS = [
  */
 export default function PagoReserva({ reservaId, total }) {
   const [tarjeta, setTarjeta] = useState(TARJETAS[0].valor);
+  const [claveIntento, setClaveIntento] = useState(() => crypto.randomUUID());
   const [pagando, setPagando] = useState(false);
   const [aprobada, setAprobada] = useState(null);
   const [error, setError] = useState(null);
@@ -36,11 +37,16 @@ export default function PagoReserva({ reservaId, total }) {
   const [cancelacion, setCancelacion] = useState(null);
   const [errorCancelacion, setErrorCancelacion] = useState(null);
 
+  function cambiarTarjeta(evento) {
+    setTarjeta(evento.target.value);
+    setClaveIntento(crypto.randomUUID());
+  }
+
   async function pagar() {
     setError(null);
     setPagando(true);
     try {
-      setAprobada(await pagarReserva(reservaId, tarjeta));
+      setAprobada(await pagarReserva(reservaId, tarjeta, claveIntento));
       setTerminado(true);
     } catch (falla) {
       const conMensaje = falla.estado >= 400 && falla.estado !== 500;
@@ -72,7 +78,7 @@ export default function PagoReserva({ reservaId, total }) {
         <div className={estilos.formulario}>
           <label className={estilos.campo}>
             Tarjeta de prueba
-            <select value={tarjeta} onChange={(evento) => setTarjeta(evento.target.value)} disabled={pagando || tarjetaFija}>
+            <select value={tarjeta} onChange={cambiarTarjeta} disabled={pagando || tarjetaFija}>
               {TARJETAS.map((opcion) => (
                 <option key={opcion.valor} value={opcion.valor}>{opcion.etiqueta}</option>
               ))}
