@@ -37,10 +37,11 @@ async function leerJson(respuesta) {
   }
 }
 
-async function solicitar(ruta, opciones) {
+/** Envía la petición y devuelve la respuesta si fue exitosa; si no, lanza ErrorApi con el ProblemDetail. */
+async function enviar(ruta, opciones, aceptar) {
   const sesion = obtenerSesion();
   const { cabeceras = {}, ...peticion } = opciones;
-  const headers = { ...cabeceras, Accept: 'application/json' };
+  const headers = { ...cabeceras, Accept: aceptar };
   // Con un archivo el navegador fija el Content-Type con su separador (boundary): no se debe pisar.
   if (!(peticion.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
@@ -56,8 +57,8 @@ async function solicitar(ruta, opciones) {
     throw new ErrorApi(0, MENSAJE_SIN_CONEXION);
   }
 
-  const datos = await leerJson(respuesta);
   if (!respuesta.ok) {
+    const datos = await leerJson(respuesta);
     // Solo un 401 con token enviado fuera de /auth/ significa sesión vencida o revocada.
     // Un 401 de login son credenciales malas, y ningún otro estado (503, 500) toca la sesión.
     // Y solo si el token enviado sigue siendo el actual: un 401 tardío de un token viejo no debe borrar una sesión nueva.
@@ -67,11 +68,26 @@ async function solicitar(ruta, opciones) {
     throw new ErrorApi(respuesta.status, datos?.detail ?? MENSAJE_INESPERADO, datos?.errores ?? {},
       { codigo: datos?.codigo, motivo: datos?.motivo });
   }
-  return datos;
+  return respuesta;
+}
+
+async function solicitar(ruta, opciones) {
+  return leerJson(await enviar(ruta, opciones, 'application/json'));
 }
 
 export function get(ruta) {
   return solicitar(ruta, { method: 'GET' });
+}
+
+/**
+ * Descarga un archivo con GET. El nombre sale de la cabecera Content-Disposition que envía la API.
+ * @returns {Promise<{contenido: Blob, nombre: string}>}
+ */
+export async function descargar(ruta) {
+  const respuesta = await enviar(ruta, { method: 'GET' }, '*/*');
+  const disposicion = respuesta.headers.get('Content-Disposition') ?? '';
+  const nombre = /filename="([^"]+)"/.exec(disposicion)?.[1] ?? 'archivo';
+  return { contenido: await respuesta.blob(), nombre };
 }
 
 /** `cabeceras` agrega cabeceras propias de la operación, como `Idempotency-Key`. */

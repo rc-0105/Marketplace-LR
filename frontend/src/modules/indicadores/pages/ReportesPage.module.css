@@ -1,0 +1,130 @@
+.pagina {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: var(--espacio-12) var(--espacio-4);
+}
+
+.titulo {
+  margin: 0 0 var(--espacio-2);
+  font-size: var(--texto-encabezado);
+}
+
+.nota {
+  display: block;
+  margin: 0;
+  color: var(--color-texto-secundario);
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-1);
+  max-width: 24rem;
+  margin: var(--espacio-6) 0 var(--espacio-2);
+}
+
+.etiqueta {
+  font-size: var(--texto-pequeno);
+  font-weight: 600;
+}
+
+.control {
+  min-height: 2.75rem;
+  padding: 0 var(--espacio-3);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  background: var(--color-fondo);
+  color: var(--color-texto);
+  font: inherit;
+}
+
+.error {
+  padding: var(--espacio-3) var(--espacio-4);
+  border-radius: var(--radio);
+  background: var(--color-error-fondo);
+  color: var(--color-error);
+}
+
+.resultado {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-3);
+  margin-top: var(--espacio-8);
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espacio-2);
+}
+
+.primario,
+.secundario {
+  min-height: 2.75rem;
+  padding: 0 var(--espacio-4);
+  border: 1px solid var(--color-terracota);
+  border-radius: var(--radio);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transicion);
+}
+
+.primario {
+  background: var(--color-terracota);
+  color: var(--color-sobre-terracota);
+}
+
+.primario:hover:not(:disabled) {
+  background: var(--color-terracota-oscuro);
+}
+
+.secundario {
+  background: transparent;
+  color: var(--color-terracota);
+}
+
+.secundario:hover:not(:disabled) {
+  background: var(--color-superficie);
+}
+
+.primario:disabled,
+.secundario:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.aviso {
+  display: block;
+  color: var(--color-texto);
+}
+
+.desplazable {
+  overflow-x: auto;
+}
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--texto-pequeno);
+  font-variant-numeric: tabular-nums;
+}
+
+.leyenda {
+  margin-bottom: var(--espacio-3);
+  font-size: var(--texto-titulo);
+  font-weight: 600;
+  text-align: left;
+}
+
+.tabla th,
+.tabla td {
+  padding: var(--espacio-2) var(--espacio-3);
+  border-bottom: 1px solid var(--color-borde);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tabla th {
+  font-weight: 600;
+}

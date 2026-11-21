@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ErrorApi, eliminar, get, post, put, subirArchivo } from './http.js';
+import { ErrorApi, descargar, eliminar, get, post, put, subirArchivo } from './http.js';
 import { guardarSesion, limpiarSesion, obtenerSesion, suscribirExpiracion } from './sesion.js';
 
 function respuesta(estado, cuerpo) {
@@ -129,6 +129,38 @@ describe('http', () => {
     });
   });
 
+  it('descarga un archivo con el nombre que envía la API, sin pedir JSON', async () => {
+    const fetchFalso = vi.fn(() => Promise.resolve(new Response('PDF', {
+      status: 200,
+      headers: { 'Content-Disposition': 'attachment; filename="reporte-reservas-historico.pdf"' },
+    })));
+    vi.stubGlobal('fetch', fetchFalso);
+
+    const archivo = await descargar('/api/v1/admin/reportes/reservas?formato=pdf');
+
+    expect(archivo.nombre).toBe('reporte-reservas-historico.pdf');
+    // El Blob de jsdom no implementa text(): basta con que traiga los 3 bytes del cuerpo.
+    expect(archivo.contenido.size).toBe(3);
+    expect(fetchFalso).toHaveBeenCalledWith('/api/v1/admin/reportes/reservas?formato=pdf', expect.objectContaining({
+      method: 'GET',
+      headers: expect.objectContaining({ Accept: '*/*' }),
+    }));
+  });
+
+  it('una descarga sin nombre en la respuesta usa "archivo"', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response('x', { status: 200 }))));
+
+    await expect(descargar('/api/v1/recurso')).resolves.toMatchObject({ nombre: 'archivo' });
+  });
+
+  it('una descarga rechazada se convierte en ErrorApi con el detalle de la API', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => respuesta(400, { detail: 'Formato de exportación desconocido. Use pdf o xlsx.' })));
+
+    await expect(descargar('/api/v1/recurso')).rejects.toMatchObject({
+      estado: 400, message: 'Formato de exportación desconocido. Use pdf o xlsx.',
+    });
+  });
+
   it('informa cuando no hay conexión con el servidor', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))));
 
@@ -183,6 +215,17 @@ describe('http', () => {
 
       expect(obtenerSesion()?.token).toBe('nuevo.token');
       expect(expiracion).not.toHaveBeenCalled();
+    });
+
+    it('una descarga envía el token y un 401 limpia la sesión igual que las demás peticiones', async () => {
+      iniciarSesion();
+      const fetchFalso = vi.fn(() => respuesta(401, { detail: 'Necesitas iniciar sesión.' }));
+      vi.stubGlobal('fetch', fetchFalso);
+
+      await expect(descargar('/api/v1/recurso')).rejects.toMatchObject({ estado: 401 });
+
+      expect(fetchFalso.mock.calls[0][1].headers).toHaveProperty('Authorization', 'Bearer abc.def');
+      expect(obtenerSesion()).toBeNull();
     });
 
     it('conserva la sesión ante un 401 de /api/v1/auth/', async () => {
