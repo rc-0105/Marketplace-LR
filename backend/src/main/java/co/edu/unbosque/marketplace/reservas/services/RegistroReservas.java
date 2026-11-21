@@ -113,4 +113,9 @@ public class RegistroReservas {
         cancelaciones.saveAndFlush(cancelacion);
         return true;
     }
+
+    @Transactional
+    public void guardarResultado(Cancelacion cancelacion) {
+        cancelaciones.save(cancelacion);
+    }
 }

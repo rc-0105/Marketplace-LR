@@ -39,7 +39,26 @@ public class Cancelacion {
     @Column(name = "valor_devolucion", nullable = false, updatable = false, precision = 12, scale = 2)
     private BigDecimal valorDevolucion;
 
-    // El único valor que esta historia persiste es CANCELADA; SOF-76 va a ampliar los desenlaces posibles.
+    @Column(name = "resultado_reembolso", length = 20)
+    private String resultadoReembolso;
+    @Column(name = "reembolso_id", length = 80)
+    private String reembolsoId;
+    @Column(name = "error_reembolso", length = 40)
+    private String errorReembolso;
+
+    public String getResultadoReembolso() { return resultadoReembolso; }
+    public String getReembolsoId() { return reembolsoId; }
+
+    public void registrarExito(String identificador) {
+        reembolsoId = identificador;
+        resultadoReembolso = "SIMULADO";
+        errorReembolso = null;
+    }
+
+    public void registrarFallo() {
+        errorReembolso = "FALLO_PASARELA";
+    }
+
     @Enumerated(EnumType.STRING)
     @Column(name = "estado_final", nullable = false, updatable = false, length = 20)
     private EstadoReserva estadoFinal;
@@ -56,6 +75,11 @@ public class Cancelacion {
         this.motivo = motivo;
         this.valorDevolucion = valorDevolucion;
         this.estadoFinal = estadoFinal;
+    }
+
+    public void prepararReembolsoSimulado() {
+        // La cancelación se confirma antes de contactar con la pasarela.
+        resultadoReembolso = valorDevolucion.signum() > 0 ? "REVISION_MANUAL" : "NO_APLICA";
     }
 
     public static Cancelacion nueva(Long reservaId, Long usuarioId, Instant fecha, String motivo,
