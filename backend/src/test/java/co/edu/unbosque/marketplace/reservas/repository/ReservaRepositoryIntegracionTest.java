@@ -365,6 +365,42 @@ class ReservaRepositoryIntegracionTest {
         assertThat(guardar(publicacionId, "2026-12-10", "2026-12-14", EstadoReserva.PENDIENTE).getId()).isNotNull();
     }
 
+    @Test
+    @DisplayName("SOF-36: findByPublicacionIdInOrderByLlegadaAscIdAsc trae todos los estados, ordenadas por"
+            + " llegada ascendente, sin separar pasadas de futuras (D2/D3)")
+    void findByPublicacionIdInTraeTodosLosEstadosOrdenadosPorLlegadaAscendente() {
+        Reserva pasada = guardar(publicacionId, "2026-11-01", "2026-11-05", EstadoReserva.CANCELADA);
+        Reserva pendiente = guardar(publicacionId, "2026-12-10", "2026-12-12", EstadoReserva.PENDIENTE);
+        Reserva confirmada = guardar(publicacionId, "2026-12-15", "2026-12-18", EstadoReserva.CONFIRMADA);
+        Reserva vencida = guardar(publicacionId, "2026-12-20", "2026-12-22", EstadoReserva.VENCIDA);
+        // De otra publicación: no debe aparecer al pedir solo publicacionId.
+        guardar(otraPublicacionId, "2026-12-01", "2026-12-03", EstadoReserva.CONFIRMADA);
+
+        List<Reserva> encontradas = reservas.findByPublicacionIdInOrderByLlegadaAscIdAsc(Set.of(publicacionId));
+
+        // Pasadas y futuras se intercalan por fecha de llegada: no hay un segundo grupo al final (D3).
+        assertThat(encontradas).extracting(Reserva::getId)
+                .containsExactly(pasada.getId(), pendiente.getId(), confirmada.getId(), vencida.getId());
+        assertThat(encontradas).extracting(Reserva::getEstado)
+                .containsExactly(EstadoReserva.CANCELADA, EstadoReserva.PENDIENTE, EstadoReserva.CONFIRMADA,
+                        EstadoReserva.VENCIDA);
+    }
+
+    @Test
+    @DisplayName("SOF-36: findByPublicacionIdInOrderByLlegadaAscIdAsc consulta varias publicaciones a la vez y"
+            + " desempata por id cuando la llegada es la misma")
+    void findByPublicacionIdInConVariasPublicacionesYMismaLlegada() {
+        Reserva primera = guardar(publicacionId, "2026-12-10", "2026-12-12", EstadoReserva.PENDIENTE);
+        Reserva segunda = guardar(publicacionId, "2026-12-10", "2026-12-14", EstadoReserva.CONFIRMADA);
+        Reserva deOtra = guardar(otraPublicacionId, "2026-12-01", "2026-12-03", EstadoReserva.CONFIRMADA);
+
+        List<Reserva> encontradas = reservas
+                .findByPublicacionIdInOrderByLlegadaAscIdAsc(Set.of(publicacionId, otraPublicacionId));
+
+        assertThat(encontradas).extracting(Reserva::getId)
+                .containsExactly(deOtra.getId(), primera.getId(), segunda.getId());
+    }
+
     private List<Reserva> ocupantesDe(Long id) {
         return reservas.findOcupantes(id, DESDE, HASTA, AHORA);
     }

@@ -2,6 +2,7 @@ package co.edu.unbosque.marketplace.identidad.repository;
 
 import co.edu.unbosque.marketplace.identidad.model.EstadoCuenta;
 import co.edu.unbosque.marketplace.identidad.model.Usuario;
+import co.edu.unbosque.marketplace.identidad.services.HuespedBasico;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -32,4 +33,9 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     @Query("SELECT u.id FROM Usuario u WHERE u.id IN :ids AND u.estado = :estado")
     Set<Long> findIdsByIdInAndEstado(@Param("ids") Collection<Long> ids, @Param("estado") EstadoCuenta estado);
+
+    // Nombre básico para otros módulos (SOF-36, D4/D5): nunca el correo ni el teléfono.
+    @Query("SELECT new co.edu.unbosque.marketplace.identidad.services.HuespedBasico(u.id, u.nombre)"
+            + " FROM Usuario u WHERE u.id IN :ids")
+    List<HuespedBasico> findBasicosByIdIn(@Param("ids") Collection<Long> ids);
 }

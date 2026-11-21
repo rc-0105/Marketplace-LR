@@ -1,0 +1,45 @@
+schema: spec-driven
+
+context: |
+  Tech stack: Backend (Java 21 + Spring Boot 3.3.5 + Maven), Frontend (React 18 + Vite 5)
+  Architecture: Monorepo (backend/ + frontend/) with stateless JWT auth, PostgreSQL + Flyway migrations
+  Testing: Backend (JUnit 5 + Mockito + AssertJ + JaCoCo), Frontend (Vitest + React Testing Library)
+  Style: Hexagonal/Clean Architecture (backend), React with Atomic Design (frontend)
+
+strict_tdd: true
+
+testing:
+  backend:
+    test_command: "mvn test"
+    coverage_command: "mvn test jacoco:report"
+    frameworks: ["JUnit 5", "Mockito", "AssertJ"]
+    layers: ["Unit", "Integration"]
+  frontend:
+    test_command: "npm run test"
+    coverage_command: "npm run test:cobertura"
+    frameworks: ["Vitest", "React Testing Library"]
+    layers: ["Unit", "Integration"]
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    guidelines:
+      - Follow existing code patterns
+    tdd: true
+    test_command: "mvn test && npm run test"
+  verify:
+    test_command: "mvn test && npm run test"
+    build_command: "mvn clean package && npm run build"
+    coverage_threshold: 70
+  archive:
+    - Warn before merging destructive deltas
