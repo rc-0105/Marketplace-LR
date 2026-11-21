@@ -2,16 +2,23 @@
   position: relative;
   display: inline-grid;
   place-items: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  border: 1px solid var(--color-borde-control);
-  border-radius: var(--radio);
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid var(--color-borde);
+  border-radius: 50%;
+  background: var(--color-superficie);
   color: var(--color-texto);
-  transition: background-color var(--transicion);
+  transition: background-color var(--transicion), border-color var(--transicion);
 }
 
 .campana:hover {
-  background: var(--color-superficie);
+  border-color: var(--color-borde-control);
+  background: var(--color-fondo);
+}
+
+.campana:focus-visible {
+  outline: 2px solid var(--color-terracota);
+  outline-offset: 2px;
 }
 
 .icono {
