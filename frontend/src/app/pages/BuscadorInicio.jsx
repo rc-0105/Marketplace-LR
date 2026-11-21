@@ -17,7 +17,7 @@ function validar({ ciudad, llegada, salida }) {
 }
 
 /** Barra de búsqueda del Inicio: dónde, fechas y cuántos; entrega los criterios ya validados. */
-export default function BuscadorInicio({ alBuscar, buscando }) {
+export default function BuscadorInicio({ alBuscar, buscando, anchoCompleto = false }) {
   const [datos, setDatos] = useState({ ciudad: '', llegada: '', salida: '', capacidad: '' });
   const [error, setError] = useState('');
 
@@ -40,7 +40,7 @@ export default function BuscadorInicio({ alBuscar, buscando }) {
   }
 
   return (
-    <div className={estilos.contenedor}>
+    <div className={anchoCompleto ? `${estilos.contenedor} ${estilos.completo}` : estilos.contenedor}>
       <form className={estilos.buscador} onSubmit={enviar} noValidate aria-label="Buscar alojamientos">
         <div className={estilos.campo}>
           <label htmlFor="inicio-ciudad">Dónde</label>
@@ -77,4 +77,5 @@ export default function BuscadorInicio({ alBuscar, buscando }) {
 BuscadorInicio.propTypes = {
   alBuscar: PropTypes.func.isRequired,
   buscando: PropTypes.bool,
+  anchoCompleto: PropTypes.bool,
 };
