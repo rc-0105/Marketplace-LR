@@ -9,7 +9,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import co.edu.unbosque.marketplace.reservas.model.Cancelacion;
+import co.edu.unbosque.marketplace.reservas.model.EstadoReserva;
 import co.edu.unbosque.marketplace.reservas.model.Reserva;
+import co.edu.unbosque.marketplace.reservas.repository.CancelacionRepository;
 import co.edu.unbosque.marketplace.reservas.repository.ReservaRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -30,7 +33,9 @@ class RegistroReservasTest {
     private static final LocalDate SALIDA = LocalDate.of(2026, 12, 14);
 
     private final ReservaRepository reservas = mock(ReservaRepository.class);
-    private final RegistroReservas registro = new RegistroReservas(reservas, Clock.fixed(AHORA, ZoneOffset.UTC));
+    private final CancelacionRepository cancelaciones = mock(CancelacionRepository.class);
+    private final RegistroReservas registro = new RegistroReservas(reservas, cancelaciones,
+            Clock.fixed(AHORA, ZoneOffset.UTC));
 
     @Test
     @DisplayName("Antes de insertar libera los apartados vencidos que cruzan las mismas noches de la publicación")
@@ -64,13 +69,30 @@ class RegistroReservasTest {
     }
 
     @Test
-    @DisplayName("cancelar delega en el repositorio y es verdadero solo si canceló una reserva (SOF-75)")
-    void cancelarDelegaEnElRepositorio() {
+    @DisplayName("cancelar cambia el estado y registra la cancelación, en ese orden y en la misma transacción (SOF-75)")
+    void cancelarCambiaElEstadoYRegistraLaCancelacion() {
         when(reservas.cancelar(42L)).thenReturn(1);
+        Cancelacion cancelacion = cancelacionDe(42L);
+
+        assertThat(registro.cancelar(cancelacion)).isTrue();
+
+        var orden = inOrder(reservas, cancelaciones);
+        orden.verify(reservas).cancelar(42L);
+        orden.verify(cancelaciones).saveAndFlush(cancelacion);
+    }
+
+    @Test
+    @DisplayName("Si la reserva ya no estaba CONFIRMADA, cancelar es falso y no registra ninguna cancelación (SOF-75)")
+    void cancelarSinCambioNoRegistraLaCancelacion() {
         when(reservas.cancelar(99L)).thenReturn(0);
 
-        assertThat(registro.cancelar(42L)).isTrue();
-        assertThat(registro.cancelar(99L)).isFalse();
+        assertThat(registro.cancelar(cancelacionDe(99L))).isFalse();
+
+        verify(cancelaciones, never()).saveAndFlush(any());
+    }
+
+    private static Cancelacion cancelacionDe(Long reservaId) {
+        return Cancelacion.nueva(reservaId, 7L, AHORA, "Motivo", BigDecimal.TEN, EstadoReserva.CANCELADA);
     }
 
     private static Reserva nueva() {

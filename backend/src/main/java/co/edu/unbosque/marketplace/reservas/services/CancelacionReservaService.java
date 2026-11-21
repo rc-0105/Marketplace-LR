@@ -11,7 +11,6 @@ import co.edu.unbosque.marketplace.reservas.exceptions.ReservaNoEncontradaExcept
 import co.edu.unbosque.marketplace.reservas.model.Cancelacion;
 import co.edu.unbosque.marketplace.reservas.model.EstadoReserva;
 import co.edu.unbosque.marketplace.reservas.model.Reserva;
-import co.edu.unbosque.marketplace.reservas.repository.CancelacionRepository;
 import co.edu.unbosque.marketplace.reservas.repository.ReservaRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -39,17 +38,14 @@ public class CancelacionReservaService {
     private final ReservaRepository reservas;
     private final PublicacionService publicaciones;
     private final RegistroReservas registro;
-    private final CancelacionRepository cancelaciones;
     private final PublicadorEventos publicador;
     private final Clock reloj;
 
     public CancelacionReservaService(ReservaRepository reservas, PublicacionService publicaciones,
-            RegistroReservas registro, CancelacionRepository cancelaciones, PublicadorEventos publicador,
-            Clock reloj) {
+            RegistroReservas registro, PublicadorEventos publicador, Clock reloj) {
         this.reservas = reservas;
         this.publicaciones = publicaciones;
         this.registro = registro;
-        this.cancelaciones = cancelaciones;
         this.publicador = publicador;
         this.reloj = reloj;
     }
@@ -76,15 +72,14 @@ public class CancelacionReservaService {
         }
 
         BigDecimal valorDevolucion = reserva.getTotal();
-        if (!registro.cancelar(reservaId)) {
+        Cancelacion cancelacion = Cancelacion.nueva(reservaId, usuarioId, Instant.now(reloj), motivo,
+                valorDevolucion, EstadoReserva.CANCELADA);
+        // El cambio de estado y el registro de la cancelación son una sola transacción (RegistroReservas).
+        if (!registro.cancelar(cancelacion)) {
             // Perdió la carrera: otra cancelación, o una conciliación de pago, la resolvió justo antes.
             Reserva actual = reservas.findById(reservaId).orElseThrow(ReservaNoEncontradaException::new);
             throw new ReservaNoCancelableException(mensajeEstadoNoCancelable(actual.getEstado()));
         }
-
-        Instant ahora = Instant.now(reloj);
-        Cancelacion cancelacion = cancelaciones.save(
-                Cancelacion.nueva(reservaId, usuarioId, ahora, motivo, valorDevolucion, EstadoReserva.CANCELADA));
 
         auditar(reservaId, usuarioId, ResultadoEvento.EXITO, Map.of(
                 "canceladoPor", esAnfitrion ? "ANFITRION" : "HUESPED",

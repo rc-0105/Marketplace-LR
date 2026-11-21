@@ -3,6 +3,7 @@ package co.edu.unbosque.marketplace.reservas.services;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -19,7 +20,6 @@ import co.edu.unbosque.marketplace.reservas.exceptions.ReservaNoEncontradaExcept
 import co.edu.unbosque.marketplace.reservas.model.Cancelacion;
 import co.edu.unbosque.marketplace.reservas.model.EstadoReserva;
 import co.edu.unbosque.marketplace.reservas.model.Reserva;
-import co.edu.unbosque.marketplace.reservas.repository.CancelacionRepository;
 import co.edu.unbosque.marketplace.reservas.repository.ReservaRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -52,23 +52,21 @@ class CancelacionReservaServiceTest {
     private final ReservaRepository reservas = mock(ReservaRepository.class);
     private final PublicacionService publicaciones = mock(PublicacionService.class);
     private final RegistroReservas registro = mock(RegistroReservas.class);
-    private final CancelacionRepository cancelaciones = mock(CancelacionRepository.class);
     private final PublicadorEventos publicador = mock(PublicadorEventos.class);
     private final CancelacionReservaService servicio = new CancelacionReservaService(reservas, publicaciones,
-            registro, cancelaciones, publicador, Clock.fixed(AHORA, ZoneOffset.UTC));
+            registro, publicador, Clock.fixed(AHORA, ZoneOffset.UTC));
 
     @BeforeEach
     void preparar() {
         when(reservas.findById(RESERVA_ID)).thenReturn(Optional.of(confirmada()));
         when(publicaciones.consultarAcceso(PUBLICACION_ID))
                 .thenReturn(Optional.of(new AccesoPublicacion(ANFITRION_ID, true)));
-        when(cancelaciones.save(any(Cancelacion.class))).then(invocacion -> invocacion.getArgument(0));
     }
 
     @Test
     @DisplayName("AC1: el huésped titular cancela su reserva CONFIRMADA y queda la auditoría con el desglose")
     void elHuespedCancelaSuReserva() {
-        when(registro.cancelar(RESERVA_ID)).thenReturn(true);
+        when(registro.cancelar(any(Cancelacion.class))).thenReturn(true);
 
         Cancelacion cancelacion = servicio.cancelar(RESERVA_ID, HUESPED_ID, "Cambio de planes");
 
@@ -77,7 +75,8 @@ class CancelacionReservaServiceTest {
         assertThat(cancelacion.getMotivo()).isEqualTo("Cambio de planes");
         assertThat(cancelacion.getValorDevolucion()).isEqualByComparingTo("470000");
         assertThat(cancelacion.getEstadoFinal()).isEqualTo(EstadoReserva.CANCELADA);
-        verify(registro).cancelar(RESERVA_ID);
+        verify(registro).cancelar(argThat(registrada -> registrada.getReservaId().equals(RESERVA_ID)
+                && registrada.getUsuarioId().equals(HUESPED_ID)));
         assertThat(auditado().resultado()).isEqualTo(ResultadoEvento.EXITO);
         assertThat(auditado().datos()).containsEntry("canceladoPor", "HUESPED");
     }
@@ -85,7 +84,7 @@ class CancelacionReservaServiceTest {
     @Test
     @DisplayName("AC3: el anfitrión también puede cancelar, con devolución del 100% y la auditoría distingue quién canceló")
     void elAnfitrionCancelaLaReserva() {
-        when(registro.cancelar(RESERVA_ID)).thenReturn(true);
+        when(registro.cancelar(any(Cancelacion.class))).thenReturn(true);
 
         Cancelacion cancelacion = servicio.cancelar(RESERVA_ID, ANFITRION_ID, "El alojamiento no estará disponible");
 
@@ -142,7 +141,7 @@ class CancelacionReservaServiceTest {
     @Test
     @DisplayName("Si la actualización condicional pierde la carrera (0 filas), no inserta la cancelación y responde 409")
     void siPierdeLaCarreraNoInsertaLaCancelacion() {
-        when(registro.cancelar(RESERVA_ID)).thenReturn(false);
+        when(registro.cancelar(any(Cancelacion.class))).thenReturn(false);
         when(reservas.findById(RESERVA_ID)).thenReturn(Optional.of(confirmada()),
                 Optional.of(con(EstadoReserva.VENCIDA)));
 
@@ -150,7 +149,6 @@ class CancelacionReservaServiceTest {
                 .isInstanceOf(ReservaNoCancelableException.class)
                 .hasMessage("Esta reserva ya venció: no se puede cancelar.");
 
-        verify(cancelaciones, never()).save(any());
     }
 
     @Test

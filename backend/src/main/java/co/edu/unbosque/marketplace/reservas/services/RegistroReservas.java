@@ -1,6 +1,8 @@
 package co.edu.unbosque.marketplace.reservas.services;
 
+import co.edu.unbosque.marketplace.reservas.model.Cancelacion;
 import co.edu.unbosque.marketplace.reservas.model.Reserva;
+import co.edu.unbosque.marketplace.reservas.repository.CancelacionRepository;
 import co.edu.unbosque.marketplace.reservas.repository.ReservaRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -16,10 +18,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class RegistroReservas {
 
     private final ReservaRepository reservas;
+    private final CancelacionRepository cancelaciones;
     private final Clock reloj;
 
-    public RegistroReservas(ReservaRepository reservas, Clock reloj) {
+    public RegistroReservas(ReservaRepository reservas, CancelacionRepository cancelaciones, Clock reloj) {
         this.reservas = reservas;
+        this.cancelaciones = cancelaciones;
         this.reloj = reloj;
     }
 
@@ -73,9 +77,17 @@ public class RegistroReservas {
         return reservas.vencerCaducados(Instant.now(reloj));
     }
 
-    /** Cancelación (SOF-75): cancela si la reserva sigue CONFIRMADA; {@code false} si ya no lo estaba. */
+    /**
+     * Cancelación (SOF-75): si la reserva sigue CONFIRMADA la cancela y registra {@code cancelacion} en la
+     * misma transacción, así nunca queda una reserva CANCELADA sin su registro (AC2). Si el registro falla,
+     * el cambio de estado se revierte. Devuelve {@code false}, sin registrar nada, si ya no estaba CONFIRMADA.
+     */
     @Transactional
-    public boolean cancelar(Long reservaId) {
-        return reservas.cancelar(reservaId) == 1;
+    public boolean cancelar(Cancelacion cancelacion) {
+        if (reservas.cancelar(cancelacion.getReservaId()) != 1) {
+            return false;
+        }
+        cancelaciones.saveAndFlush(cancelacion);
+        return true;
     }
 }

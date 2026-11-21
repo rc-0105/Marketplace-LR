@@ -1,6 +1,7 @@
 package co.edu.unbosque.marketplace.reservas.controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -9,10 +10,16 @@ import co.edu.unbosque.marketplace.alojamientos.repository.PublicacionRepository
 import co.edu.unbosque.marketplace.identidad.model.Rol;
 import co.edu.unbosque.marketplace.identidad.model.Usuario;
 import co.edu.unbosque.marketplace.identidad.repository.UsuarioRepository;
+import co.edu.unbosque.marketplace.reservas.model.Cancelacion;
+import co.edu.unbosque.marketplace.reservas.model.EstadoReserva;
 import co.edu.unbosque.marketplace.reservas.repository.ReservaRepository;
+import co.edu.unbosque.marketplace.reservas.services.RegistroReservas;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -53,6 +61,8 @@ class CancelacionReservaIntegracionTest {
     private PasswordEncoder codificador;
     @Autowired
     private ObjectMapper json;
+    @Autowired
+    private RegistroReservas registro;
 
     private Long publicacionId;
 
@@ -196,6 +206,22 @@ class CancelacionReservaIntegracionTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    @DisplayName("Si registrar la cancelación falla, el cambio de estado se revierte: la reserva sigue CONFIRMADA")
+    void siFallaElRegistroLaReservaSigueConfirmada() throws Exception {
+        long id = reservarYPagar(iniciarSesion("ana@correo.com"));
+        Long huespedId = jdbc.queryForObject("SELECT id FROM usuario WHERE correo = ?", Long.class, "ana@correo.com");
+        // Una fila previa para la misma reserva hace fallar la inserción por el índice único.
+        jdbc.update("INSERT INTO cancelacion (reserva_id, usuario_id, fecha, motivo, valor_devolucion, estado_final)"
+                + " VALUES (?, ?, now(), 'previa', 0, 'CANCELADA')", id, huespedId);
+
+        assertThatThrownBy(() -> registro.cancelar(Cancelacion.nueva(id, huespedId, Instant.now(), "Motivo",
+                BigDecimal.TEN, EstadoReserva.CANCELADA)))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        assertThat(fila(id)).containsEntry("estado", "CONFIRMADA");
+    }
+
     private ResultActions cancelar(String token, long id, String motivo) throws Exception {
         return mvc.perform(post("/api/v1/reservas/{id}/cancelacion", id)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -219,7 +245,9 @@ class CancelacionReservaIntegracionTest {
     }
 
     private long reservar(String token) throws Exception {
+        // La cabecera de idempotencia la exige POST /reservas desde SOF-77 (#104); antes se ignora.
         String respuesta = mvc.perform(post("/api/v1/reservas").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON).content(cuerpoReserva()))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
