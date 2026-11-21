@@ -1,0 +1,36 @@
+.campana {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--color-borde-control);
+  border-radius: var(--radio);
+  color: var(--color-texto);
+  transition: background-color var(--transicion);
+}
+
+.campana:hover {
+  background: var(--color-superficie);
+}
+
+.icono {
+  display: block;
+}
+
+.contador {
+  position: absolute;
+  top: -0.4rem;
+  right: -0.4rem;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 var(--espacio-1);
+  border-radius: 999px;
+  background: var(--color-terracota);
+  color: var(--color-sobre-terracota);
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25rem;
+  text-align: center;
+}

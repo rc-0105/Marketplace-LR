@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -18,8 +20,10 @@ import ch.qos.logback.core.read.ListAppender;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
+import co.edu.unbosque.marketplace.compartido.notificaciones.TipoNotificacion;
 import co.edu.unbosque.marketplace.reservas.exceptions.ApartadoPerdidoDuranteElPagoException;
 import co.edu.unbosque.marketplace.reservas.exceptions.FalloPasarelaPagoException;
+import co.edu.unbosque.marketplace.reservas.exceptions.PagoRechazadoException;
 import co.edu.unbosque.marketplace.reservas.exceptions.ReservaNoPagableException;
 import co.edu.unbosque.marketplace.reservas.model.EstadoPago;
 import co.edu.unbosque.marketplace.reservas.model.EstadoReserva;
@@ -59,8 +63,9 @@ class PagoReservaServiceTest {
     private final RegistroReservas registro = mock(RegistroReservas.class);
     private final PasarelaPagos pasarela = mock(PasarelaPagos.class);
     private final PublicadorEventos publicador = mock(PublicadorEventos.class);
+    private final NotificacionesReserva notificaciones = mock(NotificacionesReserva.class);
     private final PagoReservaService servicio = new PagoReservaService(reservas, registro, pasarela, publicador,
-            Clock.fixed(AHORA, ZoneOffset.UTC));
+            notificaciones, Clock.fixed(AHORA, ZoneOffset.UTC));
 
     private final Logger logger = (Logger) LoggerFactory.getLogger(PagoReservaService.class);
     private final ListAppender<ILoggingEvent> eventos = new ListAppender<>();
@@ -162,6 +167,7 @@ class PagoReservaServiceTest {
         assertThatThrownBy(() -> servicio.pagar(RESERVA_ID, HUESPED_ID, "pm_card_chargeDeclined"))
                 .isInstanceOf(ReservaNoPagableException.class)
                 .hasMessage("Esta reserva ya está pagada.");
+        verify(notificaciones, never()).notificar(any(), any());
     }
 
     @Test
@@ -213,6 +219,34 @@ class PagoReservaServiceTest {
         assertThat(servicio.pagar(RESERVA_ID, HUESPED_ID, "pm_card_visa")).isSameAs(confirmada);
 
         verify(pasarela, never()).reembolsar(anyString());
+        // El intento que sí confirmó ya avisó: este no repite la notificación.
+        verify(notificaciones, never()).notificar(any(), any());
+    }
+
+    @Test
+    @DisplayName("SOF-37: un pago aprobado confirma la reserva y avisa al huésped y al anfitrión")
+    void unPagoAprobadoNotificaLaConfirmacion() {
+        when(pasarela.cobrar(any())).thenReturn(new CobroAprobado("pi_1"));
+        when(registro.confirmarPago(RESERVA_ID, "pi_1")).thenReturn(true);
+        Reserva confirmada = con(EstadoReserva.CONFIRMADA, EstadoPago.APROBADO, "pi_1");
+        when(reservas.findById(RESERVA_ID)).thenReturn(Optional.of(pendiente()), Optional.of(confirmada));
+
+        assertThat(servicio.pagar(RESERVA_ID, HUESPED_ID, "pm_card_visa")).isSameAs(confirmada);
+
+        verify(notificaciones).notificar(confirmada, TipoNotificacion.RESERVA_CONFIRMADA);
+    }
+
+    @Test
+    @DisplayName("SOF-37: un pago rechazado cancela la reserva, responde el rechazo y avisa al huésped y al anfitrión")
+    void unPagoRechazadoNotificaElRechazo() {
+        when(pasarela.cobrar(any())).thenReturn(new PasarelaPagos.CobroRechazado("card_declined"));
+        when(registro.rechazarPago(RESERVA_ID)).thenReturn(true);
+
+        assertThatThrownBy(() -> servicio.pagar(RESERVA_ID, HUESPED_ID, "pm_card_chargeDeclined"))
+                .isInstanceOf(PagoRechazadoException.class);
+
+        verify(notificaciones).notificar(argThat(reserva -> RESERVA_ID.equals(reserva.getId())),
+                eq(TipoNotificacion.RESERVA_RECHAZADA));
     }
 
     private EventoCritico auditado() {
