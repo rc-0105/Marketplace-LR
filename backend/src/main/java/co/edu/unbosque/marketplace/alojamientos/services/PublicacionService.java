@@ -28,6 +28,7 @@ import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
 import co.edu.unbosque.marketplace.compartido.seguridad.Propiedad;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -36,6 +37,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -252,6 +254,17 @@ public class PublicacionService {
     @Transactional(readOnly = true)
     public boolean esModoInmediato(Long publicacionId) {
         return buscarActiva(publicacionId).getModoReserva() == ModoReserva.INMEDIATA;
+    }
+
+    /**
+     * Alojamientos de las reservas de un huésped (SOF-35), por id. A diferencia de {@link #consultarActiva} no
+     * filtra por estado: la reserva sigue siendo del huésped aunque luego la publicación se pause. Un id que ya
+     * no existe simplemente no aparece en el resultado.
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, AlojamientoReservado> consultarReservados(Collection<Long> publicacionIds) {
+        return publicaciones.findAllById(publicacionIds).stream()
+                .collect(Collectors.toUnmodifiableMap(Publicacion::getId, AlojamientoReservado::desde));
     }
 
     // Una publicación inexistente o que no está ACTIVA responde el mismo 404: a quien reserva o
