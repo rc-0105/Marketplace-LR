@@ -1,14 +1,21 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi, get, post } from '../shared/services/http.js';
 import { guardarSesion, limpiarSesion, obtenerSesion } from '../shared/services/sesion.js';
+import { listarNotificaciones } from '../modules/notificaciones/services/notificacionesService.js';
 import App from './App.jsx';
 
 vi.mock('../shared/services/http.js', async (importOriginal) => ({
   ...(await importOriginal()),
   get: vi.fn(),
   post: vi.fn(),
+}));
+
+// La campana del encabezado consulta notificaciones con sesión: se aísla para no tocar las llamadas a `get`.
+vi.mock('../modules/notificaciones/services/notificacionesService.js', () => ({
+  listarNotificaciones: vi.fn(),
+  marcarLeida: vi.fn(),
 }));
 
 function iniciar(rol) {
@@ -34,9 +41,27 @@ function renderizarEn(ruta) {
 }
 
 describe('App', () => {
+  beforeEach(() => {
+    vi.mocked(listarNotificaciones).mockResolvedValue({ noLeidas: 0, notificaciones: [] });
+  });
+
   afterEach(() => {
     limpiarSesion();
     vi.clearAllMocks();
+  });
+
+  it.each(['HUESPED', 'ANFITRION', 'ADMINISTRADOR'])('muestra las notificaciones a un %s con sesión', async (rol) => {
+    vi.mocked(listarNotificaciones).mockResolvedValue({ noLeidas: 0, notificaciones: [] });
+    iniciar(rol);
+    renderizarEn('/notificaciones');
+    expect(screen.getByRole('heading', { name: 'Notificaciones' })).toBeInTheDocument();
+    expect(await screen.findByText('No tienes notificaciones.')).toBeInTheDocument();
+  });
+
+  it('sin sesión las notificaciones llevan al inicio de sesión', () => {
+    renderizarEn('/notificaciones');
+    expect(screen.getByRole('heading', { name: 'Inicia sesión' })).toBeInTheDocument();
+    expect(listarNotificaciones).not.toHaveBeenCalled();
   });
 
   it('muestra el Inicio con su título en la ruta raíz', () => {

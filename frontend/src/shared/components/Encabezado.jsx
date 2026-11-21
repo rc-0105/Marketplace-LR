@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { Link, useLocation } from 'react-router-dom';
+import CampanaNotificaciones from '../../modules/notificaciones/components/CampanaNotificaciones.jsx';
 import { homeDe } from '../sesion/rutasPorRol.js';
 import { useSesion } from '../sesion/useSesion.js';
 import estilos from './Encabezado.module.css';
@@ -11,7 +12,7 @@ import estilos from './Encabezado.module.css';
  * "Volver a mi panel" para salir de cualquier pantalla.
  * Con sesión ofrece "Mi cuenta" y "Cerrar sesión", que delega en `alCerrarSesion`;
  * al huésped además le ofrece "Mis reservas", al anfitrión "Mis publicaciones" y al administrador
- * "Revisar publicaciones".
+ * "Revisar publicaciones". Con sesión, cualquier rol ve además la campana de notificaciones.
  */
 export default function Encabezado({ alCerrarSesion }) {
   const sesion = useSesion();
@@ -51,6 +52,7 @@ export default function Encabezado({ alCerrarSesion }) {
           {sesion.usuario.rol === 'ADMINISTRADOR' && (
             <Link to="/administrador/publicaciones" className={estilos.enlace}>Revisar publicaciones</Link>
           )}
+          <CampanaNotificaciones />
           <Link to="/mi-cuenta" className={estilos.enlace}>Mi cuenta</Link>
           <button type="button" className={estilos.cerrarSesion} onClick={cerrar} disabled={cerrando}>
             Cerrar sesión
