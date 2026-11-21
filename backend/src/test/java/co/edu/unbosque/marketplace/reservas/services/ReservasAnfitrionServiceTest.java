@@ -142,7 +142,7 @@ class ReservasAnfitrionServiceTest {
     }
 
     private static AlojamientoReservado alojamiento(Long id) {
-        return new AlojamientoReservado(id, "Casa en la playa", "Santa Marta", null, Map.of());
+        return new AlojamientoReservado(id, "Casa en la playa", "Santa Marta", null, Map.of(), null);
     }
 
     private static Publicacion publicacionCon(Long id, Long anfitrionId) {
