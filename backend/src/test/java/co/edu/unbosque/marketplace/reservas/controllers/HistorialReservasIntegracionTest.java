@@ -175,6 +175,70 @@ class HistorialReservasIntegracionTest {
         mvc.perform(get("/api/v1/reservas/mias")).andExpect(status().isUnauthorized());
     }
 
+    @Test
+    @DisplayName("AC2: al abrir una reserva veo el alojamiento, el desglose del pago y el estado actual")
+    void elDetalleMuestraAlojamientoDesgloseYEstado() throws Exception {
+        Long desayuno = jdbc.queryForObject("INSERT INTO servicio_adicional (publicacion_id, nombre, costo) "
+                + "VALUES (?, 'Desayuno', 25000) RETURNING id", Long.class, publicacionId);
+        long id = jdbc.queryForObject("""
+                INSERT INTO reserva (publicacion_id, huesped_id, llegada, salida, estado, noches, precio_base,
+                    tarifa_limpieza, tarifa_servicio, descuento, total_servicios_adicionales, total, vence_en,
+                    estado_pago, transaccion_id, servicios_adicionales_ids)
+                VALUES (?, ?, ?, ?, 'CONFIRMADA', 3, 300000, 30000, 33000, 15000, 25000, 373000, ?, 'APROBADO',
+                    'sim_abc', ?::bigint[]) RETURNING id
+                """, Long.class, publicacionId, ana, HOY.plusDays(5), HOY.plusDays(8),
+                Timestamp.from(Instant.now().minus(1, ChronoUnit.DAYS)), "{" + desayuno + ",999999}");
+
+        detalle(iniciarSesion("ana@correo.com"), id)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.estado").value("CONFIRMADA"))
+                .andExpect(jsonPath("$.llegada").value(HOY.plusDays(5).toString()))
+                .andExpect(jsonPath("$.salida").value(HOY.plusDays(8).toString()))
+                .andExpect(jsonPath("$.alojamiento.id").value(publicacionId))
+                .andExpect(jsonPath("$.alojamiento.titulo").value("Casa en la playa"))
+                .andExpect(jsonPath("$.noches").value(3))
+                .andExpect(jsonPath("$.precioBase").value(300000))
+                .andExpect(jsonPath("$.tarifaLimpieza").value(30000))
+                .andExpect(jsonPath("$.tarifaServicio").value(33000))
+                .andExpect(jsonPath("$.descuento").value(15000))
+                .andExpect(jsonPath("$.totalServiciosAdicionales").value(25000))
+                .andExpect(jsonPath("$.total").value(373000))
+                .andExpect(jsonPath("$.estadoPago").value("APROBADO"))
+                .andExpect(jsonPath("$.transaccionId").value("sim_abc"))
+                .andExpect(jsonPath("$.serviciosAdicionales[*].id").value(contains(desayuno.intValue(), 999999)))
+                .andExpect(jsonPath("$.serviciosAdicionales[0].nombre").value("Desayuno"))
+                .andExpect(jsonPath("$.serviciosAdicionales[1].nombre").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("El detalle de una PENDIENTE con el apartado agotado muestra VENCIDA")
+    void elDetalleMuestraElEstadoActual() throws Exception {
+        long id = insertarPendiente(ana, HOY.plusDays(5), HOY.plusDays(7), Instant.now().minus(1, ChronoUnit.MINUTES));
+
+        detalle(iniciarSesion("ana@correo.com"), id)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("VENCIDA"))
+                .andExpect(jsonPath("$.estadoPago").value("SIN_PAGO"));
+    }
+
+    @Test
+    @DisplayName("Solo el dueño abre su reserva: otro huésped 403, el anfitrión 403, sin token 401 y si no existe 404")
+    void soloElDuenoAbreSuReserva() throws Exception {
+        long id = insertar(ana, HOY.plusDays(5), HOY.plusDays(7), "CONFIRMADA", "APROBADO", "sim_9", "220000.00");
+
+        detalle(iniciarSesion("carla@correo.com"), id).andExpect(status().isForbidden());
+        detalle(iniciarSesion("luis@correo.com"), id).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/reservas/{id}", id)).andExpect(status().isUnauthorized());
+        detalle(iniciarSesion("ana@correo.com"), 999_999L)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("No encontramos esa reserva."));
+    }
+
+    private ResultActions detalle(String token, long id) throws Exception {
+        return mvc.perform(get("/api/v1/reservas/{id}", id).header(HttpHeaders.AUTHORIZATION, "Bearer " + token));
+    }
+
     private ResultActions mias(String token) throws Exception {
         return mvc.perform(get("/api/v1/reservas/mias").header(HttpHeaders.AUTHORIZATION, "Bearer " + token));
     }

@@ -1,12 +1,17 @@
 package co.edu.unbosque.marketplace.reservas.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import co.edu.unbosque.marketplace.alojamientos.services.AlojamientoReservado;
 import co.edu.unbosque.marketplace.alojamientos.services.PublicacionService;
+import co.edu.unbosque.marketplace.compartido.exceptions.AccesoDenegadoException;
+import co.edu.unbosque.marketplace.reservas.exceptions.ReservaNoEncontradaException;
 import co.edu.unbosque.marketplace.reservas.model.EstadoReserva;
 import co.edu.unbosque.marketplace.reservas.model.Reserva;
 import co.edu.unbosque.marketplace.reservas.repository.ReservaRepository;
@@ -17,6 +22,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -99,6 +105,33 @@ class HistorialReservasServiceTest {
             assertThat(consultada.reserva().getId()).isEqualTo(1L);
             assertThat(consultada.alojamiento()).isNull();
         });
+    }
+
+    @Test
+    @DisplayName("El detalle de una reserva inexistente es 404 y el de una ajena 403, sin leer la publicación")
+    void elDetalleExigeQueLaReservaExistaYSeaDelHuesped() {
+        Reserva deOtro = reserva(1L, 10L, HOY_BOGOTA.plusDays(5), HOY_BOGOTA.plusDays(7), EstadoReserva.CONFIRMADA,
+                AHORA);
+        when(reservas.findById(1L)).thenReturn(Optional.of(deOtro));
+        when(reservas.findById(2L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.detalle(2L, 7L)).isInstanceOf(ReservaNoEncontradaException.class);
+        assertThatThrownBy(() -> servicio.detalle(1L, 8L)).isInstanceOf(AccesoDenegadoException.class);
+        verify(publicaciones, never()).consultarReservados(any());
+    }
+
+    @Test
+    @DisplayName("El detalle propio trae el estado actual y el alojamiento de la reserva")
+    void elDetallePropioTraeEstadoYAlojamiento() {
+        Reserva propia = reserva(1L, 10L, HOY_BOGOTA.plusDays(5), HOY_BOGOTA.plusDays(7), EstadoReserva.PENDIENTE,
+                AHORA);
+        when(reservas.findById(1L)).thenReturn(Optional.of(propia));
+        when(publicaciones.consultarReservados(Set.of(10L))).thenReturn(Map.of(10L, alojamiento(10L)));
+
+        ReservaConsultada detalle = servicio.detalle(1L, 7L);
+
+        assertThat(detalle.estadoActual()).isEqualTo(EstadoReserva.VENCIDA);
+        assertThat(detalle.alojamiento().titulo()).isEqualTo("Casa en la playa");
     }
 
     private static AlojamientoReservado alojamiento(Long id) {

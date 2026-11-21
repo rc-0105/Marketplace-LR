@@ -2,6 +2,8 @@ package co.edu.unbosque.marketplace.reservas.services;
 
 import co.edu.unbosque.marketplace.alojamientos.services.AlojamientoReservado;
 import co.edu.unbosque.marketplace.alojamientos.services.PublicacionService;
+import co.edu.unbosque.marketplace.compartido.seguridad.Propiedad;
+import co.edu.unbosque.marketplace.reservas.exceptions.ReservaNoEncontradaException;
 import co.edu.unbosque.marketplace.reservas.model.Reserva;
 import co.edu.unbosque.marketplace.reservas.repository.ReservaRepository;
 import java.time.Clock;
@@ -12,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
@@ -55,5 +58,17 @@ public class HistorialReservasService {
         }
         Collections.reverse(pasadas);
         return new HistorialReservas(List.copyOf(futuras), List.copyOf(pasadas));
+    }
+
+    /**
+     * Una reserva del huésped con su alojamiento (AC2). Una que no existe responde 404 y la de otro usuario
+     * 403, la misma regla que el pago (SOF-34); la publicación se lee solo después de comprobar el dueño.
+     */
+    public ReservaConsultada detalle(Long reservaId, Long huespedId) {
+        Reserva reserva = reservas.findById(reservaId).orElseThrow(ReservaNoEncontradaException::new);
+        Propiedad.exigirPropietario(reserva.getHuespedId(), huespedId);
+        AlojamientoReservado alojamiento = publicaciones.consultarReservados(Set.of(reserva.getPublicacionId()))
+                .get(reserva.getPublicacionId());
+        return new ReservaConsultada(reserva, reserva.estadoActual(Instant.now(reloj)), alojamiento);
     }
 }

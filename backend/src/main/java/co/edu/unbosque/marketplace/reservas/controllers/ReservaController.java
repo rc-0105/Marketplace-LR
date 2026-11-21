@@ -6,6 +6,7 @@ import co.edu.unbosque.marketplace.compartido.seguridad.Permisos;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.CancelacionResponse;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.CancelarReservaRequest;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.CrearReservaRequest;
+import co.edu.unbosque.marketplace.reservas.controllers.dto.DetalleReservaResponse;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.MisReservasResponse;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.PagarReservaRequest;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.ReservaResponse;
@@ -88,6 +89,12 @@ public class ReservaController {
     public MisReservasResponse mias(@AuthenticationPrincipal Jwt jwt) {
         // El huésped sale del token: no hay forma de pedir las reservas de otro.
         return MisReservasResponse.desde(historialService.mias(Long.valueOf(jwt.getSubject())));
+    }
+
+    /** Una reserva del huésped autenticado con su alojamiento, desglose y estado (SOF-35, RF-38). */
+    @GetMapping("/{id}")
+    public DetalleReservaResponse detalle(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        return DetalleReservaResponse.desde(historialService.detalle(id, Long.valueOf(jwt.getSubject())));
     }
 
     /** Paga la reserva PENDIENTE del huésped con la pasarela en modo prueba (SOF-34, RF-37). */
