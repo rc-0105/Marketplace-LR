@@ -123,6 +123,8 @@ public class CancelacionReservaService {
             case PENDIENTE -> "Esta reserva todavía no está confirmada: no se puede cancelar.";
             case CONFIRMADA -> "Esta reserva ya no se puede cancelar.";
             case EN_REVISION_MANUAL -> "Esta reserva está en revisión por un administrador.";
+            case PENDIENTE_APROBACION -> "Esta solicitud espera la aprobación del anfitrión.";
+            case RECHAZADA -> "Esta solicitud fue rechazada por el anfitrión: no se puede cancelar.";
             case COMPLETADA -> "Esta reserva ya se completó: no se puede cancelar.";
         };
     }

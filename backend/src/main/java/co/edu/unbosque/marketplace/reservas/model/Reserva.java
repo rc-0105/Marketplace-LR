@@ -102,6 +102,10 @@ public class Reserva {
     @Column(name = "transaccion_id")
     private String transaccionId;
 
+    // Por qué el anfitrión rechazó la solicitud (SOF-79); solo lo escribe la actualización condicional de rechazo.
+    @Column(name = "motivo_rechazo", length = 500, insertable = false, updatable = false)
+    private String motivoRechazo;
+
     protected Reserva() {
         // Requerido por JPA.
     }
@@ -109,12 +113,12 @@ public class Reserva {
     private Reserva(Long publicacionId, Long huespedId, LocalDate llegada, LocalDate salida, int noches,
             BigDecimal precioBase, BigDecimal tarifaLimpieza, BigDecimal tarifaServicio, BigDecimal descuento,
             BigDecimal totalServiciosAdicionales, BigDecimal total, Set<Long> serviciosAdicionalesIds,
-            Instant venceEn) {
+            Instant venceEn, EstadoReserva estado) {
         this.publicacionId = publicacionId;
         this.huespedId = huespedId;
         this.llegada = llegada;
         this.salida = salida;
-        this.estado = EstadoReserva.PENDIENTE;
+        this.estado = estado;
         this.noches = noches;
         this.precioBase = precioBase;
         this.tarifaLimpieza = tarifaLimpieza;
@@ -136,7 +140,21 @@ public class Reserva {
             BigDecimal totalServiciosAdicionales, BigDecimal total, Set<Long> serviciosAdicionalesIds,
             Instant venceEn) {
         return new Reserva(publicacionId, huespedId, llegada, salida, noches, precioBase, tarifaLimpieza,
-                tarifaServicio, descuento, totalServiciosAdicionales, total, serviciosAdicionalesIds, venceEn);
+                tarifaServicio, descuento, totalServiciosAdicionales, total, serviciosAdicionalesIds, venceEn,
+                EstadoReserva.PENDIENTE);
+    }
+
+    /**
+     * Solicitud a una publicación en modo APROBACION (SOF-79): nace PENDIENTE_APROBACION y aparta las noches hasta
+     * {@code venceEn}, el plazo que tiene el anfitrión para responder.
+     */
+    public static Reserva nuevaSolicitud(Long publicacionId, Long huespedId, LocalDate llegada, LocalDate salida,
+            int noches, BigDecimal precioBase, BigDecimal tarifaLimpieza, BigDecimal tarifaServicio,
+            BigDecimal descuento, BigDecimal totalServiciosAdicionales, BigDecimal total,
+            Set<Long> serviciosAdicionalesIds, Instant venceEn) {
+        return new Reserva(publicacionId, huespedId, llegada, salida, noches, precioBase, tarifaLimpieza,
+                tarifaServicio, descuento, totalServiciosAdicionales, total, serviciosAdicionalesIds, venceEn,
+                EstadoReserva.PENDIENTE_APROBACION);
     }
 
     /**
@@ -145,7 +163,8 @@ public class Reserva {
      */
     public boolean ocupaNoches(Instant ahora) {
         return estado == EstadoReserva.CONFIRMADA || estado == EstadoReserva.EN_REVISION_MANUAL
-                || (estado == EstadoReserva.PENDIENTE && venceEn.isAfter(ahora));
+                || ((estado == EstadoReserva.PENDIENTE || estado == EstadoReserva.PENDIENTE_APROBACION)
+                        && venceEn.isAfter(ahora));
     }
 
     /**
@@ -163,7 +182,8 @@ public class Reserva {
      * aunque la tarea programada todavía no la haya pasado, la misma regla de {@link #ocupaNoches}.
      */
     public EstadoReserva estadoActual(Instant ahora) {
-        return estado == EstadoReserva.PENDIENTE && !venceEn.isAfter(ahora) ? EstadoReserva.VENCIDA : estado;
+        boolean conApartado = estado == EstadoReserva.PENDIENTE || estado == EstadoReserva.PENDIENTE_APROBACION;
+        return conApartado && !venceEn.isAfter(ahora) ? EstadoReserva.VENCIDA : estado;
     }
 
     /** El apartado se agotó sin confirmarse: pasa a VENCIDA y libera las noches. */
@@ -189,6 +209,10 @@ public class Reserva {
 
     public LocalDate getSalida() {
         return salida;
+    }
+
+    public String getMotivoRechazo() {
+        return motivoRechazo;
     }
 
     public EstadoReserva getEstado() {

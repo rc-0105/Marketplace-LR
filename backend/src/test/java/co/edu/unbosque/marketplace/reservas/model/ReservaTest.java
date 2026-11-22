@@ -73,6 +73,24 @@ class ReservaTest {
         assertThat(reserva.ocupaNoches(VENCE.plusSeconds(3600))).isTrue();
     }
 
+    @Test
+    @DisplayName("SOF-79: una PENDIENTE_APROBACION ocupa noches solo hasta que vence su ventana de aprobación")
+    void unaSolicitudOcupaMientrasLaVentanaVale() {
+        Reserva reserva = nueva();
+        ReflectionTestUtils.setField(reserva, "estado", EstadoReserva.PENDIENTE_APROBACION);
+
+        assertThat(reserva.ocupaNoches(VENCE.minusSeconds(1))).isTrue();
+        assertThat(reserva.ocupaNoches(VENCE)).isFalse();
+        assertThat(reserva.estadoActual(VENCE.minusSeconds(1))).isEqualTo(EstadoReserva.PENDIENTE_APROBACION);
+        assertThat(reserva.estadoActual(VENCE)).isEqualTo(EstadoReserva.VENCIDA);
+    }
+
+    @Test
+    @DisplayName("SOF-79: una reserva nueva no tiene motivo de rechazo")
+    void unaReservaNuevaNoTieneMotivoDeRechazo() {
+        assertThat(nueva().getMotivoRechazo()).isNull();
+    }
+
     private static Reserva nueva() {
         return Reserva.nueva(30L, 7L, LLEGADA, SALIDA, 4, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE,
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ONE, Set.of(), VENCE);

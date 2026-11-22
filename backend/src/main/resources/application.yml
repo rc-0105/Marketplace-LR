@@ -63,6 +63,10 @@ jwt:
 marketplace:
   reservas:
     minutos-apartado: ${RESERVAS_MINUTOS_APARTADO:15}
+    # Aprobación de reservas (SOF-79, RF-52): el anfitrión tiene horas-aprobacion para responder una solicitud
+    # (si no, pasa a VENCIDA); al aprobarla, el huésped tiene horas-pago-aprobada para pagarla.
+    horas-aprobacion: ${RESERVAS_HORAS_APROBACION:24}
+    horas-pago-aprobada: ${RESERVAS_HORAS_PAGO_APROBADA:24}
     # Cierre de reservas (SOF-78, RF-50): cada este intervalo, pasa a COMPLETADA toda reserva
     # CONFIRMADA cuya fecha de salida ya pasó, lo que habilita la reseña y la saca de la
     # restricción de exclusión (una vez al día por defecto).

@@ -267,7 +267,7 @@ public class PublicacionService {
 
     /**
      * Si una publicación ACTIVA confirma la reserva de una vez o exige aprobación del anfitrión
-     * (RF-21): SOF-33 solo soporta la confirmación inmediata. No expone {@link ModoReserva}
+     * (RF-21); en el segundo caso la reserva nace como solicitud pendiente (SOF-79). No expone {@link ModoReserva}
      * fuera del módulo (ADR-2); misma regla de visibilidad que {@link #consultarActiva}.
      */
     @Transactional(readOnly = true)

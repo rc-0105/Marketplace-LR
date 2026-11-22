@@ -13,8 +13,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 /**
- * Una reserva ocupa noches si está CONFIRMADA, EN_REVISION_MANUAL (SOF-83) o PENDIENTE con el apartado vigente
- * ({@code venceEn > ahora}, ADR-4). Todas las consultas de lectura aplican esa regla con el instante
+ * Una reserva ocupa noches si está CONFIRMADA, EN_REVISION_MANUAL (SOF-83) o PENDIENTE / PENDIENTE_APROBACION (SOF-79) con el apartado
+ * vigente ({@code venceEn > ahora}, ADR-4). Todas las consultas de lectura aplican esa regla con el instante
  * {@code ahora} que da el reloj de la aplicación, de modo que un apartado agotado deja de contar sin
  * esperar a que la tarea programada lo pase a VENCIDA. Las ventanas son semiabiertas
  * {@code [desde, hasta)}: {@code llegada < hasta} y {@code salida > desde}, así que una reserva que solo
@@ -25,7 +25,8 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
     String OCUPA = """
             (r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.CONFIRMADA
              or r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.EN_REVISION_MANUAL
-             or (r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE
+             or ((r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE
+                  or r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE_APROBACION)
                  and r.venceEn > :ahora))""";
 
     // Historial del huésped (SOF-35): todas sus reservas, en cualquier estado, por fecha de llegada.
@@ -60,10 +61,20 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
     @Modifying(flushAutomatically = true)
     @Query("update Reserva r set r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.VENCIDA"
             + " where r.publicacionId = :publicacionId and r.llegada < :hasta and r.salida > :desde"
-            + " and r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE"
+            + " and r.estado in (co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE,"
+            + " co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE_APROBACION)"
             + " and r.venceEn <= :ahora")
     int vencerCaducadosEn(@Param("publicacionId") Long publicacionId, @Param("desde") LocalDate desde,
             @Param("hasta") LocalDate hasta, @Param("ahora") Instant ahora);
+
+    // Solicitudes agotadas de la publicación que cruzan el rango (SOF-79): las vence por fila el registro, para que
+    // quien gane la actualización avise al huésped, antes de que el vencimiento masivo las pase sin aviso.
+    @Query("select r from Reserva r where r.publicacionId = :publicacionId and r.llegada < :hasta"
+            + " and r.salida > :desde"
+            + " and r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE_APROBACION"
+            + " and r.venceEn <= :ahora order by r.id")
+    List<Reserva> findSolicitudesCaducadasEn(@Param("publicacionId") Long publicacionId,
+            @Param("desde") LocalDate desde, @Param("hasta") LocalDate hasta, @Param("ahora") Instant ahora);
 
     // Igual, para todas las publicaciones: lo usa la tarea programada.
     @Modifying(flushAutomatically = true)
@@ -123,6 +134,51 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
             + " where r.id = :id"
             + " and r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.CONFIRMADA")
     int cancelar(@Param("id") Long id);
+
+    // Cancelación del huésped de su solicitud (SOF-79): solo si sigue esperando la respuesta del anfitrión; libera
+    // las noches. No toca el pago, que nunca existió.
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Reserva r set r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.CANCELADA"
+            + " where r.id = :id"
+            + " and r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE_APROBACION")
+    int cancelarSolicitud(@Param("id") Long id);
+
+    // Solicitudes que esperan la respuesta del anfitrión (SOF-79): PENDIENTE_APROBACION con la ventana vigente, la
+    // que vence primero arriba. Una vencida que la tarea aún no pasó a VENCIDA ya no se puede responder.
+    @Query("select r from Reserva r where r.publicacionId in :publicacionIds"
+            + " and r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE_APROBACION"
+            + " and r.venceEn > :ahora order by r.venceEn, r.id")
+    List<Reserva> findSolicitudesVigentes(@Param("publicacionIds") Collection<Long> publicacionIds,
+            @Param("ahora") Instant ahora);
+
+    // Candidatas al vencimiento por fila (SOF-79): quien gana la actualización condicional es quien avisa.
+    List<Reserva> findByEstadoAndVenceEnLessThanEqual(EstadoReserva estado, Instant ahora);
+
+    // El anfitrión aprueba (SOF-79): solo si sigue esperando y su ventana no se agotó. Pasa a PENDIENTE con un
+    // apartado nuevo (venceEn) para que el huésped pague. Devuelve 0 si ya no estaba pendiente, venció, o perdió la
+    // carrera con otra respuesta o con el vencimiento.
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Reserva r set r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE,"
+            + " r.venceEn = :venceEn where r.id = :id"
+            + " and r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE_APROBACION"
+            + " and r.venceEn > :ahora")
+    int aprobarSolicitud(@Param("id") Long id, @Param("ahora") Instant ahora, @Param("venceEn") Instant venceEn);
+
+    // El anfitrión rechaza con motivo (SOF-79): mismas condiciones que la aprobación; libera las noches.
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Reserva r set r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.RECHAZADA,"
+            + " r.motivoRechazo = :motivo where r.id = :id"
+            + " and r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE_APROBACION"
+            + " and r.venceEn > :ahora")
+    int rechazarSolicitud(@Param("id") Long id, @Param("ahora") Instant ahora, @Param("motivo") String motivo);
+
+    // Vencimiento de una solicitud (SOF-79): solo si sigue esperando y su ventana ya se agotó.
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Reserva r set r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.VENCIDA"
+            + " where r.id = :id"
+            + " and r.estado = co.edu.unbosque.marketplace.reservas.model.EstadoReserva.PENDIENTE_APROBACION"
+            + " and r.venceEn <= :ahora")
+    int vencerSolicitud(@Param("id") Long id, @Param("ahora") Instant ahora);
 
     // Bloqueo de la publicación (SOF-83, AC2): sus reservas CONFIRMADA cuya salida es posterior a hoy pasan a
     // revisión manual. Una estancia ya terminada no cambia. Devuelve cuántas pasaron. No limpia el contexto de
