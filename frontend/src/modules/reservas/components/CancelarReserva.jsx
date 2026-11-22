@@ -73,14 +73,14 @@ export default function CancelarReserva({ reservaId, onCancelada }) {
   return (
     <section className={estilos.panel} aria-labelledby="cancelar-titulo">
       <h2 id="cancelar-titulo" className={estilos.titulo}>Cancelar reserva</h2>
-      <p className={estilos.nota}>Cuéntanos por qué cancelas. La devolución se calcula al confirmar.</p>
+      <p className={estilos.nota}>Cuéntanos por qué cancelas. Puedes ver cuánto te devolvemos antes de confirmar.</p>
       <label className={estilos.campo}>
         Motivo de la cancelación
         <textarea value={motivo} onChange={(evento) => setMotivo(evento.target.value)} disabled={cancelando}
           maxLength={500} />
       </label>
       {error && <p role="alert" className={estilos.error}>{error}</p>}
-      {calculo && <p aria-live="polite">{calculo.politica || 'Sin política'} · Base: {formatearPesos(calculo.base)}.
+      {calculo && <p className={estilos.devolucion} aria-live="polite">{calculo.politica || 'Sin política'} · Base: {formatearPesos(calculo.base)}.
         {' '}Devolución estimada: {calculo.porcentaje}% ({formatearPesos(calculo.valorDevolucion)}).</p>}
       <div className={estilos.acciones}>
         <button type="button" className={estilos.confirmar} onClick={calculo ? confirmar : anticipar}
