@@ -309,6 +309,107 @@ class AprobacionReservasIntegracionTest {
                 .andExpect(status().isConflict());
     }
 
+    // ---- vencimiento y carreras ----
+
+    @Test
+    @DisplayName("Vencimiento: la tarea pasa a VENCIDA la solicitud sin respuesta y avisa al huésped exactamente una vez")
+    void elVencimientoAvisaUnaVez() throws Exception {
+        long id = solicitar("ana@correo.com");
+        long otra = solicitar("carla@correo.com", LLEGADA.plusDays(20), SALIDA.plusDays(20));
+        vencerAhora(id);
+
+        assertThat(aprobacion.vencerSolicitudesCaducadas()).isEqualTo(1);
+        assertThat(aprobacion.vencerSolicitudesCaducadas()).isZero();
+
+        assertThat(estado(id)).isEqualTo("VENCIDA");
+        assertThat(estado(otra)).isEqualTo("PENDIENTE_APROBACION");
+        assertThat(notificaciones("ana@correo.com", "SOLICITUD_VENCIDA")).hasSize(1);
+        assertThat(notificaciones("carla@correo.com", "SOLICITUD_VENCIDA")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Carrera aprobar/vencer, primero vence: aprobar da 409 y la tarea avisa; la aprobación no avisa")
+    void primeroVenceLuegoAprobar() throws Exception {
+        long id = solicitar("ana@correo.com");
+        vencerAhora(id);
+
+        assertThat(aprobacion.vencerSolicitudesCaducadas()).isEqualTo(1);
+        aprobar(bearer("luis@correo.com"), id).andExpect(status().isConflict());
+
+        assertThat(estado(id)).isEqualTo("VENCIDA");
+        assertThat(notificaciones("ana@correo.com", "SOLICITUD_VENCIDA")).hasSize(1);
+        assertThat(notificaciones("ana@correo.com", "SOLICITUD_APROBADA")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Carrera aprobar/vencer, primero aprueba: el vencimiento por fila pierde y no avisa")
+    void primeroApruebaLuegoVence() throws Exception {
+        long id = solicitar("ana@correo.com");
+        aprobar(bearer("luis@correo.com"), id).andExpect(status().isOk());
+
+        // Una corrida que ya había cargado la candidata antes de la aprobación: su actualización condicional pierde.
+        assertThat(registro.vencerSolicitud(id)).isFalse();
+        assertThat(aprobacion.vencerSolicitudesCaducadas()).isZero();
+
+        assertThat(estado(id)).isEqualTo("PENDIENTE");
+        assertThat(notificaciones("ana@correo.com", "SOLICITUD_VENCIDA")).isEmpty();
+        assertThat(notificaciones("ana@correo.com", "SOLICITUD_APROBADA")).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Una reserva que cruza una solicitud ya vencida la vence al insertar y avisa al huésped exactamente una vez")
+    void laInsercionQueVenceUnaSolicitudAvisaUnaVez() throws Exception {
+        long id = solicitar("ana@correo.com");
+        vencerAhora(id);
+
+        long otra = solicitar("carla@correo.com");
+
+        assertThat(estado(id)).isEqualTo("VENCIDA");
+        assertThat(estado(otra)).isEqualTo("PENDIENTE_APROBACION");
+        assertThat(notificaciones("ana@correo.com", "SOLICITUD_VENCIDA")).hasSize(1);
+        // La tarea programada ya no encuentra nada que vencer: no hay un segundo aviso.
+        assertThat(aprobacion.vencerSolicitudesCaducadas()).isZero();
+        assertThat(notificaciones("ana@correo.com", "SOLICITUD_VENCIDA")).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Aprobar y rechazar a la vez sobre la misma solicitud: exactamente una gana, la otra recibe 409 y solo hay un aviso")
+    void aprobarYRechazarConcurrentes() throws Exception {
+        long id = solicitar("ana@correo.com");
+        String token = bearer("luis@correo.com");
+        CountDownLatch salida = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            List<Callable<Integer>> tareas = new ArrayList<>();
+            tareas.add(() -> {
+                salida.await();
+                return aprobar(token, id).andReturn().getResponse().getStatus();
+            });
+            tareas.add(() -> {
+                salida.await();
+                return rechazar(token, id, "No disponible").andReturn().getResponse().getStatus();
+            });
+            List<Future<Integer>> resultados = new ArrayList<>();
+            for (Callable<Integer> tarea : tareas) {
+                resultados.add(pool.submit(tarea));
+            }
+            salida.countDown();
+            List<Integer> estados = new ArrayList<>();
+            for (Future<Integer> resultado : resultados) {
+                estados.add(resultado.get());
+            }
+            assertThat(estados).containsExactlyInAnyOrder(200, 409);
+        } finally {
+            pool.shutdownNow();
+        }
+
+        String finalEstado = estado(id);
+        assertThat(finalEstado).isIn("PENDIENTE", "RECHAZADA");
+        int avisos = notificaciones("ana@correo.com", "SOLICITUD_APROBADA").size()
+                + notificaciones("ana@correo.com", "SOLICITUD_RECHAZADA").size();
+        assertThat(avisos).isEqualTo(1);
+    }
+
     // ---- ayudas ----
 
     private ResultActions aprobar(String token, long id) throws Exception {

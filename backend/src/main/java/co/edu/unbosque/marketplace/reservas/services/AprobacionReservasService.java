@@ -24,10 +24,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -129,6 +131,27 @@ public class AprobacionReservasService {
         auditar(reservaId, anfitrionId, "rechazar_solicitud", Map.of("motivo", limpio));
         avisar(reserva, TipoNotificacion.SOLICITUD_RECHAZADA, limpio);
         return new ResolucionSolicitud(reservaId, EstadoReserva.RECHAZADA, null, limpio);
+    }
+
+    /**
+     * Vence, fila por fila, las solicitudes cuya ventana se agotó y avisa al huésped (SOLICITUD_VENCIDA) solo cuando
+     * esta corrida fue la que cambió la fila: una aprobación o rechazo concurrente, u otra corrida, ya la resolvió.
+     * Devuelve cuántas venció. Cada minuto, como el vencimiento de los apartados de las PENDIENTE.
+     */
+    @Scheduled(fixedDelay = 1, timeUnit = TimeUnit.MINUTES)
+    public int vencerSolicitudesCaducadas() {
+        int vencidas = 0;
+        for (Reserva candidata : reservas.findByEstadoAndVenceEnLessThanEqual(EstadoReserva.PENDIENTE_APROBACION,
+                Instant.now(reloj))) {
+            if (registro.vencerSolicitud(candidata.getId())) {
+                vencidas++;
+                avisar(candidata, TipoNotificacion.SOLICITUD_VENCIDA, null);
+            }
+        }
+        if (vencidas > 0) {
+            LOG.info("Se vencieron {} solicitud(es) de reserva sin respuesta del anfitrión", vencidas);
+        }
+        return vencidas;
     }
 
     // 404 si no existe; 403 (auditado como fallo) si no es del anfitrión; 409 si ya no espera respuesta.

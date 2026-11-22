@@ -204,6 +204,23 @@ class AprobacionReservasServiceTest {
     }
 
     @Test
+    @DisplayName("Vencimiento: solo la corrida que cambia la fila avisa al huésped (SOLICITUD_VENCIDA) una vez")
+    void vencimientoAvisaSoloAlGanador() {
+        Reserva ganada = solicitud(EstadoReserva.PENDIENTE_APROBACION);
+        Reserva perdida = solicitud(EstadoReserva.PENDIENTE_APROBACION);
+        ReflectionTestUtils.setField(perdida, "id", 43L);
+        when(reservas.findByEstadoAndVenceEnLessThanEqual(EstadoReserva.PENDIENTE_APROBACION, AHORA))
+                .thenReturn(List.of(ganada, perdida));
+        when(registro.vencerSolicitud(RESERVA_ID)).thenReturn(true);
+        when(registro.vencerSolicitud(43L)).thenReturn(false);
+
+        assertThat(servicio.vencerSolicitudesCaducadas()).isEqualTo(1);
+
+        verify(notificaciones).notificarHuesped(ganada, TipoNotificacion.SOLICITUD_VENCIDA, null);
+        verify(notificaciones, never()).notificarHuesped(eq(perdida), any(), any());
+    }
+
+    @Test
     @DisplayName("Listar: sin publicaciones responde vacío sin consultar reservas")
     void listarSinPublicaciones() {
         when(publicaciones.listarDelAnfitrion(ANFITRION_ID)).thenReturn(List.of());
