@@ -25,6 +25,11 @@ const HERRAMIENTAS = [
     ruta: '/administrador/dashboard', enlace: 'Ver dashboard',
   },
   {
+    id: 'reportes', icono: 'reportes', titulo: 'Reportes',
+    nota: 'Exporta a Excel o PDF los reportes para la gerencia; cada exportación queda registrada.',
+    ruta: '/administrador/reportes', enlace: 'Exportar reportes',
+  },
+  {
     id: 'usuarios', icono: 'usuarios', titulo: 'Usuarios',
     nota: 'Restringe las cuentas que incumplen las políticas o rehabilítalas.',
     ruta: '/administrador/usuarios', enlace: 'Administrar usuarios',

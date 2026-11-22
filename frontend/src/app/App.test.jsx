@@ -189,6 +189,27 @@ describe('App', () => {
     expect(get).toHaveBeenCalledWith('/api/v1/admin/dashboard');
   });
 
+  it('muestra los reportes al administrador y pide el de reservas a la API', async () => {
+    get.mockResolvedValue({
+      tipo: 'reservas', titulo: 'Reporte de reservas', desde: null, hasta: null, encabezados: ['ID'], filas: [],
+    });
+    iniciar('ADMINISTRADOR');
+    renderizarEn('/administrador/reportes');
+
+    expect(screen.getByRole('heading', { name: 'Reportes' })).toBeInTheDocument();
+    expect(await screen.findByRole('table', { name: 'Reporte de reservas' })).toBeInTheDocument();
+    expect(get).toHaveBeenCalledWith('/api/v1/admin/reportes/reservas');
+  });
+
+  it.each([['HUESPED', 'Huésped'], ['ANFITRION', 'Anfitrión']])(
+    'un %s que entra a los reportes vuelve a su panel', (rol, nombre) => {
+      iniciar(rol);
+      renderizarEn('/administrador/reportes');
+      esperarInicioDe(rol, nombre);
+      expect(get).not.toHaveBeenCalledWith(expect.stringContaining('/admin/'));
+    },
+  );
+
   it.each([['HUESPED', 'Huésped'], ['ANFITRION', 'Anfitrión']])(
     'un %s que entra al dashboard vuelve a su panel', (rol, nombre) => {
       iniciar(rol);

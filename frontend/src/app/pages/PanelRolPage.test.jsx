@@ -57,6 +57,8 @@ describe('PanelRolPage', () => {
     expect(screen.getByRole('link', { name: 'Consultar auditoría' })).toHaveAttribute('href', '/administrador/auditoria');
     expect(screen.getByRole('heading', { name: 'Indicadores' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Ver dashboard' })).toHaveAttribute('href', '/administrador/dashboard');
+    expect(screen.getByRole('heading', { name: 'Reportes' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Exportar reportes' })).toHaveAttribute('href', '/administrador/reportes');
     expect(screen.getByRole('link', { name: 'Ir a Mi cuenta' })).toHaveAttribute('href', '/mi-cuenta');
     expect(screen.queryByText(/en construcción/)).not.toBeInTheDocument();
     expect(await screen.findByText('No hay publicaciones pendientes de revisión.')).toBeInTheDocument();
