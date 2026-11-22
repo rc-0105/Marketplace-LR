@@ -20,6 +20,11 @@ const HERRAMIENTAS = [
     ruta: '/administrador/moderacion', enlace: 'Moderar publicaciones',
   },
   {
+    id: 'dashboard', icono: 'indicadores', titulo: 'Indicadores',
+    nota: 'Mide la operación: usuarios, publicaciones, reservas, ingresos y demanda.',
+    ruta: '/administrador/dashboard', enlace: 'Ver dashboard',
+  },
+  {
     id: 'usuarios', icono: 'usuarios', titulo: 'Usuarios',
     nota: 'Restringe las cuentas que incumplen las políticas o rehabilítalas.',
     ruta: '/administrador/usuarios', enlace: 'Administrar usuarios',

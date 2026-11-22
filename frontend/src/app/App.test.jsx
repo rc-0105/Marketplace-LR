@@ -175,6 +175,29 @@ describe('App', () => {
     expect(get).not.toHaveBeenCalled();
   });
 
+  it('muestra el dashboard al administrador y lo pide a la API', async () => {
+    get.mockResolvedValue({
+      desde: null, hasta: null, usuariosPorRol: { HUESPED: 0, ANFITRION: 0, ADMINISTRADOR: 1 }, publicacionesActivas: 0,
+      reservasPorEstado: { PENDIENTE: 0, CONFIRMADA: 0, CANCELADA: 0, VENCIDA: 0, COMPLETADA: 0 },
+      ingresosEstimados: 0, ciudadesMayorDemanda: [],
+    });
+    iniciar('ADMINISTRADOR');
+    renderizarEn('/administrador/dashboard');
+
+    expect(screen.getByRole('heading', { name: 'Dashboard de indicadores' })).toBeInTheDocument();
+    expect(await screen.findByText('Todavía no hay reservas en este rango.')).toBeInTheDocument();
+    expect(get).toHaveBeenCalledWith('/api/v1/admin/dashboard');
+  });
+
+  it.each([['HUESPED', 'Huésped'], ['ANFITRION', 'Anfitrión']])(
+    'un %s que entra al dashboard vuelve a su panel', (rol, nombre) => {
+      iniciar(rol);
+      renderizarEn('/administrador/dashboard');
+      esperarInicioDe(rol, nombre);
+      expect(get).not.toHaveBeenCalledWith(expect.stringContaining('/admin/'));
+    },
+  );
+
   it('muestra el detalle del evento de auditoría al administrador y lo pide a la API', async () => {
     get.mockResolvedValue({ id: 7, fecha: '2026-11-16T03:30:00Z', usuario: '2', accion: 'RESERVA', entidad: 'Reserva',
       entidadId: '55', resultado: 'EXITO', datos: {}, correlacion: 'c-1' });
