@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi } from '../../../shared/services/http.js';
-import { formatearFecha, formatearPesos } from '../models/reserva.js';
+import { formatearFecha, formatearPesos, formatearPlazo } from '../models/reserva.js';
 
 // Intl separa el signo del número con un espacio duro; Testing Library normaliza el DOM pero no lo esperado.
 const pesos = (valor) => formatearPesos(valor).replace(/\s/g, ' ');
@@ -51,6 +51,59 @@ describe('DetalleReservaPage', () => {
     expect(screen.getByText(`${formatearFecha('2026-12-10')} – ${formatearFecha('2026-12-14')} · 4 noches`))
       .toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Volver a mis reservas' })).toHaveAttribute('href', '/huesped/reservas');
+  });
+
+  it('una solicitud pendiente de aprobación no ofrece pagar y sí cancelarla (SOF-79)', async () => {
+    vi.mocked(consultarReserva).mockResolvedValue(detalle({ estado: 'PENDIENTE_APROBACION', estadoPago: 'SIN_PAGO' }));
+
+    renderizar();
+
+    expect(await screen.findByText('Pendiente de aprobación')).toBeInTheDocument();
+    expect(screen.getByText(/anfitrión.*responder/i)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Ir al portal de pagos' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancelar reserva' })).toBeInTheDocument();
+  });
+
+  it('la solicitud pendiente muestra el plazo que trae la API, no un número fijo de horas', async () => {
+    vi.mocked(consultarReserva).mockResolvedValue(detalle({
+      estado: 'PENDIENTE_APROBACION', estadoPago: 'SIN_PAGO', venceEn: '2026-11-24T15:00:00Z',
+    }));
+
+    renderizar();
+
+    const nota = await screen.findByText(/anfitrión.*responder/i);
+    expect(nota).toHaveTextContent(formatearPlazo('2026-11-24T15:00:00Z'));
+    expect(nota).not.toHaveTextContent('24 horas');
+  });
+
+  it('una solicitud rechazada muestra el motivo que dio el anfitrión', async () => {
+    vi.mocked(consultarReserva).mockResolvedValue(detalle({
+      estado: 'RECHAZADA', estadoPago: 'SIN_PAGO', motivoRechazo: 'Fechas no disponibles',
+    }));
+
+    renderizar();
+
+    expect(await screen.findByText('Rechazada')).toBeInTheDocument();
+    expect(screen.getByText(/Fechas no disponibles/)).toBeInTheDocument();
+  });
+
+  it('una solicitud rechazada se muestra como rechazada sin pagar ni cancelar', async () => {
+    vi.mocked(consultarReserva).mockResolvedValue(detalle({ estado: 'RECHAZADA', estadoPago: 'SIN_PAGO' }));
+
+    renderizar();
+
+    expect(await screen.findByText('Rechazada')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Ir al portal de pagos' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cancelar reserva' })).not.toBeInTheDocument();
+  });
+
+  it('una reserva pendiente de pago sigue ofreciendo el portal y no la nota de aprobación', async () => {
+    vi.mocked(consultarReserva).mockResolvedValue(detalle({ estado: 'PENDIENTE', estadoPago: 'SIN_PAGO' }));
+
+    renderizar();
+
+    expect(await screen.findByRole('link', { name: 'Ir al portal de pagos' })).toBeInTheDocument();
+    expect(screen.queryByText(/anfitrión.*responder/i)).not.toBeInTheDocument();
   });
 
   it('muestra el desglose del pago que quedó fijo al reservar', async () => {

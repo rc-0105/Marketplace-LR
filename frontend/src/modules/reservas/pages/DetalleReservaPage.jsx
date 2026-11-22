@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import FormularioResena from '../../resenas/components/FormularioResena.jsx';
 import CancelarReserva from '../components/CancelarReserva.jsx';
 import {
-  formatearFecha, formatearPesos, nombreDeEstadoPago, nombreDeEstadoReserva,
+  formatearFecha, formatearPesos, formatearPlazo, nombreDeEstadoPago, nombreDeEstadoReserva,
 } from '../models/reserva.js';
 import { consultarReserva } from '../services/reservaService.js';
 import estilos from './DetalleReservaPage.module.css';
@@ -104,7 +104,21 @@ export default function DetalleReservaPage() {
         )}
       </section>
 
-      {(reserva.estado === 'CONFIRMADA' || cancelada) && <CancelarReserva reservaId={reserva.id} onCancelada={refrescar} />}
+      {reserva.estado === 'PENDIENTE_APROBACION' && (
+        <p className={estilos.nota}>
+          Esperando la respuesta del anfitrión
+          {reserva.venceEn ? `, que puede responder hasta el ${formatearPlazo(reserva.venceEn)}` : ''}. Si aprueba la
+          solicitud podrás pagar.
+        </p>
+      )}
+
+      {reserva.estado === 'RECHAZADA' && reserva.motivoRechazo && (
+        <p className={estilos.nota}>Motivo del rechazo: {reserva.motivoRechazo}</p>
+      )}
+
+      {(['CONFIRMADA', 'PENDIENTE_APROBACION'].includes(reserva.estado) || cancelada) && (
+        <CancelarReserva reservaId={reserva.id} onCancelada={refrescar} />
+      )}
 
       {reserva.estado === 'COMPLETADA' && <FormularioResena reservaId={reserva.id} />}
     </main>

@@ -223,6 +223,13 @@
   box-shadow: 0 0 0 4px rgb(161 74 40 / 15%);
 }
 
+.enlace {
+  display: inline-block;
+  margin: 0 var(--espacio-4) var(--espacio-4) calc(var(--espacio-4) * 2 + 2.75rem);
+  color: var(--color-terracota-oscuro);
+  font-weight: 500;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .noLeida:hover {
     transform: none;

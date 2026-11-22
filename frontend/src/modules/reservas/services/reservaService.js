@@ -1,6 +1,7 @@
 import { get, post } from '../../../shared/services/http.js';
 import {
   cancelacionDesdeApi, detalleReservaDesdeApi, reservaDesdeApi, reservaEnRevisionDesdeApi, resumenReservaDesdeApi,
+  solicitudReservaDesdeApi,
 } from '../models/reserva.js';
 
 const RUTA = '/api/v1/reservas';
@@ -72,6 +73,36 @@ export function anticiparCancelacion(reservaId) {
  */
 export async function cancelarReserva(reservaId, motivo) {
   return cancelacionDesdeApi(await post(`${RUTA}/${reservaId}/cancelacion`, { motivo }));
+}
+
+/**
+ * Solicitudes de reserva que esperan la respuesta del anfitrión autenticado (SOF-79), la más urgente primero.
+ * @returns {Promise<import('../models/reserva.js').SolicitudReserva[]>}
+ */
+export async function listarSolicitudes() {
+  const respuesta = await get(`${RUTA}/solicitudes`);
+  return respuesta.map(solicitudReservaDesdeApi);
+}
+
+/**
+ * Aprueba una solicitud: la reserva pasa a PENDIENTE y el huésped tiene 24 h para pagar (SOF-79). 409 si ya
+ * no se puede responder (vencida, ya resuelta o publicación bloqueada). El ErrorApi se propaga.
+ * @param {number} reservaId
+ * @returns {Promise<{reservaId: number, estado: string, venceEn: string}>}
+ */
+export function aprobarSolicitud(reservaId) {
+  return post(`${RUTA}/${reservaId}/aprobar`);
+}
+
+/**
+ * Rechaza una solicitud con un motivo obligatorio de hasta 500 caracteres (SOF-79). 400 si el motivo es
+ * inválido y 409 si ya no se puede responder. El ErrorApi se propaga.
+ * @param {number} reservaId
+ * @param {string} motivo
+ * @returns {Promise<{reservaId: number, estado: string, motivo: string}>}
+ */
+export function rechazarSolicitud(reservaId, motivo) {
+  return post(`${RUTA}/${reservaId}/rechazar`, { motivo: motivo.trim() });
 }
 
 const RUTA_REVISION = '/api/v1/admin/reservas';

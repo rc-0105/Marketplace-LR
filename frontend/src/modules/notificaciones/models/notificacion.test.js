@@ -1,5 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { aVistaNotificacion } from './notificacion.js';
+import { aVistaNotificacion, enlaceDeNotificacion } from './notificacion.js';
+
+describe('enlaceDeNotificacion', () => {
+  it('SOLICITUD_RECIBIDA lleva al anfitrión a sus solicitudes', () => {
+    expect(enlaceDeNotificacion({ tipo: 'SOLICITUD_RECIBIDA', entidadId: 9 }))
+      .toEqual({ ruta: '/anfitrion/solicitudes', texto: 'Ver solicitudes' });
+  });
+
+  it.each(['SOLICITUD_APROBADA', 'SOLICITUD_RECHAZADA', 'SOLICITUD_VENCIDA'])(
+    '%s lleva al huésped al detalle de su reserva', (tipo) => {
+      expect(enlaceDeNotificacion({ tipo, entidadId: 9 }))
+        .toEqual({ ruta: '/huesped/reservas/9', texto: 'Ver reserva' });
+    });
+
+  it('otros tipos o una solicitud sin entidad no tienen enlace', () => {
+    expect(enlaceDeNotificacion({ tipo: 'RESERVA_CONFIRMADA', entidadId: 9 })).toBeNull();
+    expect(enlaceDeNotificacion({ tipo: 'SOLICITUD_APROBADA', entidadId: null })).toBeNull();
+  });
+});
 
 describe('aVistaNotificacion', () => {
   it('conserva los datos y muestra la fecha de creación en hora de Bogotá', () => {

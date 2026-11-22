@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi } from '../../../shared/services/http.js';
 import { fijarNoLeidas, obtenerNoLeidas } from '../services/contadorNotificaciones.js';
@@ -51,6 +52,30 @@ describe('NotificacionesPage', () => {
     expect(textoDe(items[1])).toContain('20/11/2026 08:30');
     expect(items[1]).not.toHaveTextContent('Sin leer');
     expect(obtenerNoLeidas()).toBe(1);
+  });
+
+  it.each([
+    ['SOLICITUD_RECIBIDA', 'Solicitud', 'Ver solicitudes', '/anfitrion/solicitudes'],
+    ['SOLICITUD_APROBADA', 'Solicitud', 'Ver reserva', '/huesped/reservas/7'],
+    ['SOLICITUD_RECHAZADA', 'Solicitud', 'Ver reserva', '/huesped/reservas/7'],
+    ['SOLICITUD_VENCIDA', 'Solicitud', 'Ver reserva', '/huesped/reservas/7'],
+  ])('muestra %s con su categoría y su enlace (SOF-79)', async (tipo, categoria, texto, ruta) => {
+    vi.mocked(listarNotificaciones).mockResolvedValue({ noLeidas: 1, notificaciones: [
+      notificacion({ id: 5, tipo, mensaje: 'Mensaje de solicitud' })] });
+    render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><NotificacionesPage /></MemoryRouter>);
+
+    const item = (await screen.findAllByRole('listitem'))[0];
+    expect(item).toHaveTextContent(categoria);
+    expect(item).toHaveTextContent('Mensaje de solicitud');
+    expect(within(item).getByRole('link', { name: texto })).toHaveAttribute('href', ruta);
+  });
+
+  it('un tipo sin enlace no muestra ninguno', async () => {
+    vi.mocked(listarNotificaciones).mockResolvedValue({ noLeidas: 1, notificaciones: [NO_LEIDA] });
+    render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><NotificacionesPage /></MemoryRouter>);
+
+    await screen.findAllByRole('listitem');
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 
   it('sin notificaciones muestra el estado vacío', async () => {

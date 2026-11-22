@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Link, useNavigate } from 'react-router-dom';
 import Campo from '../../../shared/components/Campo.jsx';
+import { formatearPlazo } from '../../reservas/models/reserva.js';
 import { crearReserva } from '../../reservas/services/reservaService.js';
 import { cotizarEstancia } from '../services/cotizacionService.js';
 import estilos from './CotizadorEstancia.module.css';
@@ -33,6 +34,8 @@ export default function CotizadorEstancia({
   const [errorReserva, setErrorReserva] = useState(null);
   // Reserva ya pagada del huésped con esta misma estancia: la API la devuelve en vez de crear otra.
   const [yaReservada, setYaReservada] = useState(null);
+  // Reserva creada en una publicación con aprobación del anfitrión (SOF-79): no hay pago hasta que responda.
+  const [solicitada, setSolicitada] = useState(null);
   const navegar = useNavigate();
   // Cada edición o cálculo invalida las respuestas en vuelo: una cotización tardía no debe reaparecer.
   const solicitud = useRef(0);
@@ -43,6 +46,7 @@ export default function CotizadorEstancia({
     setCalculando(false);
     setErrorReserva(null);
     setYaReservada(null);
+    setSolicitada(null);
   }
 
   function cambiarFecha(evento) {
@@ -84,6 +88,12 @@ export default function CotizadorEstancia({
       // Si ya la tenía confirmada no hay nada que pagar: se avisa en vez de abrir el portal de pagos.
       if (reserva.estado === 'CONFIRMADA') {
         setYaReservada(reserva);
+        setReservando(false);
+        return;
+      }
+      // Con aprobación del anfitrión la reserva es solo una solicitud: se paga después, si la aprueba.
+      if (reserva.estado === 'PENDIENTE_APROBACION') {
+        setSolicitada(reserva);
         setReservando(false);
         return;
       }
@@ -156,6 +166,15 @@ export default function CotizadorEstancia({
             <div className={estilos.yaReservada}>
               <output>Ya reservaste estas fechas. Tu reserva está confirmada y pagada.</output>
               <Link to={`/huesped/reservas/${yaReservada.id}`} className={estilos.verReserva}>Ver mi reserva</Link>
+            </div>
+          ) : solicitada ? (
+            <div className={estilos.yaReservada}>
+              <output>
+                {`Solicitud enviada. El anfitrión puede responder${solicitada.venceEn
+                  ? ` hasta el ${formatearPlazo(solicitada.venceEn)}` : ' dentro de su plazo'}; si la aprueba, te avisaremos
+                para que pagues y confirmes la reserva.`}
+              </output>
+              <Link to={`/huesped/reservas/${solicitada.id}`} className={estilos.verReserva}>Ver mi solicitud</Link>
             </div>
           ) : (
             <button type="button" className={estilos.reservar} onClick={confirmarReserva} disabled={reservando}>

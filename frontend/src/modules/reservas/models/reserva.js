@@ -5,7 +5,7 @@
  * @property {number} publicacionId
  * @property {string} llegada fecha en formato AAAA-MM-DD
  * @property {string} salida fecha en formato AAAA-MM-DD
- * @property {'PENDIENTE'|'CONFIRMADA'|'CANCELADA'|'VENCIDA'|'COMPLETADA'} estado
+ * @property {'PENDIENTE_APROBACION'|'PENDIENTE'|'RECHAZADA'|'CONFIRMADA'|'CANCELADA'|'VENCIDA'|'COMPLETADA'} estado
  * @property {'SIN_PAGO'|'APROBADO'|'RECHAZADO'|'ERROR'|'REEMBOLSADO'|'NO_COBRADO'} estadoPago
  * @property {string|null} transaccionId identificador de la transacción en la pasarela, si se aprobó o se reembolsó
  * @property {number} noches
@@ -55,7 +55,9 @@
  */
 
 const NOMBRE_ESTADO_RESERVA = {
+  PENDIENTE_APROBACION: 'Pendiente de aprobación',
   PENDIENTE: 'Pendiente de pago',
+  RECHAZADA: 'Rechazada',
   CONFIRMADA: 'Confirmada',
   CANCELADA: 'Cancelada',
   VENCIDA: 'Vencida',
@@ -91,6 +93,16 @@ export function nombreDeEstadoPago(estado) {
 /** @param {number} valor importe en pesos colombianos */
 export function formatearPesos(valor) {
   return FORMATO_PESOS.format(valor);
+}
+
+// Un plazo es un instante, no un día: se muestra en hora de Bogotá, como el resto de los avisos del backend.
+const FORMATO_PLAZO = new Intl.DateTimeFormat('es-CO', {
+  timeZone: 'America/Bogota', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+});
+
+/** @param {string} instante instante ISO límite de una solicitud o de un apartado */
+export function formatearPlazo(instante) {
+  return FORMATO_PLAZO.format(new Date(instante));
 }
 
 /** @param {string} fecha día en formato AAAA-MM-DD */
@@ -141,6 +153,7 @@ export function detalleReservaDesdeApi(dato) {
     total: Number(dato.total),
     estadoPago: dato.estadoPago,
     transaccionId: dato.transaccionId ?? null,
+    motivoRechazo: dato.motivoRechazo ?? null,
   };
 }
 
@@ -165,6 +178,7 @@ export function reservaDesdeApi(dato) {
     total: Number(dato.total),
     estadoPago: dato.estadoPago,
     transaccionId: dato.transaccionId ?? null,
+    venceEn: dato.venceEn ?? null,
   };
 }
 
@@ -192,6 +206,43 @@ export function cancelacionDesdeApi(dato) {
     valorDevolucion: Number(dato.valorDevolucion),
     resultadoReembolso: dato.resultadoReembolso,
     fecha: dato.fecha,
+  };
+}
+
+/**
+ * Solicitud de reserva pendiente de respuesta del anfitrión (SOF-79).
+ * @typedef {Object} SolicitudReserva
+ * @property {number} id
+ * @property {number} publicacionId
+ * @property {string|null} titulo
+ * @property {string|null} ciudad
+ * @property {string|null} imagenPrincipal
+ * @property {string|null} huespedNombre
+ * @property {string} llegada AAAA-MM-DD
+ * @property {string} salida AAAA-MM-DD
+ * @property {number} noches
+ * @property {number} total
+ * @property {string} venceEn instante ISO límite para que el anfitrión responda
+ */
+
+/**
+ * Convierte una fila de GET /api/v1/reservas/solicitudes; el total llega como número o texto.
+ * @param {Record<string, any>} dato
+ * @returns {SolicitudReserva}
+ */
+export function solicitudReservaDesdeApi(dato) {
+  return {
+    id: dato.id,
+    publicacionId: dato.publicacionId,
+    titulo: dato.titulo ?? null,
+    ciudad: dato.ciudad ?? null,
+    imagenPrincipal: dato.imagenPrincipal ?? null,
+    huespedNombre: dato.huespedNombre ?? null,
+    llegada: dato.llegada,
+    salida: dato.salida,
+    noches: dato.noches,
+    total: Number(dato.total),
+    venceEn: dato.venceEn,
   };
 }
 

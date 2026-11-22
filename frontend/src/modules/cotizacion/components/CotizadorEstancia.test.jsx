@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi } from '../../../shared/services/http.js';
+import { formatearPlazo } from '../../reservas/models/reserva.js';
 import { crearReserva } from '../../reservas/services/reservaService.js';
 import { cotizarEstancia } from '../services/cotizacionService.js';
 import CotizadorEstancia from './CotizadorEstancia.jsx';
@@ -220,6 +221,40 @@ describe('CotizadorEstancia', () => {
 
     expect(await screen.findByText('Portal de pagos de la reserva')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Confirmar reserva' })).not.toBeInTheDocument();
+  });
+
+  it('si la reserva queda pendiente de aprobación avisa "Solicitud enviada" y no va al portal de pagos (SOF-79)', async () => {
+    vi.mocked(cotizarEstancia).mockResolvedValue(SIN_SERVICIOS);
+    vi.mocked(crearReserva).mockResolvedValue({
+      id: 1, estado: 'PENDIENTE_APROBACION', total: 470000, venceEn: '2026-11-24T15:00:00Z',
+    });
+    abrir();
+    cotizar();
+    await desglose();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar reserva' }));
+
+    const aviso = await screen.findByRole('status');
+    expect(aviso).toHaveTextContent('Solicitud enviada');
+    expect(aviso).toHaveTextContent(formatearPlazo('2026-11-24T15:00:00Z'));
+    expect(aviso).not.toHaveTextContent('24 horas');
+    expect(screen.getByRole('link', { name: 'Ver mi solicitud' })).toHaveAttribute('href', '/huesped/reservas/1');
+    expect(screen.queryByText('Portal de pagos de la reserva')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Confirmar reserva' })).not.toBeInTheDocument();
+  });
+
+  it('tras una solicitud enviada, editar una fecha descarta el aviso', async () => {
+    vi.mocked(cotizarEstancia).mockResolvedValue(SIN_SERVICIOS);
+    vi.mocked(crearReserva).mockResolvedValue({ id: 1, estado: 'PENDIENTE_APROBACION', total: 470000 });
+    abrir();
+    cotizar();
+    await desglose();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar reserva' }));
+    await screen.findByText(/Solicitud enviada/);
+
+    fireEvent.change(screen.getByLabelText('Salida'), { target: { value: '2026-12-15' } });
+
+    expect(screen.queryByText(/Solicitud enviada/)).not.toBeInTheDocument();
   });
 
   it('si esas fechas ya las reservó y pagó, avisa que ya las reservó y no va al portal de pagos', async () => {

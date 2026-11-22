@@ -56,6 +56,18 @@ describe('CancelarReserva', () => {
     expect(cancelarReserva).not.toHaveBeenCalled();
   });
 
+  it('al cancelar una solicitud aún sin pago (devolución 0) no promete devolución (SOF-79)', async () => {
+    vi.mocked(cancelarReserva).mockResolvedValue(
+      { reservaId: 7, estado: 'CANCELADA', motivo: 'Ya no viajo', valorDevolucion: 0, resultadoReembolso: 'NO_APLICA' });
+    abrir();
+
+    confirmar('Ya no viajo');
+
+    const aviso = await screen.findByRole('status');
+    expect(aviso).toHaveTextContent('no corresponde devolución');
+    expect(aviso).not.toHaveTextContent('simulada');
+  });
+
   it('cancela con el motivo, muestra la devolución y avisa a la página', async () => {
     const resultado = { reservaId: 7, estado: 'CANCELADA', motivo: 'Cambio de planes', valorDevolucion: 470000 };
     vi.mocked(cancelarReserva).mockResolvedValue(resultado);

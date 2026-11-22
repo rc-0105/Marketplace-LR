@@ -1,11 +1,43 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { get, post } from '../../../shared/services/http.js';
 import {
-  anticiparCancelacion, cancelarReserva, consultarReserva, crearReserva, listarMisReservas, listarReservasEnRevision, pagarReserva,
-  resolverReservaEnRevision,
+  anticiparCancelacion, aprobarSolicitud, cancelarReserva, consultarReserva, crearReserva, listarMisReservas,
+  listarReservasEnRevision, listarSolicitudes, pagarReserva, rechazarSolicitud, resolverReservaEnRevision,
 } from './reservaService.js';
 
 vi.mock('../../../shared/services/http.js', () => ({ get: vi.fn(), post: vi.fn() }));
+
+describe('solicitudes de reserva del anfitrión (SOF-79)', () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  it('lista las solicitudes con el total numérico', async () => {
+    vi.mocked(get).mockResolvedValue([{ id: 4, titulo: 'Casa', huespedNombre: 'Ana', total: '500000.00',
+      llegada: '2026-12-10', salida: '2026-12-12', noches: 2, venceEn: '2026-11-22T10:00:00Z' }]);
+
+    const solicitudes = await listarSolicitudes();
+
+    expect(get).toHaveBeenCalledWith('/api/v1/reservas/solicitudes');
+    expect(solicitudes).toEqual([expect.objectContaining({ id: 4, titulo: 'Casa', huespedNombre: 'Ana', total: 500000 })]);
+  });
+
+  it('aprueba una solicitud sin cuerpo', async () => {
+    vi.mocked(post).mockResolvedValue({ reservaId: 4, estado: 'PENDIENTE', venceEn: '2026-11-23T10:00:00Z' });
+
+    const resultado = await aprobarSolicitud(4);
+
+    expect(post).toHaveBeenCalledWith('/api/v1/reservas/4/aprobar');
+    expect(resultado).toEqual({ reservaId: 4, estado: 'PENDIENTE', venceEn: '2026-11-23T10:00:00Z' });
+  });
+
+  it('rechaza una solicitud con su motivo recortado', async () => {
+    vi.mocked(post).mockResolvedValue({ reservaId: 4, estado: 'RECHAZADA', motivo: 'Fechas no disponibles' });
+
+    const resultado = await rechazarSolicitud(4, '  Fechas no disponibles ');
+
+    expect(post).toHaveBeenCalledWith('/api/v1/reservas/4/rechazar', { motivo: 'Fechas no disponibles' });
+    expect(resultado.estado).toBe('RECHAZADA');
+  });
+});
 
 describe('listarMisReservas', () => {
   beforeEach(() => vi.resetAllMocks());

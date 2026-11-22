@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
-import { aVistaNotificacion } from '../models/notificacion.js';
+import { Link } from 'react-router-dom';
+import { aVistaNotificacion, enlaceDeNotificacion } from '../models/notificacion.js';
 import { descontarNoLeida, fijarNoLeidas } from '../services/contadorNotificaciones.js';
 import { listarNotificaciones, marcarLeida } from '../services/notificacionesService.js';
 import estilos from './NotificacionesPage.module.css';
@@ -18,6 +19,10 @@ const ESTILO_POR_TIPO = {
   },
   PUBLICACION_ESTADO: { categoria: 'Publicación', tono: 'tonoMarca', trazo: 'M4 11l8-7 8 7M6 9.5V20h12V9.5M10 20v-5h4v5' },
   CUENTA_RESTRINGIDA: { categoria: 'Cuenta', tono: 'tonoAviso', trazo: 'M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6zM12 8v4M12 15.5v.5' },
+  SOLICITUD_RECIBIDA: { categoria: 'Solicitud', tono: 'tonoMarca', trazo: 'M4 6h16v12H4zM4 7l8 6 8-6' },
+  SOLICITUD_APROBADA: { categoria: 'Solicitud', tono: 'tonoExito', trazo: 'M5 12.5l4.5 4.5L19 7' },
+  SOLICITUD_RECHAZADA: { categoria: 'Solicitud', tono: 'tonoError', trazo: 'M6 6l12 12M18 6L6 18' },
+  SOLICITUD_VENCIDA: { categoria: 'Solicitud', tono: 'tonoAviso', trazo: 'M12 7v5l3 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z' },
   RESENA_OCULTA: {
     categoria: 'Reseña', tono: 'tonoAviso',
     trazo: 'M3 3l18 18M10.6 6.1A9.8 9.8 0 0 1 12 6c5 0 9 6 9 6a16 16 0 0 1-2.6 3.2M6.6 7.6C4.3 9.2 3 12 3 12s4 6 9 6a8.6 8.6 0 0 0 4-1',
@@ -57,7 +62,8 @@ export default function NotificacionesPage() {
     listarNotificaciones()
       .then((respuesta) => {
         if (!vigente) return;
-        setNotificaciones((respuesta?.notificaciones ?? []).map(aVistaNotificacion));
+        setNotificaciones((respuesta?.notificaciones ?? []).map((notificacion) => (
+          { ...aVistaNotificacion(notificacion), enlace: enlaceDeNotificacion(notificacion) })));
         fijarNoLeidas(respuesta?.noLeidas);
       })
       .catch((error) => vigente && setErrorCarga(mensajeDe(error, MENSAJE_ERROR_CARGA)));
@@ -133,6 +139,9 @@ export default function NotificacionesPage() {
                     onClick={() => abrir(notificacion)}>
                     {contenido}
                   </button>
+                )}
+                {notificacion.enlace && (
+                  <Link to={notificacion.enlace.ruta} className={estilos.enlace}>{notificacion.enlace.texto}</Link>
                 )}
               </li>
             );

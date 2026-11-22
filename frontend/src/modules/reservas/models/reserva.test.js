@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  cancelacionDesdeApi, detalleReservaDesdeApi, nombreDeEstadoPago, nombreDeEstadoReserva, reservaDesdeApi,
+  cancelacionDesdeApi, detalleReservaDesdeApi, formatearPlazo, nombreDeEstadoPago, nombreDeEstadoReserva, reservaDesdeApi,
   resumenReservaDesdeApi,
 } from './reserva.js';
 
@@ -26,6 +26,7 @@ describe('detalleReservaDesdeApi', () => {
       noches: 4, precioBase: '400000.00', tarifaLimpieza: '30000.00', tarifaServicio: '40000.00', descuento: '0.00',
       serviciosAdicionales: [{ id: 1, nombre: 'Desayuno' }, { id: 2, nombre: null }],
       totalServiciosAdicionales: '15000.00', total: '485000.00', estadoPago: 'APROBADO', transaccionId: 'sim_1',
+      motivoRechazo: 'Fechas no disponibles',
     });
 
     expect(detalle).toEqual({
@@ -34,6 +35,7 @@ describe('detalleReservaDesdeApi', () => {
       noches: 4, precioBase: 400000, tarifaLimpieza: 30000, tarifaServicio: 40000, descuento: 0,
       serviciosAdicionales: [{ id: 1, nombre: 'Desayuno' }, { id: 2, nombre: null }],
       totalServiciosAdicionales: 15000, total: 485000, estadoPago: 'APROBADO', transaccionId: 'sim_1',
+      motivoRechazo: 'Fechas no disponibles',
     });
   });
 
@@ -43,10 +45,22 @@ describe('detalleReservaDesdeApi', () => {
     expect(detalle.alojamiento).toBeNull();
     expect(detalle.serviciosAdicionales).toEqual([]);
     expect(detalle.transaccionId).toBeNull();
+    expect(detalle.motivoRechazo).toBeNull();
+  });
+});
+
+describe('formatearPlazo', () => {
+  it('muestra el instante límite en hora de Bogotá, con día y hora', () => {
+    expect(formatearPlazo('2026-11-23T15:00:00Z')).toMatch(/23.*nov.*10:00/);
   });
 });
 
 describe('nombres de estado', () => {
+  it('nombra los estados de la solicitud de reserva con aprobación del anfitrión (SOF-79)', () => {
+    expect(['PENDIENTE_APROBACION', 'RECHAZADA'].map(nombreDeEstadoReserva))
+      .toEqual(['Pendiente de aprobación', 'Rechazada']);
+  });
+
   it('nombra cada estado de la reserva y del pago para mostrarlo', () => {
     expect(['PENDIENTE', 'CONFIRMADA', 'CANCELADA', 'VENCIDA', 'COMPLETADA'].map(nombreDeEstadoReserva))
       .toEqual(['Pendiente de pago', 'Confirmada', 'Cancelada', 'Vencida', 'Completada']);
@@ -61,12 +75,14 @@ describe('reservaDesdeApi', () => {
       id: 12, publicacionId: 5, llegada: '2026-12-10', salida: '2026-12-14', estado: 'PENDIENTE', noches: 4,
       precioBase: '400000.00', tarifaLimpieza: '30000.00', tarifaServicio: '40000.00', descuento: '0.00',
       totalServiciosAdicionales: '15000.00', total: '485000.00', estadoPago: 'SIN_PAGO', transaccionId: null,
+      venceEn: '2026-11-23T15:00:00Z',
     });
 
     expect(reserva).toEqual({
       id: 12, publicacionId: 5, llegada: '2026-12-10', salida: '2026-12-14', estado: 'PENDIENTE', noches: 4,
       precioBase: 400000, tarifaLimpieza: 30000, tarifaServicio: 40000, descuento: 0,
       totalServiciosAdicionales: 15000, total: 485000, estadoPago: 'SIN_PAGO', transaccionId: null,
+      venceEn: '2026-11-23T15:00:00Z',
     });
   });
 

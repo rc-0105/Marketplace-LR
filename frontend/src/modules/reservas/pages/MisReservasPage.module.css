@@ -119,9 +119,15 @@
   text-transform: uppercase;
 }
 
-.PENDIENTE {
+.PENDIENTE,
+.PENDIENTE_APROBACION {
   background: #f6e7c8;
   color: #6b4a12;
+}
+
+.RECHAZADA {
+  background: var(--color-error-fondo);
+  color: var(--color-error);
 }
 
 .CONFIRMADA {
