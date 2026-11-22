@@ -137,6 +137,7 @@ class AprobacionReservasIntegracionTest {
         mvc.perform(get("/api/v1/reservas/solicitudes").header(HttpHeaders.AUTHORIZATION, token))
                 .andExpect(status().isForbidden());
         aprobar(token, id).andExpect(status().isForbidden());
+        rechazar(token, id, "No").andExpect(status().isForbidden());
         assertThat(estado(id)).isEqualTo("PENDIENTE_APROBACION");
     }
 
@@ -187,6 +188,7 @@ class AprobacionReservasIntegracionTest {
 
         aprobar(bearer("marta@correo.com"), id).andExpect(status().isForbidden());
         aprobar(bearer("luis@correo.com"), 999_999L).andExpect(status().isNotFound());
+        rechazar(bearer("marta@correo.com"), id, "No").andExpect(status().isForbidden());
         assertThat(estado(id)).isEqualTo("PENDIENTE_APROBACION");
     }
 
@@ -198,6 +200,7 @@ class AprobacionReservasIntegracionTest {
 
         aprobar(token, id).andExpect(status().isOk());
         aprobar(token, id).andExpect(status().isConflict());
+        rechazar(token, id, "Tarde").andExpect(status().isConflict());
         assertThat(estado(id)).isEqualTo("PENDIENTE");
     }
 
@@ -223,6 +226,87 @@ class AprobacionReservasIntegracionTest {
         aprobar(bearer("luis@correo.com"), id).andExpect(status().isConflict());
 
         assertThat(estado(id)).isEqualTo("PENDIENTE_APROBACION");
+    }
+
+    // ---- rechazar ----
+
+    @Test
+    @DisplayName("Rechazar: RECHAZADA con motivo guardado, noches liberadas y aviso al huésped con el motivo")
+    void rechazaLaSolicitud() throws Exception {
+        long id = solicitar("ana@correo.com");
+
+        rechazar(bearer("luis@correo.com"), id, "  Fechas no disponibles  ")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reservaId").value(id))
+                .andExpect(jsonPath("$.estado").value("RECHAZADA"))
+                .andExpect(jsonPath("$.motivo").value("Fechas no disponibles"))
+                .andExpect(jsonPath("$.venceEn").doesNotExist());
+
+        assertThat(jdbc.queryForObject("SELECT motivo_rechazo FROM reserva WHERE id = ?", String.class, id))
+                .isEqualTo("Fechas no disponibles");
+        assertThat(notificaciones("ana@correo.com", "SOLICITUD_RECHAZADA").get(0)).asString()
+                .contains("Fechas no disponibles");
+        // Las noches quedan libres: otro huésped puede solicitar las mismas fechas.
+        solicitar("carla@correo.com");
+    }
+
+    @Test
+    @DisplayName("El detalle de la reserva del huésped trae el motivo del rechazo; sin rechazo viene nulo")
+    void elDetalleTraeElMotivoDelRechazo() throws Exception {
+        long id = solicitar("ana@correo.com");
+        mvc.perform(get("/api/v1/reservas/{id}", id).header(HttpHeaders.AUTHORIZATION, bearer("ana@correo.com")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.motivoRechazo").value((Object) null));
+
+        rechazar(bearer("luis@correo.com"), id, "Fechas no disponibles").andExpect(status().isOk());
+
+        mvc.perform(get("/api/v1/reservas/{id}", id).header(HttpHeaders.AUTHORIZATION, bearer("ana@correo.com")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("RECHAZADA"))
+                .andExpect(jsonPath("$.motivoRechazo").value("Fechas no disponibles"));
+    }
+
+    @Test
+    @DisplayName("Rechazar con el motivo de 500 caracteres: se guarda completo y el aviso cabe en la notificación")
+    void rechazarConMotivoMaximoCabeEnLaNotificacion() throws Exception {
+        long id = solicitar("ana@correo.com");
+        String motivo = "x".repeat(500);
+
+        rechazar(bearer("luis@correo.com"), id, motivo).andExpect(status().isOk());
+
+        assertThat(jdbc.queryForObject("SELECT motivo_rechazo FROM reserva WHERE id = ?", String.class, id))
+                .hasSize(500);
+        List<Map<String, Object>> filas = jdbc.queryForList(
+                "SELECT mensaje FROM notificacion WHERE tipo = 'SOLICITUD_RECHAZADA'");
+        assertThat(filas).hasSize(1);
+        assertThat(((String) filas.get(0).get("mensaje")).length()).isLessThanOrEqualTo(600);
+    }
+
+    @Test
+    @DisplayName("Rechazar: motivo vacío, ausente o de más de 500 caracteres responde 400 y no cambia nada")
+    void rechazarConMotivoInvalidoEs400() throws Exception {
+        long id = solicitar("ana@correo.com");
+        String token = bearer("luis@correo.com");
+
+        mvc.perform(post("/api/v1/reservas/{id}/rechazar", id).header(HttpHeaders.AUTHORIZATION, token)
+                .contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isBadRequest());
+        rechazar(token, id, "   ").andExpect(status().isBadRequest());
+        rechazar(token, id, "x".repeat(501)).andExpect(status().isBadRequest());
+
+        assertThat(estado(id)).isEqualTo("PENDIENTE_APROBACION");
+    }
+
+    @Test
+    @DisplayName("Una solicitud RECHAZADA no se puede pagar: 409")
+    void unaRechazadaNoSePaga() throws Exception {
+        long id = solicitar("ana@correo.com");
+        rechazar(bearer("luis@correo.com"), id, "No").andExpect(status().isOk());
+
+        mvc.perform(post("/api/v1/reservas/{id}/pago", id).header(HttpHeaders.AUTHORIZATION, bearer("ana@correo.com"))
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"metodoPago": "pm_card_visa"}
+                                """))
+                .andExpect(status().isConflict());
     }
 
     // ---- ayudas ----

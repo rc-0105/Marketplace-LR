@@ -12,6 +12,7 @@ import co.edu.unbosque.marketplace.compartido.notificaciones.TipoNotificacion;
 import co.edu.unbosque.marketplace.identidad.services.DirectorioUsuariosService;
 import co.edu.unbosque.marketplace.identidad.services.HuespedBasico;
 import co.edu.unbosque.marketplace.reservas.exceptions.ReservaNoEncontradaException;
+import co.edu.unbosque.marketplace.reservas.exceptions.ResolucionInvalidaException;
 import co.edu.unbosque.marketplace.reservas.exceptions.SolicitudNoRespondibleException;
 import co.edu.unbosque.marketplace.reservas.model.EstadoReserva;
 import co.edu.unbosque.marketplace.reservas.model.Reserva;
@@ -44,6 +45,7 @@ public class AprobacionReservasService {
 
     private static final Logger LOG = LoggerFactory.getLogger(AprobacionReservasService.class);
     private static final String ENTIDAD = "Reserva";
+    private static final int MOTIVO_MAXIMO = 500;
 
     private final ReservaRepository reservas;
     private final PublicacionService publicaciones;
@@ -106,6 +108,27 @@ public class AprobacionReservasService {
         auditar(reservaId, anfitrionId, "aprobar_solicitud", Map.of("venceEnPago", venceEn.toString()));
         avisar(reserva, TipoNotificacion.SOLICITUD_APROBADA, null);
         return new ResolucionSolicitud(reservaId, EstadoReserva.PENDIENTE, venceEn, null);
+    }
+
+    /**
+     * Rechaza la solicitud con un motivo obligatorio (se recorta; máximo 500) y libera las noches. Mismos 404, 403 y
+     * 409 que {@link #aprobar}; un motivo vacío o demasiado largo responde 400.
+     */
+    public ResolucionSolicitud rechazar(Long reservaId, Long anfitrionId, String motivo) {
+        String limpio = motivo == null ? "" : motivo.trim();
+        if (limpio.isEmpty()) {
+            throw new ResolucionInvalidaException("motivo", "Indica el motivo del rechazo");
+        }
+        if (limpio.length() > MOTIVO_MAXIMO) {
+            throw new ResolucionInvalidaException("motivo", "El motivo no puede superar los 500 caracteres");
+        }
+        Reserva reserva = solicitudDelAnfitrion(reservaId, anfitrionId, "rechazar_solicitud");
+        if (!registro.rechazarSolicitud(reservaId, limpio)) {
+            throw perdioLaCarrera();
+        }
+        auditar(reservaId, anfitrionId, "rechazar_solicitud", Map.of("motivo", limpio));
+        avisar(reserva, TipoNotificacion.SOLICITUD_RECHAZADA, limpio);
+        return new ResolucionSolicitud(reservaId, EstadoReserva.RECHAZADA, null, limpio);
     }
 
     // 404 si no existe; 403 (auditado como fallo) si no es del anfitrión; 409 si ya no espera respuesta.

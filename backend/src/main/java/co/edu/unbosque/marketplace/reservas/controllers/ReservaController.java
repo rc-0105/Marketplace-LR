@@ -10,6 +10,7 @@ import co.edu.unbosque.marketplace.reservas.controllers.dto.DetalleReservaRespon
 import co.edu.unbosque.marketplace.reservas.controllers.dto.MisReservasResponse;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.PagarReservaRequest;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.ReservaAnfitrionResponse;
+import co.edu.unbosque.marketplace.reservas.controllers.dto.RechazarSolicitudRequest;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.ReservaResponse;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.ResolucionSolicitudResponse;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.SolicitudReservaResponse;
@@ -134,6 +135,15 @@ public class ReservaController {
     @PreAuthorize(Permisos.ANFITRION)
     public ResolucionSolicitudResponse aprobar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
         return ResolucionSolicitudResponse.desde(aprobacionService.aprobar(id, Long.valueOf(jwt.getSubject())));
+    }
+
+    /** Rechaza la solicitud con un motivo obligatorio y libera las noches (SOF-79). 403 si no es del anfitrión. */
+    @PostMapping("/{id}/rechazar")
+    @PreAuthorize(Permisos.ANFITRION)
+    public ResolucionSolicitudResponse rechazar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
+            @Valid @RequestBody RechazarSolicitudRequest data) {
+        return ResolucionSolicitudResponse
+                .desde(aprobacionService.rechazar(id, Long.valueOf(jwt.getSubject()), data.motivo()));
     }
 
     /** Una reserva del huésped autenticado con su alojamiento, desglose y estado (SOF-35, RF-38). */

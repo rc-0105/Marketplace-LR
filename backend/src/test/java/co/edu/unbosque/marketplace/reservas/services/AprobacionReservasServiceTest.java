@@ -151,6 +151,49 @@ class AprobacionReservasServiceTest {
     }
 
     @Test
+    @DisplayName("Rechazar: guarda el motivo recortado, avisa al huésped con el motivo y audita")
+    void rechazaLaSolicitud() {
+        preparar(EstadoReserva.PENDIENTE_APROBACION);
+        when(registro.rechazarSolicitud(RESERVA_ID, "No disponible")).thenReturn(true);
+
+        ResolucionSolicitud resultado = servicio.rechazar(RESERVA_ID, ANFITRION_ID, "  No disponible  ");
+
+        assertThat(resultado.estado()).isEqualTo(EstadoReserva.RECHAZADA);
+        assertThat(resultado.motivo()).isEqualTo("No disponible");
+        verify(notificaciones).notificarHuesped(any(Reserva.class), eq(TipoNotificacion.SOLICITUD_RECHAZADA),
+                eq("No disponible"));
+        assertThat(auditado().datos()).containsEntry("operacion", "rechazar_solicitud")
+                .containsEntry("motivo", "No disponible");
+    }
+
+    @Test
+    @DisplayName("Rechazar: el motivo es obligatorio (vacío o solo espacios) y máximo 500 caracteres")
+    void rechazarValidaElMotivo() {
+        preparar(EstadoReserva.PENDIENTE_APROBACION);
+
+        assertThatThrownBy(() -> servicio.rechazar(RESERVA_ID, ANFITRION_ID, "   "))
+                .isInstanceOf(ResolucionInvalidaException.class);
+        assertThatThrownBy(() -> servicio.rechazar(RESERVA_ID, ANFITRION_ID, null))
+                .isInstanceOf(ResolucionInvalidaException.class);
+        assertThatThrownBy(() -> servicio.rechazar(RESERVA_ID, ANFITRION_ID, "x".repeat(501)))
+                .isInstanceOf(ResolucionInvalidaException.class);
+
+        verify(registro, never()).rechazarSolicitud(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("Rechazar: de otro anfitrión es 403; perdiendo la carrera es 409 sin avisar")
+    void rechazarAutorizaYPierdeLaCarrera() {
+        preparar(EstadoReserva.PENDIENTE_APROBACION);
+        assertThatThrownBy(() -> servicio.rechazar(RESERVA_ID, OTRO_ID, "No")).isInstanceOf(AccesoDenegadoException.class);
+
+        when(registro.rechazarSolicitud(anyLong(), any())).thenReturn(false);
+        assertThatThrownBy(() -> servicio.rechazar(RESERVA_ID, ANFITRION_ID, "No"))
+                .isInstanceOf(SolicitudNoRespondibleException.class);
+        verify(notificaciones, never()).notificarHuesped(any(), any(), any());
+    }
+
+    @Test
     @DisplayName("Aprobar: una notificación que falla no deshace la aprobación")
     void laNotificacionNoRompeLaAprobacion() {
         preparar(EstadoReserva.PENDIENTE_APROBACION);

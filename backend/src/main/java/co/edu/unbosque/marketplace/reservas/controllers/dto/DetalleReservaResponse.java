@@ -20,7 +20,8 @@ import java.util.Map;
 public record DetalleReservaResponse(Long id, Alojamiento alojamiento, LocalDate llegada, LocalDate salida,
         EstadoReserva estado, Instant venceEn, long noches, BigDecimal precioBase, BigDecimal tarifaLimpieza,
         BigDecimal tarifaServicio, BigDecimal descuento, List<ServicioReservado> serviciosAdicionales,
-        BigDecimal totalServiciosAdicionales, BigDecimal total, EstadoPago estadoPago, String transaccionId) {
+        BigDecimal totalServiciosAdicionales, BigDecimal total, EstadoPago estadoPago, String transaccionId,
+        String motivoRechazo) {
 
     public record Alojamiento(Long id, String titulo, String ciudad, String imagenPrincipal) {
     }
@@ -40,6 +41,6 @@ public record DetalleReservaResponse(Long id, Alojamiento alojamiento, LocalDate
                 reserva.getLlegada(), reserva.getSalida(), consultada.estadoActual(), reserva.getVenceEn(),
                 reserva.getNoches(), reserva.getPrecioBase(), reserva.getTarifaLimpieza(), reserva.getTarifaServicio(),
                 reserva.getDescuento(), servicios, reserva.getTotalServiciosAdicionales(), reserva.getTotal(),
-                reserva.getEstadoPago(), reserva.getTransaccionId());
+                reserva.getEstadoPago(), reserva.getTransaccionId(), reserva.getMotivoRechazo());
     }
 }
