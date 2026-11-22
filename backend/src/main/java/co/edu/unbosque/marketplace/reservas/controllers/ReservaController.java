@@ -11,7 +11,10 @@ import co.edu.unbosque.marketplace.reservas.controllers.dto.MisReservasResponse;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.PagarReservaRequest;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.ReservaAnfitrionResponse;
 import co.edu.unbosque.marketplace.reservas.controllers.dto.ReservaResponse;
+import co.edu.unbosque.marketplace.reservas.controllers.dto.ResolucionSolicitudResponse;
+import co.edu.unbosque.marketplace.reservas.controllers.dto.SolicitudReservaResponse;
 import co.edu.unbosque.marketplace.reservas.model.Cancelacion;
+import co.edu.unbosque.marketplace.reservas.services.AprobacionReservasService;
 import co.edu.unbosque.marketplace.reservas.services.CancelacionReservaService;
 import co.edu.unbosque.marketplace.reservas.services.HistorialReservasService;
 import co.edu.unbosque.marketplace.reservas.services.PagoReservaService;
@@ -52,16 +55,19 @@ public class ReservaController {
     private final ServicioIdempotencia idempotencia;
     private final HistorialReservasService historialService;
     private final ReservasAnfitrionService reservasAnfitrionService;
+    private final AprobacionReservasService aprobacionService;
 
     public ReservaController(ReservaService reservaService, PagoReservaService pagoService,
             CancelacionReservaService cancelacionService, ServicioIdempotencia idempotencia,
-            HistorialReservasService historialService, ReservasAnfitrionService reservasAnfitrionService) {
+            HistorialReservasService historialService, ReservasAnfitrionService reservasAnfitrionService,
+            AprobacionReservasService aprobacionService) {
         this.reservaService = reservaService;
         this.pagoService = pagoService;
         this.cancelacionService = cancelacionService;
         this.idempotencia = idempotencia;
         this.historialService = historialService;
         this.reservasAnfitrionService = reservasAnfitrionService;
+        this.aprobacionService = aprobacionService;
     }
 
     /**
@@ -110,6 +116,24 @@ public class ReservaController {
             @RequestParam(required = false) Long publicacionId) {
         return reservasAnfitrionService.delAnfitrion(Long.valueOf(jwt.getSubject()), publicacionId).stream()
                 .map(ReservaAnfitrionResponse::desde).toList();
+    }
+
+    /**
+     * Solicitudes de reserva que esperan la respuesta del anfitrión autenticado (SOF-79, HU-34): PENDIENTE_APROBACION
+     * con la ventana vigente, la que vence primero arriba. Declarado antes de {@code /{id}} como {@code /anfitrion}.
+     */
+    @GetMapping("/solicitudes")
+    @PreAuthorize(Permisos.ANFITRION)
+    public List<SolicitudReservaResponse> solicitudes(@AuthenticationPrincipal Jwt jwt) {
+        return aprobacionService.listarSolicitudes(Long.valueOf(jwt.getSubject())).stream()
+                .map(SolicitudReservaResponse::desde).toList();
+    }
+
+    /** Aprueba la solicitud: pasa a PENDIENTE con un plazo de pago para el huésped (SOF-79). 403 si no es del anfitrión. */
+    @PostMapping("/{id}/aprobar")
+    @PreAuthorize(Permisos.ANFITRION)
+    public ResolucionSolicitudResponse aprobar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        return ResolucionSolicitudResponse.desde(aprobacionService.aprobar(id, Long.valueOf(jwt.getSubject())));
     }
 
     /** Una reserva del huésped autenticado con su alojamiento, desglose y estado (SOF-35, RF-38). */
