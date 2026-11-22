@@ -449,6 +449,32 @@ class ReservaIntegracionTest {
         assertThat(reservasGuardadas(id)).isZero();
     }
 
+    @Test
+    void cadaReservaConservaLaPoliticaVigenteAlCrear() throws Exception {
+        Long id = publicacion("ACTIVA");
+        String token = iniciarSesion("ana@correo.com");
+        int sinPolitica = idDe(reservar(token, id, LLEGADA, SALIDA, "[]"));
+        asignarPolitica(id, "Flexible");
+        int flexible = idDe(reservar(token, id, SALIDA, SALIDA.plusDays(2), "[]"));
+        asignarPolitica(id, "Estricta");
+        int estricta = idDe(reservar(token, id, SALIDA.plusDays(2), SALIDA.plusDays(4), "[]"));
+
+        assertThat(idDe(reservar(token, id, SALIDA, SALIDA.plusDays(2), "[]"))).isEqualTo(flexible);
+        assertThat(terminos(sinPolitica)).containsOnlyNulls();
+        assertThat(terminos(flexible)).containsExactly("Flexible", 2, 50);
+        assertThat(terminos(estricta)).containsExactly("Estricta", 14, 0);
+    }
+
+    private void asignarPolitica(Long id, String nombre) {
+        jdbc.update("UPDATE publicacion SET politica_id = (SELECT id FROM politica_cancelacion WHERE nombre = ?) WHERE id = ?",
+                nombre, id);
+    }
+
+    private Object[] terminos(int reservaId) {
+        return jdbc.queryForObject("SELECT politica_nombre, politica_dias_sin_costo, politica_porcentaje_devolucion FROM reserva WHERE id = ?",
+                (fila, indice) -> new Object[]{fila.getString(1), fila.getObject(2), fila.getObject(3)}, reservaId);
+    }
+
     // Cada llamada es un intento nuevo, con su propia clave de idempotencia (SOF-77).
     private ResultActions reservar(String token, Long id, LocalDate llegada, LocalDate salida, String adicionales)
             throws Exception {

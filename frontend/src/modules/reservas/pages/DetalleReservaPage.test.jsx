@@ -9,7 +9,7 @@ const pesos = (valor) => formatearPesos(valor).replace(/\s/g, ' ');
 import { cancelarReserva, consultarReserva } from '../services/reservaService.js';
 import DetalleReservaPage from './DetalleReservaPage.jsx';
 
-vi.mock('../services/reservaService.js', () => ({ consultarReserva: vi.fn(), cancelarReserva: vi.fn() }));
+vi.mock('../services/reservaService.js', () => ({ consultarReserva: vi.fn(), cancelarReserva: vi.fn(), anticiparCancelacion: async () => ({ porcentaje: 100, base: 485000, valorDevolucion: 485000 }) }));
 
 function renderizar(id = '3') {
   render(
@@ -171,7 +171,8 @@ describe('DetalleReservaPage', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Cancelar reserva' }));
     fireEvent.change(screen.getByLabelText('Motivo de la cancelación'), { target: { value: 'Cambio de planes' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar cancelación' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ver devolución' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirmar cancelación' }));
 
     expect(await screen.findByText(/Reserva cancelada/)).toHaveTextContent(/485\.000/);
     expect(cancelarReserva).toHaveBeenCalledWith(3, 'Cambio de planes');
