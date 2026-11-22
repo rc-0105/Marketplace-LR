@@ -41,9 +41,6 @@ marketplace-lr/
 ├── docs/
 │   ├── adr/                      copia local de los ADR
 │   └── openapi.yaml              contrato generado desde el código
-├── AGENTS.md                     estructura y convenciones de código
-├── CLAUDE.md                     carga AGENTS.md en Claude Code
-└── CONTRIBUTING.md               flujo Git, ramas y commits
 ```
 
 ## Stack
