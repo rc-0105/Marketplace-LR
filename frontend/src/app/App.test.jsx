@@ -107,6 +107,21 @@ describe('App', () => {
     expect(screen.queryByText(/^Ingresaste como/)).not.toBeInTheDocument();
   });
 
+  it('el anfitrión ve sus solicitudes de reserva en /anfitrion/solicitudes (SOF-79)', async () => {
+    vi.mocked(get).mockResolvedValue([]);
+    iniciar('ANFITRION');
+    renderizarEn('/anfitrion/solicitudes');
+    expect(await screen.findByRole('heading', { name: 'Solicitudes de reserva' })).toBeInTheDocument();
+    expect(get).toHaveBeenCalledWith('/api/v1/reservas/solicitudes');
+  });
+
+  it('un huésped que entra a /anfitrion/solicitudes vuelve a su panel', () => {
+    iniciar('HUESPED');
+    renderizarEn('/anfitrion/solicitudes');
+    esperarInicioDe('HUESPED', 'Huésped');
+    expect(screen.queryByRole('heading', { name: 'Solicitudes de reserva' })).not.toBeInTheDocument();
+  });
+
   it('un huésped que entra a /anfitrion vuelve a su panel', () => {
     iniciar('HUESPED');
     renderizarEn('/anfitrion');

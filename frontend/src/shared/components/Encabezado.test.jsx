@@ -73,6 +73,18 @@ describe('Encabezado', () => {
     expect(screen.getByRole('link', { name: 'Mis publicaciones' })).toHaveAttribute('href', '/anfitrion/publicaciones');
   });
 
+  it('al anfitrión le ofrece sus solicitudes de reserva y al huésped no (SOF-79)', () => {
+    iniciar('ANFITRION');
+    renderizar(vi.fn());
+    expect(screen.getByRole('link', { name: 'Solicitudes' })).toHaveAttribute('href', '/anfitrion/solicitudes');
+  });
+
+  it('al huésped no le ofrece las solicitudes de reserva', () => {
+    iniciar('HUESPED');
+    renderizar(vi.fn());
+    expect(screen.queryByRole('link', { name: 'Solicitudes' })).not.toBeInTheDocument();
+  });
+
   it('al huésped le ofrece sus reservas y solo a él', () => {
     iniciar('HUESPED');
     renderizar(vi.fn());

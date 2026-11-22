@@ -10,7 +10,10 @@ import estilos from './Encabezado.module.css';
 // Enlaces de navegación de cada rol; el administrador llega desde aquí a todas sus secciones.
 const ENLACES_POR_ROL = {
   HUESPED: [{ ruta: '/huesped/reservas', texto: 'Mis reservas', icono: 'reservas' }],
-  ANFITRION: [{ ruta: '/anfitrion/publicaciones', texto: 'Mis publicaciones', icono: 'publicaciones' }],
+  ANFITRION: [
+    { ruta: '/anfitrion/publicaciones', texto: 'Mis publicaciones', icono: 'publicaciones' },
+    { ruta: '/anfitrion/solicitudes', texto: 'Solicitudes', icono: 'reservas' },
+  ],
   ADMINISTRADOR: [
     { ruta: '/administrador/publicaciones', texto: 'Revisar publicaciones', icono: 'revisar' },
     { ruta: '/administrador/moderacion', texto: 'Moderación', icono: 'moderacion' },

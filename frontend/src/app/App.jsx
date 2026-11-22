@@ -21,6 +21,7 @@ import DisponibilidadPage from '../modules/disponibilidad/pages/DisponibilidadPa
 import DetalleReservaPage from '../modules/reservas/pages/DetalleReservaPage.jsx';
 import MisReservasPage from '../modules/reservas/pages/MisReservasPage.jsx';
 import PortalPagoPage from '../modules/reservas/pages/PortalPagoPage.jsx';
+import SolicitudesReservaPage from '../modules/reservas/pages/SolicitudesReservaPage.jsx';
 import ModeracionResenasPage from '../modules/resenas/pages/ModeracionResenasPage.jsx';
 import NotificacionesPage from '../modules/notificaciones/pages/NotificacionesPage.jsx';
 import InicioPage from './pages/InicioPage.jsx';
@@ -66,6 +67,8 @@ export default function App() {
           element={<RutaProtegida rol="ANFITRION"><PublicacionEnviadaPage /></RutaProtegida>} />
         <Route path="/anfitrion/publicaciones/:id/disponibilidad"
           element={<RutaProtegida rol="ANFITRION"><DisponibilidadPage /></RutaProtegida>} />
+        <Route path="/anfitrion/solicitudes"
+          element={<RutaProtegida rol="ANFITRION"><SolicitudesReservaPage /></RutaProtegida>} />
         <Route path="/huesped/busqueda"
           element={<RutaProtegida rol="HUESPED"><BusquedaPage /></RutaProtegida>} />
         <Route path="/huesped/busqueda/:id"
