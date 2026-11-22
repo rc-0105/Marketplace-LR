@@ -6,6 +6,8 @@ import co.edu.unbosque.marketplace.reservas.repository.CancelacionRepository;
 import co.edu.unbosque.marketplace.reservas.repository.ReservaRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +40,18 @@ public class RegistroReservas {
         reservas.vencerCaducadosEn(nueva.getPublicacionId(), nueva.getLlegada(), nueva.getSalida(),
                 Instant.now(reloj));
         return reservas.saveAndFlush(nueva);
+    }
+
+    /**
+     * Antes de insertar (SOF-79): vence, fila por fila, las solicitudes agotadas que cruzan el rango y devuelve solo
+     * las que esta llamada cambió, para que quien llama avise a su huésped exactamente una vez, y solo después de
+     * que esta transacción terminó. Cada vencimiento es su propia actualización condicional, igual que en la tarea
+     * programada: quien pierde la carrera no devuelve la fila.
+     */
+    @Transactional
+    public List<Reserva> vencerSolicitudesCaducadasEn(Long publicacionId, LocalDate desde, LocalDate hasta) {
+        return reservas.findSolicitudesCaducadasEn(publicacionId, desde, hasta, Instant.now(reloj)).stream()
+                .filter(candidata -> reservas.vencerSolicitud(candidata.getId(), Instant.now(reloj)) == 1).toList();
     }
 
     /** Pago aprobado (SOF-34): confirma si la reserva sigue PENDIENTE; {@code false} si ya no lo estaba. */
@@ -89,6 +103,40 @@ public class RegistroReservas {
         }
         cancelaciones.saveAndFlush(cancelacion);
         return true;
+    }
+
+    /**
+     * Cancelación del huésped de su solicitud pendiente de aprobación (SOF-79): igual que {@link #cancelar} pero
+     * sobre PENDIENTE_APROBACION; {@code false}, sin registrar nada, si ya no lo estaba.
+     */
+    @Transactional
+    public boolean cancelarSolicitud(Cancelacion cancelacion) {
+        if (reservas.cancelarSolicitud(cancelacion.getReservaId()) != 1) {
+            return false;
+        }
+        cancelaciones.saveAndFlush(cancelacion);
+        return true;
+    }
+
+    /**
+     * Aprobación del anfitrión (SOF-79): la solicitud pasa a PENDIENTE con el apartado {@code venceEn} solo si sigue
+     * esperando y su ventana no se agotó; {@code false} si ya no (otra respuesta, o el vencimiento, ganó).
+     */
+    @Transactional
+    public boolean aprobarSolicitud(Long reservaId, Instant venceEn) {
+        return reservas.aprobarSolicitud(reservaId, Instant.now(reloj), venceEn) == 1;
+    }
+
+    /** Rechazo del anfitrión (SOF-79): RECHAZADA con motivo, en las mismas condiciones que {@link #aprobarSolicitud}. */
+    @Transactional
+    public boolean rechazarSolicitud(Long reservaId, String motivo) {
+        return reservas.rechazarSolicitud(reservaId, Instant.now(reloj), motivo) == 1;
+    }
+
+    /** Vence una solicitud cuya ventana se agotó (SOF-79); {@code true} solo para quien cambió la fila. */
+    @Transactional
+    public boolean vencerSolicitud(Long reservaId) {
+        return reservas.vencerSolicitud(reservaId, Instant.now(reloj)) == 1;
     }
 
     /** Revisión manual (SOF-83): la reserva vuelve a CONFIRMADA si sigue en revisión; {@code false} si no. */

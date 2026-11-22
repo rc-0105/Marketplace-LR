@@ -18,6 +18,7 @@ import co.edu.unbosque.marketplace.compartido.eventos.AccionCritica;
 import co.edu.unbosque.marketplace.compartido.eventos.EventoCritico;
 import co.edu.unbosque.marketplace.compartido.eventos.PublicadorEventos;
 import co.edu.unbosque.marketplace.compartido.eventos.ResultadoEvento;
+import co.edu.unbosque.marketplace.compartido.notificaciones.TipoNotificacion;
 import co.edu.unbosque.marketplace.cotizacion.exceptions.CotizacionInvalidaException;
 import co.edu.unbosque.marketplace.cotizacion.services.Cotizacion;
 import co.edu.unbosque.marketplace.cotizacion.services.CotizacionService;
@@ -25,7 +26,6 @@ import co.edu.unbosque.marketplace.disponibilidad.exceptions.EstanciaNoDisponibl
 import co.edu.unbosque.marketplace.disponibilidad.model.MotivoNoDisponible;
 import co.edu.unbosque.marketplace.disponibilidad.services.DisponibilidadService;
 import co.edu.unbosque.marketplace.reservas.exceptions.FechasReservaInvalidasException;
-import co.edu.unbosque.marketplace.reservas.exceptions.ModoReservaNoSoportadoException;
 import co.edu.unbosque.marketplace.reservas.exceptions.ReservaConOtrosServiciosException;
 import co.edu.unbosque.marketplace.reservas.exceptions.ReservaSuperpuestaException;
 import co.edu.unbosque.marketplace.reservas.model.EstadoReserva;
@@ -62,11 +62,12 @@ class ReservaServiceTest {
     private final RegistroReservas registro = mock(RegistroReservas.class);
     private final DisponibilidadService disponibilidad = mock(DisponibilidadService.class);
     private final PublicadorEventos publicador = mock(PublicadorEventos.class);
+    private final NotificacionesReserva notificaciones = mock(NotificacionesReserva.class);
     // Hoy en Bogotá es 2026-12-01: la llegada del 10 es futura.
     private static final Instant AHORA = Instant.parse("2026-12-01T15:00:00Z");
     private final Clock reloj = Clock.fixed(AHORA, ZoneOffset.UTC);
     private final ReservaService servicio = new ReservaService(reservas, cotizaciones, publicaciones, disponibilidad,
-            registro, publicador, reloj, 15);
+            registro, publicador, reloj, 15, notificaciones, 24);
 
     @BeforeEach
     void preparar() {
@@ -117,15 +118,69 @@ class ReservaServiceTest {
     }
 
     @Test
-    @DisplayName("Si la publicación exige aprobación, rechaza la reserva sin cotizar ni guardar nada")
-    void modoAprobacionRechazaLaReserva() {
+    @DisplayName("SOF-79 CA1: con modo APROBACION crea la reserva PENDIENTE_APROBACION con vence_en = ahora + 24 h, la audita y avisa al anfitrión")
+    void modoAprobacionCreaLaSolicitudPendienteDeAprobacion() {
         when(publicaciones.esModoInmediato(PUBLICACION_ID)).thenReturn(false);
 
-        assertThatThrownBy(() -> servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of()))
-                .isInstanceOf(ModoReservaNoSoportadoException.class);
-        verify(cotizaciones, never()).cotizar(any(), any(), any(), any());
-        verify(registro, never()).registrar(any());
-        verify(publicador, never()).publicar(any());
+        Reserva reserva = servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of());
+
+        assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.PENDIENTE_APROBACION);
+        assertThat(reserva.getVenceEn()).isEqualTo(AHORA.plusSeconds(24 * 3600));
+        assertThat(reserva.getTotal()).isEqualByComparingTo("485000");
+        verify(registro).registrar(reserva);
+        verify(publicador).publicar(any(EventoCritico.class));
+        verify(notificaciones).notificarAnfitrion(reserva, TipoNotificacion.SOLICITUD_RECIBIDA);
+    }
+
+    @Test
+    @DisplayName("SOF-79: con horas-aprobacion distinto del defecto la solicitud vence en ese plazo")
+    void laSolicitudRespetaElPlazoConfigurado() {
+        when(publicaciones.esModoInmediato(PUBLICACION_ID)).thenReturn(false);
+        ReservaService de48 = new ReservaService(reservas, cotizaciones, publicaciones, disponibilidad, registro,
+                publicador, reloj, 15, notificaciones, 48);
+
+        Reserva reserva = de48.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of());
+
+        assertThat(reserva.getVenceEn()).isEqualTo(AHORA.plusSeconds(48 * 3600));
+    }
+
+    @Test
+    @DisplayName("SOF-79: la solicitud ajena que vence al insertar avisa a su huésped una vez, y si el aviso falla la reserva se crea")
+    void laInsercionQueVenceUnaSolicitudAvisaAlHuesped() {
+        Reserva vencida = Reserva.nuevaSolicitud(PUBLICACION_ID, 99L, LLEGADA, SALIDA, 4, new BigDecimal("400000"),
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("400000"),
+                Set.of(), AHORA.minusSeconds(60));
+        when(registro.vencerSolicitudesCaducadasEn(PUBLICACION_ID, LLEGADA, SALIDA)).thenReturn(List.of(vencida));
+        org.mockito.Mockito.doThrow(new RuntimeException("boom")).when(notificaciones).notificarHuesped(any(), any(),
+                any());
+
+        Reserva reserva = servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of());
+
+        assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.PENDIENTE);
+        verify(notificaciones, org.mockito.Mockito.times(1)).notificarHuesped(vencida,
+                TipoNotificacion.SOLICITUD_VENCIDA, null);
+    }
+
+    @Test
+    @DisplayName("SOF-79: si el aviso al anfitrión falla, la solicitud igual se crea")
+    void siElAvisoFallaLaSolicitudSeCrea() {
+        when(publicaciones.esModoInmediato(PUBLICACION_ID)).thenReturn(false);
+        org.mockito.Mockito.doThrow(new RuntimeException("boom")).when(notificaciones)
+                .notificarAnfitrion(any(), any());
+
+        Reserva reserva = servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of());
+
+        assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.PENDIENTE_APROBACION);
+    }
+
+    @Test
+    @DisplayName("SOF-79 CA4: con modo INMEDIATA sigue creando PENDIENTE con apartado de 15 minutos y sin solicitud al anfitrión")
+    void modoInmediatoNoGeneraSolicitud() {
+        Reserva reserva = servicio.crear(PUBLICACION_ID, HUESPED_ID, LLEGADA, SALIDA, Set.of());
+
+        assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.PENDIENTE);
+        assertThat(reserva.getVenceEn()).isEqualTo(AHORA.plusSeconds(15 * 60));
+        verify(notificaciones, never()).notificarAnfitrion(any(), any());
     }
 
     @Test
@@ -251,7 +306,7 @@ class ReservaServiceTest {
         // 2026-12-02T03:00Z es todavía 2026-12-01 en Bogotá (UTC-5).
         Clock madrugadaUtc = Clock.fixed(Instant.parse("2026-12-02T03:00:00Z"), ZoneOffset.UTC);
         ReservaService enMadrugada = new ReservaService(reservas, cotizaciones, publicaciones, disponibilidad, registro,
-                publicador, madrugadaUtc, 15);
+                publicador, madrugadaUtc, 15, notificaciones, 24);
         LocalDate hoy = LocalDate.of(2026, 12, 1);
         when(cotizaciones.cotizar(eq(PUBLICACION_ID), eq(hoy), eq(SALIDA), anySet())).thenReturn(cotizacion());
 

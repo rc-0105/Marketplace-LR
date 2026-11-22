@@ -64,6 +64,7 @@ class ReservaIntegracionTest {
 
     @BeforeEach
     void preparar() {
+        jdbc.update("DELETE FROM notificacion");
         reservas.deleteAll();
         publicaciones.deleteAll();
         usuarios.deleteAll();
@@ -196,16 +197,48 @@ class ReservaIntegracionTest {
     }
 
     @Test
-    @DisplayName("Una publicación en modo APROBACION rechaza la reserva: SOF-33 solo cubre la confirmación inmediata")
-    void modoAprobacionRechazaLaReserva() throws Exception {
+    @DisplayName("SOF-79 CA1: una publicación en modo APROBACION crea la reserva PENDIENTE_APROBACION con 24 h de vigencia")
+    void modoAprobacionCreaSolicitudPendienteDeAprobacion() throws Exception {
         Long id = publicacion("ACTIVA");
         jdbc.update("UPDATE publicacion SET modo_reserva = 'APROBACION' WHERE id = ?", id);
 
         reservar(iniciarSesion("ana@correo.com"), id, LLEGADA, SALIDA, "[]")
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail")
-                        .value("Esta publicación requiere aprobación del anfitrión; todavía no está soportado."));
-        assertThat(reservasGuardadas(id)).isZero();
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.estado").value("PENDIENTE_APROBACION"))
+                .andExpect(jsonPath("$.venceEn").isString());
+
+        assertThat(reservasGuardadas(id)).isEqualTo(1);
+        Long horas = jdbc.queryForObject(
+                "SELECT ROUND(EXTRACT(EPOCH FROM (vence_en - creado_en)) / 3600) FROM reserva WHERE publicacion_id = ?",
+                Long.class, id);
+        assertThat(horas).isEqualTo(24);
+        Integer avisos = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notificacion WHERE tipo = 'SOLICITUD_RECIBIDA'", Integer.class);
+        assertThat(avisos).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("SOF-79: la solicitud pendiente de aprobación aparta las noches: otro huésped recibe 409")
+    void laSolicitudPendienteApartaLasNoches() throws Exception {
+        Long id = publicacion("ACTIVA");
+        jdbc.update("UPDATE publicacion SET modo_reserva = 'APROBACION' WHERE id = ?", id);
+        reservar(iniciarSesion("ana@correo.com"), id, LLEGADA, SALIDA, "[]").andExpect(status().isCreated());
+
+        reservar(iniciarSesion("carla@correo.com"), id, LLEGADA, SALIDA, "[]").andExpect(status().isConflict());
+        assertThat(reservasGuardadas(id)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("SOF-79 CA4: una publicación en modo INMEDIATA sigue creando PENDIENTE y no avisa solicitud")
+    void modoInmediatoSigueCreandoPendiente() throws Exception {
+        Long id = publicacion("ACTIVA");
+
+        reservar(iniciarSesion("ana@correo.com"), id, LLEGADA, SALIDA, "[]")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.estado").value("PENDIENTE"));
+        Integer avisos = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notificacion WHERE tipo = 'SOLICITUD_RECIBIDA'", Integer.class);
+        assertThat(avisos).isZero();
     }
 
     @Test

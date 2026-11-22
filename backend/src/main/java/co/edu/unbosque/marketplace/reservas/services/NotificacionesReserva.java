@@ -24,6 +24,8 @@ public class NotificacionesReserva {
 
     private static final Logger LOG = LoggerFactory.getLogger(NotificacionesReserva.class);
     private static final String ENTIDAD = "Reserva";
+    private static final int MENSAJE_MAXIMO = 600;
+    private static final int MOTIVO_MAXIMO = 300;
     private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final PublicacionService publicaciones;
@@ -55,6 +57,68 @@ public class NotificacionesReserva {
         }
     }
 
+    /**
+     * Avisa solo al anfitrión de la publicación (SOF-79: solicitud recibida). Igual que {@link #notificar}, nunca
+     * lanza: el aviso es secundario a la operación que ya quedó guardada.
+     */
+    public void notificarAnfitrion(Reserva reserva, TipoNotificacion tipo) {
+        try {
+            Long publicacionId = reserva.getPublicacionId();
+            AlojamientoReservado alojamiento = publicaciones.consultarReservados(Set.of(publicacionId))
+                    .get(publicacionId);
+            if (alojamiento == null) {
+                LOG.warn("No se notificó la reserva {}: su publicación {} ya no existe", reserva.getId(), publicacionId);
+                return;
+            }
+            String detalle = "en «%s» del %s al %s".formatted(alojamiento.titulo(), reserva.getLlegada().format(FECHA),
+                    reserva.getSalida().format(FECHA));
+            publicaciones.consultarAcceso(publicacionId).map(AccesoPublicacion::anfitrionId)
+                    .ifPresent(anfitrionId -> notificador.notificar(new NuevaNotificacion(anfitrionId, tipo,
+                            paraAnfitrion(tipo, detalle), ENTIDAD, reserva.getId())));
+        } catch (RuntimeException e) {
+            LOG.error("No se pudo notificar al anfitrión la reserva {}: tipo={}", reserva.getId(), tipo, e);
+        }
+    }
+
+    /**
+     * Avisa solo al huésped de la reserva (SOF-79: solicitud aprobada, rechazada o vencida). {@code motivo} es el del
+     * rechazo, o {@code null}. Nunca lanza.
+     */
+    public void notificarHuesped(Reserva reserva, TipoNotificacion tipo, String motivo) {
+        try {
+            Long publicacionId = reserva.getPublicacionId();
+            AlojamientoReservado alojamiento = publicaciones.consultarReservados(Set.of(publicacionId))
+                    .get(publicacionId);
+            if (alojamiento == null) {
+                LOG.warn("No se notificó la reserva {}: su publicación {} ya no existe", reserva.getId(), publicacionId);
+                return;
+            }
+            String detalle = "en «%s» del %s al %s".formatted(alojamiento.titulo(), reserva.getLlegada().format(FECHA),
+                    reserva.getSalida().format(FECHA));
+            notificador.notificar(new NuevaNotificacion(reserva.getHuespedId(), tipo,
+                    recortar(paraHuespedSolicitud(tipo, detalle, motivo), MENSAJE_MAXIMO), ENTIDAD, reserva.getId()));
+        } catch (RuntimeException e) {
+            LOG.error("No se pudo notificar al huésped la reserva {}: tipo={}", reserva.getId(), tipo, e);
+        }
+    }
+
+    private static String paraHuespedSolicitud(TipoNotificacion tipo, String detalle, String motivo) {
+        return switch (tipo) {
+            case SOLICITUD_APROBADA -> "Tu solicitud de reserva " + detalle
+                    + " fue aprobada: ya puedes pagarla para confirmar la reserva.";
+            case SOLICITUD_RECHAZADA -> "Tu solicitud de reserva " + detalle + " fue rechazada por el anfitrión."
+                    + (motivo == null || motivo.isBlank() ? "" : " Motivo: " + recortar(motivo, MOTIVO_MAXIMO));
+            case SOLICITUD_VENCIDA -> "Tu solicitud de reserva " + detalle
+                    + " venció porque el anfitrión no respondió a tiempo.";
+            default -> throw new IllegalArgumentException("No es un aviso de solicitud: " + tipo);
+        };
+    }
+
+    // El mensaje de notificacion admite 600 caracteres (V28): el motivo se recorta antes y el total al final.
+    private static String recortar(String texto, int maximo) {
+        return texto.length() <= maximo ? texto : texto.substring(0, maximo - 1) + "…";
+    }
+
     private static String paraHuesped(TipoNotificacion tipo, String detalle) {
         return switch (tipo) {
             case RESERVA_CONFIRMADA -> "Tu reserva " + detalle + " quedó confirmada.";
@@ -69,6 +133,7 @@ public class NotificacionesReserva {
             case RESERVA_CONFIRMADA -> "Se confirmó una reserva " + detalle + ".";
             case RESERVA_RECHAZADA -> "Se rechazó una reserva " + detalle + " porque el pago no fue aprobado.";
             case RESERVA_CANCELADA -> "Se canceló una reserva " + detalle + ".";
+            case SOLICITUD_RECIBIDA -> "Tienes una nueva solicitud de reserva " + detalle + ".";
             default -> throw new IllegalArgumentException("No es un aviso de reserva: " + tipo);
         };
     }

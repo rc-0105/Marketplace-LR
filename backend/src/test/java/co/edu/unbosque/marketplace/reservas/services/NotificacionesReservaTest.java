@@ -100,9 +100,74 @@ class NotificacionesReservaTest {
         verify(notificador, never()).notificar(any());
     }
 
-    private java.util.List<NuevaNotificacion> enviadas() {
+    @Test
+    @DisplayName("SOF-79: aprobada, rechazada con motivo y vencida avisan solo al huésped")
+    void respuestasDeSolicitudAvisanSoloAlHuesped() {
+        notificaciones.notificarHuesped(reserva(), TipoNotificacion.SOLICITUD_APROBADA, null);
+        notificaciones.notificarHuesped(reserva(), TipoNotificacion.SOLICITUD_RECHAZADA, "No disponible");
+        notificaciones.notificarHuesped(reserva(), TipoNotificacion.SOLICITUD_VENCIDA, null);
+
+        assertThat(enviadas(3)).containsExactly(
+                new NuevaNotificacion(HUESPED_ID, TipoNotificacion.SOLICITUD_APROBADA,
+                        "Tu solicitud de reserva en «Casa en la playa» del 10/12/2026 al 14/12/2026 fue aprobada: "
+                                + "ya puedes pagarla para confirmar la reserva.", "Reserva", RESERVA_ID),
+                new NuevaNotificacion(HUESPED_ID, TipoNotificacion.SOLICITUD_RECHAZADA,
+                        "Tu solicitud de reserva en «Casa en la playa» del 10/12/2026 al 14/12/2026 fue rechazada "
+                                + "por el anfitrión. Motivo: No disponible", "Reserva", RESERVA_ID),
+                new NuevaNotificacion(HUESPED_ID, TipoNotificacion.SOLICITUD_VENCIDA,
+                        "Tu solicitud de reserva en «Casa en la playa» del 10/12/2026 al 14/12/2026 venció porque "
+                                + "el anfitrión no respondió a tiempo.", "Reserva", RESERVA_ID));
+    }
+
+    @Test
+    @DisplayName("SOF-79: un motivo de 500 caracteres se recorta para que el aviso quepa en los 600 de la columna")
+    void elMotivoLargoSeRecorta() {
+        notificaciones.notificarHuesped(reserva(), TipoNotificacion.SOLICITUD_RECHAZADA, "x".repeat(500));
+
+        String mensaje = enviadas(1).get(0).mensaje();
+        assertThat(mensaje.length()).isLessThanOrEqualTo(600);
+        assertThat(mensaje).endsWith("…");
+    }
+
+    @Test
+    @DisplayName("SOF-79: si no se puede consultar el alojamiento, el aviso al huésped no lanza")
+    void unaFallaAlAvisarAlHuespedNoLanza() {
+        when(publicaciones.consultarReservados(Set.of(PUBLICACION_ID))).thenThrow(new IllegalStateException("caída"));
+
+        assertThatCode(() -> notificaciones.notificarHuesped(reserva(), TipoNotificacion.SOLICITUD_VENCIDA, null))
+                .doesNotThrowAnyException();
+        verify(notificador, never()).notificar(any());
+    }
+
+    @Test
+    @DisplayName("SOF-79: una solicitud recibida avisa solo al anfitrión, con el alojamiento y las fechas")
+    void solicitudRecibidaAvisaSoloAlAnfitrion() {
+        notificaciones.notificarAnfitrion(reserva(), TipoNotificacion.SOLICITUD_RECIBIDA);
+
         ArgumentCaptor<NuevaNotificacion> captor = ArgumentCaptor.forClass(NuevaNotificacion.class);
-        verify(notificador, times(2)).notificar(captor.capture());
+        verify(notificador, times(1)).notificar(captor.capture());
+        assertThat(captor.getValue()).isEqualTo(new NuevaNotificacion(ANFITRION_ID, TipoNotificacion.SOLICITUD_RECIBIDA,
+                "Tienes una nueva solicitud de reserva en «Casa en la playa» del 10/12/2026 al 14/12/2026.",
+                "Reserva", RESERVA_ID));
+    }
+
+    @Test
+    @DisplayName("SOF-79: si el aviso al anfitrión falla, no rompe la operación")
+    void unaFallaAlAvisarAlAnfitrionNoRompe() {
+        when(publicaciones.consultarReservados(Set.of(PUBLICACION_ID))).thenThrow(new IllegalStateException("caída"));
+
+        assertThatCode(() -> notificaciones.notificarAnfitrion(reserva(), TipoNotificacion.SOLICITUD_RECIBIDA))
+                .doesNotThrowAnyException();
+        verify(notificador, never()).notificar(any());
+    }
+
+    private java.util.List<NuevaNotificacion> enviadas() {
+        return enviadas(2);
+    }
+
+    private java.util.List<NuevaNotificacion> enviadas(int veces) {
+        ArgumentCaptor<NuevaNotificacion> captor = ArgumentCaptor.forClass(NuevaNotificacion.class);
+        verify(notificador, times(veces)).notificar(captor.capture());
         return captor.getAllValues();
     }
 
