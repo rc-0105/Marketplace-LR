@@ -58,7 +58,7 @@ abstract class EscenarioPagoReserva {
     @Autowired
     private ObjectMapper json;
 
-    private Long publicacionId;
+    Long publicacionId;
 
     @BeforeEach
     void preparar() throws Exception {
@@ -146,6 +146,21 @@ abstract class EscenarioPagoReserva {
 }
 
 class PagoReservaIntegracionTest extends EscenarioPagoReserva {
+
+    @Test
+    @DisplayName("SOF-79: pagar una solicitud PENDIENTE_APROBACION responde 409 y no cobra")
+    void unaSolicitudPendienteDeAprobacionNoSePaga() throws Exception {
+        jdbc.update("UPDATE publicacion SET modo_reserva = 'APROBACION' WHERE id = ?", publicacionId);
+        String token = iniciarSesion("ana@correo.com");
+        long id = reservar(token);
+
+        pagar(token, id, "pm_card_visa")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail")
+                        .value("Esta solicitud espera la aprobación del anfitrión: todavía no se puede pagar."));
+
+        assertThat(fila(id)).containsEntry("estado", "PENDIENTE_APROBACION").containsEntry("estado_pago", "SIN_PAGO");
+    }
 
     @Test
     @DisplayName("AC1: con el pago exitoso la reserva queda CONFIRMADA y se registra el identificador de la transacción")

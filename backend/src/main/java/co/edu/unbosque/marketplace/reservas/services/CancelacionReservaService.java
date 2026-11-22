@@ -51,7 +51,8 @@ public class CancelacionReservaService {
         this.reloj = reloj;
     }
 
-    private record Evaluacion(Reserva reserva, boolean anfitrion, Instant fecha, CalculoCancelacion calculo) {}
+    private record Evaluacion(Reserva reserva, boolean anfitrion, Instant fecha, CalculoCancelacion calculo,
+            boolean solicitud) {}
 
     public CalculoCancelacion anticipar(Long reservaId, Long usuarioId) {
         return evaluar(reservaId, usuarioId).calculo();
@@ -65,7 +66,13 @@ public class CancelacionReservaService {
             auditar(reservaId, usuarioId, ResultadoEvento.FALLO, Map.of("resultado", "intento_no_autorizado"));
             throw new AccesoDenegadoException();
         }
-        if (reserva.getEstado() != EstadoReserva.CONFIRMADA) {
+        // SOF-79: el huésped retira su solicitud pendiente sin reembolso (nunca se cobró); el anfitrión la responde
+        // aprobando o rechazando, no cancelando.
+        boolean solicitud = reserva.getEstado() == EstadoReserva.PENDIENTE_APROBACION;
+        if (solicitud && esAnfitrion) {
+            throw new ReservaNoCancelableException("Esta solicitud espera tu respuesta: apruébala o recházala.");
+        }
+        if (reserva.getEstado() != EstadoReserva.CONFIRMADA && !solicitud) {
             throw new ReservaNoCancelableException(mensajeEstadoNoCancelable(reserva.getEstado()));
         }
         Instant ahora = reloj.instant();
@@ -73,9 +80,14 @@ public class CancelacionReservaService {
             throw new ReservaNoCancelableException("La estancia ya terminó: no se puede cancelar.");
         }
 
-        return new Evaluacion(reserva, esAnfitrion, ahora, CalculoCancelacion.calcular(reserva.getPoliticaNombre(),
-                reserva.getPoliticaDiasSinCosto(), reserva.getPoliticaPorcentajeDevolucion(), reserva.getLlegada(),
-                ahora, reserva.getTotal(), esAnfitrion));
+        // Una solicitud nunca se cobró: la política de devolución no aplica y el cálculo siempre es 0.
+        CalculoCancelacion calculo = solicitud
+                ? new CalculoCancelacion(reserva.getPoliticaNombre(), reserva.getTotal(), 0,
+                        BigDecimal.ZERO.setScale(2))
+                : CalculoCancelacion.calcular(reserva.getPoliticaNombre(), reserva.getPoliticaDiasSinCosto(),
+                        reserva.getPoliticaPorcentajeDevolucion(), reserva.getLlegada(), ahora, reserva.getTotal(),
+                        esAnfitrion);
+        return new Evaluacion(reserva, esAnfitrion, ahora, calculo, solicitud);
     }
 
     public Cancelacion cancelar(Long reservaId, Long usuarioId, String motivo) {
@@ -85,7 +97,8 @@ public class CancelacionReservaService {
                 valorDevolucion, EstadoReserva.CANCELADA);
         cancelacion.prepararReembolsoSimulado();
         // El cambio de estado y el registro de la cancelación son una sola transacción (RegistroReservas).
-        if (!registro.cancelar(cancelacion)) {
+        boolean cancelada = evaluacion.solicitud() ? registro.cancelarSolicitud(cancelacion) : registro.cancelar(cancelacion);
+        if (!cancelada) {
             // Perdió la carrera: otra cancelación, o una conciliación de pago, la resolvió justo antes.
             Reserva actual = reservas.findById(reservaId).orElseThrow(ReservaNoEncontradaException::new);
             throw new ReservaNoCancelableException(mensajeEstadoNoCancelable(actual.getEstado()));

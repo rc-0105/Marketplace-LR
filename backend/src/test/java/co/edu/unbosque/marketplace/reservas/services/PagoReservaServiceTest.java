@@ -171,6 +171,30 @@ class PagoReservaServiceTest {
     }
 
     @Test
+    @DisplayName("SOF-79: una solicitud PENDIENTE_APROBACION no se cobra: 409 sin llamar a la pasarela")
+    void unaSolicitudPendienteDeAprobacionNoSeCobra() {
+        when(reservas.findById(RESERVA_ID))
+                .thenReturn(Optional.of(con(EstadoReserva.PENDIENTE_APROBACION, EstadoPago.SIN_PAGO, null)));
+
+        assertThatThrownBy(() -> servicio.pagar(RESERVA_ID, HUESPED_ID, "pm_card_visa"))
+                .isInstanceOf(ReservaNoPagableException.class)
+                .hasMessage("Esta solicitud espera la aprobación del anfitrión: todavía no se puede pagar.");
+        org.mockito.Mockito.verifyNoInteractions(pasarela, registro, notificaciones);
+    }
+
+    @Test
+    @DisplayName("SOF-79: una solicitud RECHAZADA no se cobra: 409 sin llamar a la pasarela")
+    void unaSolicitudRechazadaNoSeCobra() {
+        when(reservas.findById(RESERVA_ID))
+                .thenReturn(Optional.of(con(EstadoReserva.RECHAZADA, EstadoPago.SIN_PAGO, null)));
+
+        assertThatThrownBy(() -> servicio.pagar(RESERVA_ID, HUESPED_ID, "pm_card_visa"))
+                .isInstanceOf(ReservaNoPagableException.class)
+                .hasMessage("Esta solicitud fue rechazada por el anfitrión: no se puede pagar.");
+        org.mockito.Mockito.verifyNoInteractions(pasarela, registro, notificaciones);
+    }
+
+    @Test
     @DisplayName("SOF-83: una reserva pendiente de una publicación bloqueada no se cobra: 409 sin llamar a la pasarela")
     void unaReservaDePublicacionBloqueadaNoSeCobra() {
         when(publicaciones.estaBloqueada(30L)).thenReturn(true);

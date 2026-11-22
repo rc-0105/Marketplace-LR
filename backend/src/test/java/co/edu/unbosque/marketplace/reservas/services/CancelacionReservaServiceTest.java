@@ -135,6 +135,99 @@ class CancelacionReservaServiceTest {
     }
 
     @Test
+    @DisplayName("SOF-79: el huésped cancela su solicitud PENDIENTE_APROBACION sin reembolso y queda auditado")
+    void elHuespedCancelaSuSolicitudPendienteDeAprobacion() {
+        when(reservas.findById(RESERVA_ID)).thenReturn(Optional.of(con(EstadoReserva.PENDIENTE_APROBACION)));
+        when(registro.cancelarSolicitud(any(Cancelacion.class))).thenReturn(true);
+
+        Cancelacion cancelacion = servicio.cancelar(RESERVA_ID, HUESPED_ID, "Cambio de planes");
+
+        assertThat(cancelacion.getValorDevolucion()).isEqualByComparingTo("0");
+        assertThat(cancelacion.getEstadoFinal()).isEqualTo(EstadoReserva.CANCELADA);
+        verify(registro, never()).cancelar(any());
+        assertThat(auditado().resultado()).isEqualTo(ResultadoEvento.EXITO);
+        assertThat(auditado().datos()).containsEntry("canceladoPor", "HUESPED");
+    }
+
+    @Test
+    @DisplayName("SOF-79: retirar una solicitud con política Flexible vigente no devuelve nada ni llama a la pasarela simulada")
+    void retirarUnaSolicitudNoGeneraReembolsoAunqueLaPoliticaDevolveria() {
+        var reembolsos = mock(co.edu.unbosque.marketplace.reservas.infraestructura.ReembolsosSimulados.class);
+        var conPasarela = new CancelacionReservaService(reservas, publicaciones, registro, publicador,
+                notificaciones, Clock.fixed(AHORA, ZoneOffset.UTC), reembolsos);
+        Reserva solicitud = conPolitica(con(EstadoReserva.PENDIENTE_APROBACION), "Flexible", 2, 50);
+        when(reservas.findById(RESERVA_ID)).thenReturn(Optional.of(solicitud));
+        when(registro.cancelarSolicitud(any(Cancelacion.class))).thenReturn(true);
+
+        Cancelacion cancelacion = conPasarela.cancelar(RESERVA_ID, HUESPED_ID, "Ya no viajo");
+
+        assertThat(cancelacion.getValorDevolucion()).isEqualByComparingTo("0");
+        assertThat(cancelacion.getResultadoReembolso()).isEqualTo("NO_APLICA");
+        verify(reembolsos, never()).solicitar(any(), any());
+        verify(registro, never()).guardarResultado(any());
+        assertThat(auditado().datos()).containsEntry("valorDevolucion", "0.00");
+    }
+
+    @Test
+    @DisplayName("SOF-79: la vista previa de retirar una solicitud muestra 0% y 0 de devolución")
+    void laVistaPreviaDeRetirarUnaSolicitudNoDevuelveNada() {
+        Reserva solicitud = conPolitica(con(EstadoReserva.PENDIENTE_APROBACION), "Flexible", 2, 50);
+        when(reservas.findById(RESERVA_ID)).thenReturn(Optional.of(solicitud));
+
+        CalculoCancelacion calculo = servicio.anticipar(RESERVA_ID, HUESPED_ID);
+
+        assertThat(calculo.porcentaje()).isZero();
+        assertThat(calculo.valorDevolucion()).isEqualByComparingTo("0");
+        assertThat(calculo.base()).isEqualByComparingTo("470000");
+    }
+
+    @Test
+    @DisplayName("SOF-79: una reserva CONFIRMADA con la misma política sí devuelve (contraste con la solicitud)")
+    void laConfirmadaConPoliticaFlexibleSiDevuelve() {
+        Reserva confirmada = conPolitica(confirmada(), "Flexible", 2, 50);
+        when(reservas.findById(RESERVA_ID)).thenReturn(Optional.of(confirmada));
+
+        CalculoCancelacion calculo = servicio.anticipar(RESERVA_ID, HUESPED_ID);
+
+        assertThat(calculo.porcentaje()).isEqualTo(100);
+        assertThat(calculo.valorDevolucion()).isEqualByComparingTo("470000");
+    }
+
+    @Test
+    @DisplayName("SOF-79: el anfitrión no cancela una solicitud pendiente (debe aprobarla o rechazarla)")
+    void elAnfitrionNoCancelaUnaSolicitudPendiente() {
+        when(reservas.findById(RESERVA_ID)).thenReturn(Optional.of(con(EstadoReserva.PENDIENTE_APROBACION)));
+
+        assertThatThrownBy(() -> servicio.cancelar(RESERVA_ID, ANFITRION_ID, "Motivo"))
+                .isInstanceOf(ReservaNoCancelableException.class)
+                .hasMessage("Esta solicitud espera tu respuesta: apruébala o recházala.");
+        verify(registro, never()).cancelarSolicitud(any());
+    }
+
+    @Test
+    @DisplayName("SOF-79: si la solicitud dejó de estar pendiente mientras se cancelaba, responde 409 sin registrar")
+    void siLaSolicitudYaNoEstabaPendienteNoSeRegistra() {
+        when(reservas.findById(RESERVA_ID)).thenReturn(Optional.of(con(EstadoReserva.PENDIENTE_APROBACION)),
+                Optional.of(con(EstadoReserva.RECHAZADA)));
+        when(registro.cancelarSolicitud(any(Cancelacion.class))).thenReturn(false);
+
+        assertThatThrownBy(() -> servicio.cancelar(RESERVA_ID, HUESPED_ID, "Motivo"))
+                .isInstanceOf(ReservaNoCancelableException.class)
+                .hasMessage("Esta solicitud fue rechazada por el anfitrión: no se puede cancelar.");
+        verify(publicador, never()).publicar(any());
+    }
+
+    @Test
+    @DisplayName("SOF-79: una solicitud RECHAZADA no se puede cancelar")
+    void unaSolicitudRechazadaNoSePuedeCancelar() {
+        when(reservas.findById(RESERVA_ID)).thenReturn(Optional.of(con(EstadoReserva.RECHAZADA)));
+
+        assertThatThrownBy(() -> servicio.cancelar(RESERVA_ID, HUESPED_ID, "Motivo"))
+                .isInstanceOf(ReservaNoCancelableException.class)
+                .hasMessage("Esta solicitud fue rechazada por el anfitrión: no se puede cancelar.");
+    }
+
+    @Test
     @DisplayName("SOF-83: una reserva en revisión manual no la cancelan ni el huésped ni el anfitrión")
     void unaReservaEnRevisionNoSePuedeCancelar() {
         when(reservas.findById(RESERVA_ID)).thenReturn(Optional.of(con(EstadoReserva.EN_REVISION_MANUAL)));
@@ -191,6 +284,13 @@ class CancelacionReservaServiceTest {
 
     private static Reserva confirmada(LocalDate llegada, LocalDate salida) {
         return con(EstadoReserva.CONFIRMADA, llegada, salida);
+    }
+
+    private static Reserva conPolitica(Reserva reserva, String nombre, int dias, int porcentaje) {
+        ReflectionTestUtils.setField(reserva, "politicaNombre", nombre);
+        ReflectionTestUtils.setField(reserva, "politicaDiasSinCosto", dias);
+        ReflectionTestUtils.setField(reserva, "politicaPorcentajeDevolucion", porcentaje);
+        return reserva;
     }
 
     private static Reserva con(EstadoReserva estado) {

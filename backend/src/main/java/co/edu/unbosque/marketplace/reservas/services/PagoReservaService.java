@@ -76,6 +76,14 @@ public class PagoReservaService {
         if (reserva.getEstado() == EstadoReserva.CONFIRMADA || reserva.getEstado() == EstadoReserva.EN_REVISION_MANUAL) {
             throw new ReservaNoPagableException("Esta reserva ya está pagada.");
         }
+        // SOF-79: una solicitud sin aprobar (o rechazada) nunca se cobra; el pago se habilita al aprobarla.
+        if (reserva.getEstado() == EstadoReserva.PENDIENTE_APROBACION) {
+            throw new ReservaNoPagableException(
+                    "Esta solicitud espera la aprobación del anfitrión: todavía no se puede pagar.");
+        }
+        if (reserva.getEstado() == EstadoReserva.RECHAZADA) {
+            throw new ReservaNoPagableException("Esta solicitud fue rechazada por el anfitrión: no se puede pagar.");
+        }
         if (!reserva.ocupaNoches(Instant.now(reloj))) {
             throw new ReservaNoPagableException("Esta reserva ya no se puede pagar: su apartado venció o fue cancelada.");
         }

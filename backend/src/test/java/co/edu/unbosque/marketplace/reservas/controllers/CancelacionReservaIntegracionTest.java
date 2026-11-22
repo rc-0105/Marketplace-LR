@@ -305,6 +305,37 @@ class CancelacionReservaIntegracionTest {
         assertThat(fila(id)).containsEntry("estado", "CONFIRMADA");
     }
 
+    @Test
+    @DisplayName("SOF-79: el huésped cancela su solicitud PENDIENTE_APROBACION sin reembolso y las noches quedan libres")
+    void elHuespedCancelaSuSolicitudPendienteDeAprobacion() throws Exception {
+        jdbc.update("UPDATE publicacion SET modo_reserva = 'APROBACION' WHERE id = ?", publicacionId);
+        String token = iniciarSesion("ana@correo.com");
+        long id = reservar(token);
+        assertThat(fila(id)).containsEntry("estado", "PENDIENTE_APROBACION");
+
+        cancelar(token, id, "Ya no viajo")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("CANCELADA"));
+
+        assertThat(fila(id)).containsEntry("estado", "CANCELADA");
+        assertThat(((Number) filaCancelacion(id).get("valor_devolucion")).doubleValue()).isZero();
+        reservar(iniciarSesion("carla@correo.com"));
+    }
+
+    @Test
+    @DisplayName("SOF-79: una solicitud RECHAZADA no se puede cancelar y el mensaje lo explica")
+    void unaSolicitudRechazadaNoSePuedeCancelar() throws Exception {
+        jdbc.update("UPDATE publicacion SET modo_reserva = 'APROBACION' WHERE id = ?", publicacionId);
+        String token = iniciarSesion("ana@correo.com");
+        long id = reservar(token);
+        jdbc.update("UPDATE reserva SET estado = 'RECHAZADA', motivo_rechazo = 'No disponible' WHERE id = ?", id);
+
+        cancelar(token, id, "Motivo")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail")
+                        .value("Esta solicitud fue rechazada por el anfitrión: no se puede cancelar."));
+    }
+
     private ResultActions cancelar(String token, long id, String motivo) throws Exception {
         return mvc.perform(post("/api/v1/reservas/{id}/cancelacion", id)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
